@@ -1,87 +1,78 @@
 # Focus GTD
 
-A Getting Things Done (GTD) compliant to-do list application built with React, TypeScript, and Vite.
+A complete Getting Things Done (GTD) productivity system for desktop and mobile.
+
+![Focus GTD](apps/mobile/assets/images/icon.png)
 
 ## Features
 
-- **GTD Workflow**: Capture, Clarify, Organize, Reflect, Engage.
-- **Inbox**: Quick capture for all your thoughts and tasks.
-- **Projects**: Organize multi-step tasks into projects with custom colors.
-- **Contexts**: Filter tasks by context (e.g., @home, @work).
-- **Weekly Review**: A guided wizard to help you review your system weekly.
-- **Views**:
-  - **List View**: Standard list for Inbox, Next Actions, etc.
-  - **Board View**: Kanban-style drag-and-drop board.
-  - **Calendar View**: Schedule and view tasks on a calendar.
-- **Local First**: Data is stored locally in `data.json`.
+### GTD Workflow
+- **Capture** - Quick add tasks to Inbox from anywhere
+- **Clarify** - Guided inbox processing with 2-minute rule
+- **Organize** - Projects, contexts, and status lists
+- **Reflect** - Weekly review wizard
+- **Engage** - Context-filtered next actions
 
-## Screenshots
+### Views
+- 📥 **Inbox** - Capture zone with processing wizard
+- ▶️ **Next Actions** - Context-filtered actionable tasks
+- 📁 **Projects** - Multi-step outcomes
+- 🏷️ **Contexts** - @home, @work, @errands, etc.
+- ⏳ **Waiting For** - Delegated items
+- 💭 **Someday/Maybe** - Deferred ideas
+- 📅 **Calendar** - Time-based planning
+- 📋 **Weekly Review** - Guided GTD review
 
-### Inbox & Next Actions
-| Inbox | Next Actions |
-|-------|--------------|
-| ![Inbox](screenshots/inbox.png) | ![Next Actions](screenshots/next_actions.png) |
+### Cross-Platform
+- 🖥️ **Desktop** - Electron app (macOS, Linux)
+- 📱 **Mobile** - React Native/Expo (iOS, Android)
+- 🔄 **Shared Core** - Same data model and business logic
 
-### Organization
-| Kanban Board | Projects |
-|--------------|----------|
-| ![Board](screenshots/board.png) | ![Projects](screenshots/projects.png) |
+## Quick Start
 
-### Planning
-| Calendar | Weekly Review |
-|----------|---------------|
-| ![Calendar](screenshots/calendar.png) | ![Review](screenshots/review.png) |
+```bash
+# Install dependencies
+bun install
+
+# Run desktop app
+bun desktop:dev
+
+# Run mobile app
+bun mobile:start
+```
+
+## Project Structure
+
+```
+Focus-GTD/
+├── apps/
+│   ├── desktop/     # Electron + React + Vite
+│   └── mobile/      # Expo + React Native
+├── packages/
+│   └── core/        # Shared business logic (Zustand store)
+└── package.json     # Monorepo root
+```
 
 ## Tech Stack
 
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- Zustand (State Management)
-- @dnd-kit (Drag and Drop)
-- date-fns
-- Electron (Desktop App)
+| Layer | Desktop | Mobile |
+|-------|---------|--------|
+| Framework | React + Vite | React Native + Expo |
+| Styling | Tailwind CSS | StyleSheet |
+| State | Zustand (shared) | Zustand (shared) |
+| Platform | Electron | iOS/Android |
 
-## Getting Started
+## Data
 
-### Running the Desktop App
+Tasks and projects are stored locally:
+- **Desktop**: `~/.config/focus-gtd/data.json`
+- **Mobile**: AsyncStorage
 
-1.  **Install Dependencies**:
-    ```bash
-    npm install
-    ```
+## Apps
 
-2.  **Launch the Desktop App**:
-    ```bash
-    npm run dev
-    ```
-    This will start the Electron desktop application directly on your macOS or Linux system.
+- [Desktop README](apps/desktop/README.md)
+- [Mobile Setup Guide](apps/mobile/MOBILE_SETUP.md)
 
-3.  **Build for Distribution** (Optional):
-    ```bash
-    npm run build
-    ```
-    This creates a distributable version of the app.
+## License
 
-## Data Persistence
-
-Tasks and projects are saved to `data.json` in your application data directory:
-- **macOS**: `~/Library/Application Support/focus-gtd/data.json`
-- **Linux**: `~/.config/focus-gtd/data.json`
-
-This file can be synced across devices using tools like Syncthing.
-
-## Testing
-
-Run the test suite:
-```bash
-npm test
-```
-
-The project includes:
-- Unit tests for the Zustand store
-- Component tests for UI elements
-- Accessibility tests with vitest-axe
-- Weekly Review workflow tests
-
+MIT

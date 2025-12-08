@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: TypeScript check (core package)
+        run: cd packages/core && bun run tsc --noEmit
+        continue-on-error: true
+
+      - name: Build desktop app
+        run: bun run desktop:build
+        continue-on-error: true
+
+      - name: Run tests (if available)
+        run: |
+          if [ -f "packages/core/package.json" ] && grep -q '"test"' packages/core/package.json; then
+            cd packages/core && bun test
+          else
+            echo "No tests configured yet"
+          fi
+        continue-on-error: true
+
+  mobile-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: TypeScript check (mobile app)
+        run: cd apps/mobile && bunx expo-doctor
+        continue-on-error: true

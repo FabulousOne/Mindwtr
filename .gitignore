@@ -1,7 +1,55 @@
-node_modules
-dist
-build
-.DS_Store
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+dist-electron/
+build/
+.vite/
+*.tsbuildinfo
+
+# Environment files
 .env
-*.log
-coverage
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+
+# Mobile (Expo)
+apps/mobile/.expo/
+apps/mobile/android/
+apps/mobile/ios/
+*.apk
+*.ipa
+
+# Desktop (Electron)
+apps/desktop/dist/
+apps/desktop/dist-electron/
+
+# Lock files (using bun)
+package-lock.json
+yarn.lock
