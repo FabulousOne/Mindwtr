@@ -1,0 +1,111 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # Build desktop app for Linux
+  desktop-linux:
+    runs-on: ubuntu-latest
+    name: Desktop Linux Build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build desktop app
+        run: |
+          cd apps/desktop
+          bun run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: |
+            apps/desktop/dist/*.AppImage
+            apps/desktop/dist/*.tar.gz
+            apps/desktop/dist/*.deb
+
+  # Build Android APK using EAS
+  android:
+    runs-on: ubuntu-latest
+    name: Android APK Build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build Android APK
+        run: |
+          cd apps/mobile
+          eas build --platform android --profile preview --non-interactive --local
+        continue-on-error: true
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: apps/mobile/*.apk
+        continue-on-error: true
+
+  # Create GitHub Release with all artifacts
+  release:
+    needs: [desktop-linux, android]
+    runs-on: ubuntu-latest
+    name: Create Release
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Desktop Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-linux
+          path: ./release-assets
+        continue-on-error: true
+
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: ./release-assets
+        continue-on-error: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./release-assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
