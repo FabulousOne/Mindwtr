@@ -4,6 +4,17 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v0.2.3)'
+        required: true
+        type: string
+      build_apk:
+        description: 'Build Android APK (uses EAS cloud minutes)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -63,10 +74,11 @@ jobs:
           path: release-artifacts/*
           if-no-files-found: error
 
-  # Build Android APK using EAS Cloud
+  # Optional Android build (only when manually triggered with build_apk=true)
   android:
     runs-on: ubuntu-latest
-    name: Android APK Build
+    name: Android Build (EAS)
+    if: ${{ github.event.inputs.build_apk == 'true' }}
     
     steps:
       - name: Checkout code
@@ -77,37 +89,34 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup EAS CLI
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
       - name: Install dependencies
         run: bun install
 
-      - name: Build Android APK (EAS Cloud)
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Build Android APK
         run: |
           cd apps/mobile
-          eas build --platform android --profile preview --non-interactive --wait
+          eas build --platform android --profile preview --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Download APK from EAS
         run: |
           cd apps/mobile
-          BUILD_URL=$(eas build:list --platform android --limit 1 --json --non-interactive | jq -r '.[0].artifacts.buildUrl // empty')
-          if [ -n "$BUILD_URL" ]; then
-            curl -L -o focus-gtd-${{ github.ref_name }}.apk "$BUILD_URL"
-            echo "Downloaded APK from: $BUILD_URL"
-          else
-            echo "No build URL found"
-          fi
+          eas build:list --platform android --status finished --limit 1 --json > build.json
+          BUILD_URL=$(cat build.json | jq -r '.[0].artifacts.buildUrl')
+          curl -L -o android-app.apk "$BUILD_URL"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Upload Android APK
+      - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: apps/mobile/*.apk
-          if-no-files-found: warn
+          path: apps/mobile/android-app.apk
+          if-no-files-found: error
 
   # Create GitHub Release with all artifacts
   release:
@@ -119,6 +128,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download Desktop Linux artifacts
         uses: actions/download-artifact@v4
@@ -126,21 +137,45 @@ jobs:
           name: desktop-linux
           path: ./release-assets
 
-      - name: Download Android APK
+      - name: Download Android artifact
+        if: ${{ needs.android.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: android-apk
           path: ./release-assets
-        continue-on-error: true
 
       - name: List release assets
         run: ls -la ./release-assets/ || echo "No assets found"
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+          
+          echo "## What's Changed in $CURRENT_TAG" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          
+          if [ -n "$PREV_TAG" ]; then
+            # Get commit messages between tags
+            git log --pretty=format:"- %s" $PREV_TAG..HEAD >> CHANGELOG.md
+          else
+            # First release - get all commits
+            git log --pretty=format:"- %s" >> CHANGELOG.md
+          fi
+          
+          echo "" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...$CURRENT_TAG" >> CHANGELOG.md
+          
+          cat CHANGELOG.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: ./release-assets/*
-          generate_release_notes: true
+          body_path: CHANGELOG.md
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
         env:
