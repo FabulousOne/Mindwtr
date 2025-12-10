@@ -12,17 +12,17 @@ Tauri v2 desktop app for the Focus GTD productivity system.
 - **Calendar View** - Time-based task planning
 
 ### Views
-| View | Description |
-|------|-------------|
-| Inbox | Capture and process incoming items |
-| Next Actions | Context-filtered actionable tasks |
-| Projects | Multi-step outcomes with tasks |
-| Contexts | Filter by location/tool |
-| Waiting For | Delegated items |
-| Someday/Maybe | Deferred ideas |
-| Calendar | Time-based view |
-| Review | Weekly review wizard |
-| Settings | Theme, sync, and preferences |
+| View          | Description                        |
+| ------------- | ---------------------------------- |
+| Inbox         | Capture and process incoming items |
+| Next Actions  | Context-filtered actionable tasks  |
+| Projects      | Multi-step outcomes with tasks     |
+| Contexts      | Filter by location/tool            |
+| Waiting For   | Delegated items                    |
+| Someday/Maybe | Deferred ideas                     |
+| Calendar      | Time-based view                    |
+| Review        | Weekly review wizard               |
+| Settings      | Theme, sync, and preferences       |
 
 ## Tech Stack
 
@@ -74,9 +74,9 @@ bun run build
 ## Data Storage
 
 Tasks are saved to:
-- **Linux**: `~/.config/tech.dongdongbh.focus-gtd/data.json`
-- **macOS**: `~/Library/Application Support/tech.dongdongbh.focus-gtd/data.json`
-- **Windows**: `%APPDATA%/tech.dongdongbh.focus-gtd/data.json`
+- **Linux**: `~/.config/focus-gtd/data.json`
+- **macOS**: `~/Library/Application Support/focus-gtd/data.json`
+- **Windows**: `%APPDATA%/focus-gtd/data.json`
 
 ## Sync
 

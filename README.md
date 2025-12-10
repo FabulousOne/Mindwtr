@@ -84,57 +84,22 @@ Download the APK from [GitHub Releases](https://github.com/dongdongbh/Focus-GTD/
 **iOS:**
 Coming soon via TestFlight.
 
-## Quick Start
+## Data Storage
 
-```bash
-# Install dependencies
-bun install
+Tasks and projects are stored locally on your device:
+- **Desktop**: `~/.config/focus-gtd/data.json`
+- **Mobile**: Device storage (AsyncStorage)
 
-# Run desktop app
-bun desktop:dev
+Optional sync via Dropbox, Syncthing, or similar can be configured in Settings.
 
-# Run mobile app
-bun mobile:start
-```
+## Development
 
-## Project Structure
-
-```
-Focus-GTD/
-├── apps/
-│   ├── desktop/     # Tauri v2 + React + Vite
-│   └── mobile/      # Expo + React Native + NativeWind
-├── packages/
-│   └── core/        # Shared business logic (Zustand store)
-└── package.json     # Monorepo root
-```
-
-## Tech Stack
-
-| Layer     | Desktop          | Mobile                |
-| --------- | ---------------- | --------------------- |
-| Framework | React + Vite     | React Native + Expo   |
-| Styling   | Tailwind CSS     | NativeWind (Tailwind) |
-| State     | Zustand (shared) | Zustand (shared)      |
-| Platform  | Tauri v2 (Rust)  | iOS/Android           |
-
-## Data & Sync
-
-Tasks and projects are stored locally:
-- **Desktop**: `~/.config/focus-gtd/data.json` (sync folder: `~/Sync/focus-gtd/`)
-- **Mobile**: AsyncStorage
-
-Optional sync folder (e.g., Dropbox, Syncthing) can be configured in Settings for cross-device sync.
-
-## Apps
-
-- [Desktop README](apps/desktop/README.md)
-- [Mobile Setup Guide](apps/mobile/MOBILE_SETUP.md)
+For developers, see the [Development Guide](docs/development.md).
 
 ## Roadmap
 
 - [ ] 🔔 **Notifications/Reminders** - Mobile push notifications for due tasks
-- [ ] 📱 **Android Widget** - Agenda widget using [react-native-android-widget](https://github.com/nickhudkins/react-native-android-widget)
+- [ ] 📱 **Android Widget** - Agenda widget for home screen
 - [ ] ☁️ **Cloud Sync** - Optional cloud-based sync service
 - [ ] 🌐 **Web App** - Browser-based version
 
