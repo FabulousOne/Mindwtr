@@ -1,23 +1,26 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useTaskStore } from './store';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { useTaskStore, flushPendingSave } from './store';
+import { storage } from './storage';
 import { act } from '@testing-library/react';
 
-// Mock electronAPI
-const mockSaveData = vi.fn();
-const mockGetData = vi.fn().mockResolvedValue({ tasks: [], projects: [], settings: {} });
-
-vi.stubGlobal('window', {
-    electronAPI: {
-        saveData: mockSaveData,
-        getData: mockGetData,
+// Mock the storage module
+vi.mock('./storage', () => ({
+    storage: {
+        getData: vi.fn().mockResolvedValue({ tasks: [], projects: [], settings: {} }),
+        saveData: vi.fn().mockResolvedValue(undefined),
     },
-});
+    setStorageAdapter: vi.fn(),
+}));
 
 describe('TaskStore', () => {
     beforeEach(() => {
         useTaskStore.setState({ tasks: [], projects: [] });
-        mockSaveData.mockClear();
-        mockGetData.mockClear();
+        vi.clearAllMocks();
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('should add a task', () => {
@@ -66,6 +69,28 @@ describe('TaskStore', () => {
 
         const { tasks } = useTaskStore.getState();
         expect(tasks).toHaveLength(0);
+    });
+
+    it('should debounced save and allow immediate flush', async () => {
+        const { addTask } = useTaskStore.getState();
+
+        // 1. Trigger a change
+        act(() => {
+            addTask('Test Save');
+        });
+
+        // Should not have saved yet (debounced)
+        expect(storage.saveData).not.toHaveBeenCalled();
+
+        // 2. Flush pending save
+        await flushPendingSave();
+
+        // Should have saved immediately
+        expect(storage.saveData).toHaveBeenCalledTimes(1);
+
+        // 3. Fast-forward timer - should not save again
+        vi.runAllTimers();
+        expect(storage.saveData).toHaveBeenCalledTimes(1);
     });
 
     it('should add a project', () => {

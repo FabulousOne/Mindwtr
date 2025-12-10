@@ -13,6 +13,7 @@ import { LanguageProvider, useLanguage } from '../contexts/language-context';
 import { setStorageAdapter, useTaskStore, flushPendingSave } from '@focus-gtd/core';
 import { mobileStorage } from '../lib/storage-adapter';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { verifyPolyfills } from '../utils/verify-polyfills';
 
 // Initialize storage for mobile
 let storageInitError: Error | null = null;
@@ -39,7 +40,11 @@ function RootLayoutContent() {
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription?.remove();
+    return () => {
+      subscription?.remove();
+      // Flush on unmount/reload as well
+      flushPendingSave().catch(console.error);
+    };
   }, []);
 
   useEffect(() => {
@@ -56,6 +61,9 @@ function RootLayoutContent() {
     // Load data from storage
     const loadData = async () => {
       try {
+        // Verify critical polyfills
+        verifyPolyfills();
+
         const store = useTaskStore.getState();
         await store.fetchData();
       } catch (e) {
