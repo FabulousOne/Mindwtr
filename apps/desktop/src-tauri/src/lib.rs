@@ -4,6 +4,9 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 
+/// App name used for config directories and files
+const APP_NAME: &str = "mindwtr";
+
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct AppConfig {
     data_file_path: Option<String>,
@@ -11,12 +14,12 @@ struct AppConfig {
 }
 
 fn get_config_path(app: &tauri::AppHandle) -> PathBuf {
-    // Use ~/.config/focus-gtd/config.json for config
+    // Use ~/.config/{APP_NAME}/config.json for config
     app.path()
         .home_dir()
         .unwrap()
         .join(".config")
-        .join("focus-gtd")
+        .join(APP_NAME)
         .join("config.json")
 }
 
@@ -29,12 +32,12 @@ fn get_data_path(app: &tauri::AppHandle) -> PathBuf {
             }
         }
     }
-    // Default data path: ~/.config/focus-gtd/data.json
+    // Default data path: ~/.config/{APP_NAME}/data.json
     app.path()
         .home_dir()
         .unwrap()
         .join(".config")
-        .join("focus-gtd")
+        .join(APP_NAME)
         .join("data.json")
 }
 
@@ -85,12 +88,12 @@ fn get_sync_path(app: tauri::AppHandle) -> String {
             }
         }
     }
-    // Default sync path: ~/Sync/focus-gtd
+    // Default sync path: ~/Sync/{APP_NAME}
     app.path()
         .home_dir()
         .unwrap()
         .join("Sync")
-        .join("focus-gtd")
+        .join(APP_NAME)
         .to_string_lossy()
         .to_string()
 }
@@ -125,7 +128,7 @@ fn set_sync_path(app: tauri::AppHandle, sync_path: String) -> Result<serde_json:
 #[tauri::command]
 fn read_sync_file(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
     let sync_path_str = get_sync_path(app);
-    let sync_file = PathBuf::from(&sync_path_str).join("focus-gtd-sync.json");
+    let sync_file = PathBuf::from(&sync_path_str).join(format!("{}-sync.json", APP_NAME));
     
     if !sync_file.exists() {
         // Return empty app data structure if file doesn't exist
@@ -143,7 +146,7 @@ fn read_sync_file(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
 #[tauri::command]
 fn write_sync_file(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
     let sync_path_str = get_sync_path(app);
-    let sync_file = PathBuf::from(&sync_path_str).join("focus-gtd-sync.json");
+    let sync_file = PathBuf::from(&sync_path_str).join(format!("{}-sync.json", APP_NAME));
 
     if let Some(parent) = sync_file.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
