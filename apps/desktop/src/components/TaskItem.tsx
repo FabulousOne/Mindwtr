@@ -1,7 +1,7 @@
 import { useState, memo } from 'react';
 
 import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Plus, Clock, Timer } from 'lucide-react';
-import { useTaskStore, Task, TaskStatus, TimeEstimate, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, getStatusColor, Project, safeFormatDate, safeParseDate, getChecklistProgress, DeferPreset, getUnblocksCount } from '@mindwtr/core';
+import { useTaskStore, Task, TaskStatus, TimeEstimate, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, getStatusColor, Project, safeFormatDate, safeParseDate, getChecklistProgress, getUnblocksCount } from '@mindwtr/core';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/language-context';
 
@@ -32,11 +32,10 @@ export const TaskItem = memo(function TaskItem({
     isMultiSelected = false,
     onToggleSelect,
 }: TaskItemProps) {
-    const { updateTask, deleteTask, moveTask, deferTask, projects, tasks } = useTaskStore();
+    const { updateTask, deleteTask, moveTask, projects, tasks } = useTaskStore();
     const { t, language } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
     const [isChecklistOpen, setIsChecklistOpen] = useState(false);
-    const [isDeferOpen, setIsDeferOpen] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
     const [editDueDate, setEditDueDate] = useState(toDateTimeLocalValue(task.dueDate));
     const [editStartTime, setEditStartTime] = useState(toDateTimeLocalValue(task.startTime));
@@ -92,27 +91,6 @@ export const TaskItem = memo(function TaskItem({
 
     const project = propProject || projects.find(p => p.id === task.projectId);
 
-    const deferPresets: { preset: DeferPreset; labelKey: string }[] = [
-        { preset: 'tomorrow', labelKey: 'defer.tomorrow' },
-        { preset: 'nextWeek', labelKey: 'defer.nextWeek' },
-        { preset: 'weekend', labelKey: 'defer.weekend' },
-        { preset: 'nextMonth', labelKey: 'defer.nextMonth' },
-        { preset: 'pickDate', labelKey: 'defer.pickDate' },
-    ];
-
-    const handleDefer = async (preset: DeferPreset) => {
-        setIsDeferOpen(false);
-        if (preset === 'pickDate') {
-            const input = window.prompt(t('defer.pickDate'));
-            if (!input) return;
-            const parsed = safeParseDate(input);
-            if (!parsed) return;
-            await updateTask(task.id, { dueDate: parsed.toISOString() });
-            return;
-        }
-        await deferTask(task.id, preset);
-    };
-
     return (
         <div
             data-task-id={task.id}
@@ -126,9 +104,15 @@ export const TaskItem = memo(function TaskItem({
             <div className="flex items-start gap-3">
                 <input
                     type="checkbox"
-                    aria-label="Mark task as done"
-                    checked={task.status === 'done'}
-                    onChange={() => moveTask(task.id, task.status === 'done' ? 'inbox' : 'done')}
+                    aria-label={selectionMode ? 'Select task' : 'Mark task as done'}
+                    checked={selectionMode ? isMultiSelected : task.status === 'done'}
+                    onChange={() => {
+                        if (selectionMode) {
+                            onToggleSelect?.();
+                        } else {
+                            moveTask(task.id, task.status === 'done' ? 'inbox' : 'done');
+                        }
+                    }}
                     className="mt-1.5 h-4 w-4 rounded border-primary text-primary focus:ring-primary cursor-pointer"
                 />
 
@@ -654,38 +638,6 @@ export const TaskItem = memo(function TaskItem({
                         className="relative flex items-center gap-2"
                         onPointerDown={(e) => e.stopPropagation()}
                     >
-                        {selectionMode && (
-                            <input
-                                type="checkbox"
-                                aria-label="Select task"
-                                checked={isMultiSelected}
-                                onChange={() => onToggleSelect?.()}
-                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
-                            />
-                        )}
-                        <button
-                            onClick={() => setIsDeferOpen((v) => !v)}
-                            aria-label={t('defer.title')}
-                            title={t('defer.title')}
-                            className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted/50"
-                        >
-                            <Clock className="w-4 h-4" />
-                        </button>
-
-                        {isDeferOpen && (
-                            <div className="absolute right-0 top-full mt-1 z-10 bg-popover border border-border rounded-md shadow-md p-1 space-y-1 min-w-[140px]">
-                                {deferPresets.map(({ preset, labelKey }) => (
-                                    <button
-                                        key={preset}
-                                        onClick={() => handleDefer(preset)}
-                                        className="w-full text-left text-xs px-2 py-1 rounded hover:bg-muted/70 transition-colors"
-                                    >
-                                        {t(labelKey)}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
                         <select
                             value={task.status}
                             aria-label="Task status"

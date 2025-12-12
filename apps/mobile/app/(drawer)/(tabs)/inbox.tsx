@@ -429,7 +429,7 @@ export default function InboxScreen() {
         </View>
       )}
 
-      <TaskList statusFilter="inbox" title={t('inbox.title')} />
+      <TaskList statusFilter="inbox" title={t('inbox.title')} enableBulkActions={false} />
       {renderProcessingView()}
     </View>
   );

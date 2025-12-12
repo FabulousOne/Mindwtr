@@ -3,7 +3,6 @@ import { generateUUID as uuidv4 } from './uuid';
 import { Task, TaskStatus, AppData, Project } from './types';
 import { StorageAdapter, noopStorage } from './storage';
 import { createNextRecurringTask } from './recurrence';
-import { getDeferredTaskUpdates, DeferPreset } from './defer-utils';
 
 let storage: StorageAdapter = noopStorage;
 
@@ -72,8 +71,6 @@ interface TaskStore {
     deleteTask: (id: string) => Promise<void>;
     /** Move task to a different status */
     moveTask: (id: string, newStatus: TaskStatus) => Promise<void>;
-    /** Defer task dates using a preset */
-    deferTask: (id: string, preset: DeferPreset) => Promise<void>;
     /** Batch update multiple tasks */
     batchUpdateTasks: (updates: Array<{ id: string; updates: Partial<Task> }>) => Promise<void>;
     /** Batch move tasks to a status */
@@ -280,17 +277,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     moveTask: async (id: string, newStatus: TaskStatus) => {
         // Delegate to updateTask to ensure recurrence/metadata logic is applied
         await get().updateTask(id, { status: newStatus });
-    },
-
-    /**
-     * Defer a task's scheduled dates using a preset.
-     * Updates any existing start/due/review dates, or creates a due date if none exist.
-     */
-    deferTask: async (id: string, preset: DeferPreset) => {
-        const task = get()._allTasks.find((t) => t.id === id);
-        if (!task) return;
-        const updates = getDeferredTaskUpdates(task, preset, new Date());
-        await get().updateTask(id, updates);
     },
 
     /**

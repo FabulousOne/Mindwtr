@@ -13,6 +13,5 @@ export * from './date';
 export * from './quick-add';
 export * from './schedule-utils';
 export * from './search';
-export * from './defer-utils';
 export * from './dependency-utils';
 export * from './hierarchy-utils';

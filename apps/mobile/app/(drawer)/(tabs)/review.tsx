@@ -1,7 +1,7 @@
-import { View, Text, ScrollView, Pressable, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTaskStore, sortTasksBy, type Task, type TaskStatus, type TaskSortBy } from '@mindwtr/core';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTheme } from '../../../contexts/theme-context';
 import { useLanguage } from '../../../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -41,19 +41,81 @@ const getStatusLabels = (lang: 'en' | 'zh'): Record<TaskStatus, string> => {
 
 export default function ReviewScreen() {
   const router = useRouter();
-  const { tasks, updateTask, deleteTask, settings } = useTaskStore();
+  const { tasks, updateTask, deleteTask, batchMoveTasks, batchDeleteTasks, batchUpdateTasks, settings } = useTaskStore();
   const { isDark } = useTheme();
   const { language, t } = useLanguage();
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
+  const [tagModalVisible, setTagModalVisible] = useState(false);
+  const [tagInput, setTagInput] = useState('');
 
   const STATUS_LABELS = getStatusLabels(language as 'en' | 'zh');
 
   // Theme-aware colors
   // Theme-aware colors
   const tc = useThemeColors();
+
+  const tasksById = useMemo(() => {
+    return tasks.reduce((acc, task) => {
+      acc[task.id] = task;
+      return acc;
+    }, {} as Record<string, Task>);
+  }, [tasks]);
+
+  const selectedIdsArray = useMemo(() => Array.from(multiSelectedIds), [multiSelectedIds]);
+  const hasSelection = selectedIdsArray.length > 0;
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setMultiSelectedIds(new Set());
+  }, []);
+
+  useEffect(() => {
+    if (selectionMode) exitSelectionMode();
+  }, [filterStatus, selectionMode, exitSelectionMode]);
+
+  const toggleMultiSelect = useCallback((taskId: string) => {
+    if (!selectionMode) setSelectionMode(true);
+    setMultiSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }, [selectionMode]);
+
+  const handleBatchMove = useCallback(async (newStatus: TaskStatus) => {
+    if (!hasSelection) return;
+    await batchMoveTasks(selectedIdsArray, newStatus);
+    exitSelectionMode();
+  }, [batchMoveTasks, selectedIdsArray, hasSelection, exitSelectionMode]);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (!hasSelection) return;
+    await batchDeleteTasks(selectedIdsArray);
+    exitSelectionMode();
+  }, [batchDeleteTasks, selectedIdsArray, hasSelection, exitSelectionMode]);
+
+  const handleBatchAddTag = useCallback(async () => {
+    const input = tagInput.trim();
+    if (!hasSelection || !input) return;
+    const tag = input.startsWith('#') ? input : `#${input}`;
+    await batchUpdateTasks(selectedIdsArray.map((id) => {
+      const task = tasksById[id];
+      const existingTags = task?.tags || [];
+      const nextTags = Array.from(new Set([...existingTags, tag]));
+      return { id, updates: { tags: nextTags } };
+    }));
+    setTagInput('');
+    setTagModalVisible(false);
+    exitSelectionMode();
+  }, [batchUpdateTasks, selectedIdsArray, tasksById, tagInput, hasSelection, exitSelectionMode]);
+
+  const bulkStatuses: TaskStatus[] = ['inbox', 'todo', 'next', 'in-progress', 'waiting', 'someday', 'done', 'archived'];
 
   // Filter out archived and deleted tasks first, then apply status filter
   const activeTasks = tasks.filter((t) => t.status !== 'archived' && !t.deletedAt);
@@ -64,19 +126,32 @@ export default function ReviewScreen() {
   const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
   const sortedTasks = sortTasksBy(filteredTasks, sortBy);
 
-  return (
+	  return (
     <View style={[styles.container, { backgroundColor: tc.bg }]}>
       <View style={[styles.header, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
         <View>
           <Text style={[styles.title, { color: tc.text }]}>📋 {language === 'zh' ? '回顾任务' : 'Review'}</Text>
           <Text style={[styles.count, { color: tc.secondaryText }]}>{filteredTasks.length} {language === 'zh' ? '个任务' : 'tasks'}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.weeklyReviewButton}
-          onPress={() => setShowReviewModal(true)}
-        >
-          <Text style={styles.weeklyReviewButtonText}>🔄 {language === 'zh' ? '周回顾' : 'Weekly Review'}</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={[
+              styles.selectButton,
+              { borderColor: tc.border, backgroundColor: selectionMode ? tc.filterBg : 'transparent' }
+            ]}
+            onPress={() => (selectionMode ? exitSelectionMode() : setSelectionMode(true))}
+          >
+            <Text style={[styles.selectButtonText, { color: tc.text }]}>
+              {selectionMode ? t('bulk.exitSelect') : t('bulk.select')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.weeklyReviewButton}
+            onPress={() => setShowReviewModal(true)}
+          >
+            <Text style={styles.weeklyReviewButtonText}>🔄 {language === 'zh' ? '周回顾' : 'Weekly Review'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView horizontal style={[styles.filterBar, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]} showsHorizontalScrollIndicator={false}>
@@ -101,6 +176,42 @@ export default function ReviewScreen() {
         ))}
       </ScrollView>
 
+      {selectionMode && (
+        <View style={[styles.bulkBar, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
+          <Text style={[styles.bulkCount, { color: tc.secondaryText }]}>
+            {selectedIdsArray.length} {t('bulk.selected')}
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bulkMoveRow}>
+            {bulkStatuses.map((status) => (
+              <TouchableOpacity
+                key={status}
+                onPress={() => handleBatchMove(status)}
+                disabled={!hasSelection}
+                style={[styles.bulkMoveButton, { backgroundColor: tc.filterBg, opacity: hasSelection ? 1 : 0.5 }]}
+              >
+                <Text style={[styles.bulkMoveText, { color: tc.text }]}>{t(`status.${status}`)}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.bulkActions}>
+            <TouchableOpacity
+              onPress={() => setTagModalVisible(true)}
+              disabled={!hasSelection}
+              style={[styles.bulkActionButton, { backgroundColor: tc.filterBg, opacity: hasSelection ? 1 : 0.5 }]}
+            >
+              <Text style={[styles.bulkActionText, { color: tc.text }]}>{t('bulk.addTag')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleBatchDelete}
+              disabled={!hasSelection}
+              style={[styles.bulkActionButton, { backgroundColor: tc.filterBg, opacity: hasSelection ? 1 : 0.5 }]}
+            >
+              <Text style={[styles.bulkActionText, { color: tc.text }]}>{t('bulk.delete')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <ScrollView style={styles.taskList}>
         {sortedTasks.map((task) => (
           <SwipeableTaskItem
@@ -112,6 +223,9 @@ export default function ReviewScreen() {
               setEditingTask(task);
               setIsModalVisible(true);
             }}
+            selectionMode={selectionMode}
+            isMultiSelected={multiSelectedIds.has(task.id)}
+            onToggleSelect={() => toggleMultiSelect(task.id)}
             onStatusChange={(status) => updateTask(task.id, { status: status as TaskStatus })}
             onDelete={() => deleteTask(task.id)}
           />
@@ -122,6 +236,47 @@ export default function ReviewScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={tagModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTagModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setTagModalVisible(false)}>
+          <Pressable
+            style={[styles.modalCard, { backgroundColor: tc.cardBg }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={[styles.modalTitle, { color: tc.text }]}>{t('bulk.addTag')}</Text>
+            <TextInput
+              value={tagInput}
+              onChangeText={setTagInput}
+              placeholder="#tag"
+              placeholderTextColor={tc.secondaryText}
+              style={[styles.modalInput, { backgroundColor: tc.filterBg, color: tc.text, borderColor: tc.border }]}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                onPress={() => {
+                  setTagModalVisible(false);
+                  setTagInput('');
+                }}
+                style={styles.modalButton}
+              >
+                <Text style={[styles.modalButtonText, { color: tc.secondaryText }]}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleBatchAddTag}
+                disabled={!tagInput.trim()}
+                style={[styles.modalButton, !tagInput.trim() && styles.modalButtonDisabled]}
+              >
+                <Text style={[styles.modalButtonText, { color: tc.tint }]}>{t('common.save')}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <TaskEditModal
         visible={isModalVisible}
@@ -203,6 +358,99 @@ const styles = StyleSheet.create({
   },
   weeklyReviewButtonText: {
     color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectButton: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  selectButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bulkBar: {
+    borderBottomWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  bulkCount: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  bulkMoveRow: {
+    gap: 6,
+    paddingVertical: 2,
+  },
+  bulkMoveButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  bulkMoveText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  bulkActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  bulkActionButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  bulkActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  modalButtonDisabled: {
+    opacity: 0.5,
+  },
+  modalButtonText: {
     fontSize: 14,
     fontWeight: '600',
   },

@@ -78,17 +78,7 @@ This document captures the phased product roadmap and how work splits between `@
 - **Mobile**
   - Same operators in search and a Saved Searches list in drawer.
 
-### 2) Quick Defer / Postpone
-**Goal:** Reduce friction when rescheduling tasks.
-
-- **Core**
-  - Helper like `deferTask(id, preset)` that updates `startTime/dueDate/reviewAt` safely.
-- **Desktop/Mobile**
-  - Quick actions menu (right‑click / long‑press / swipe) with presets:
-    - Tomorrow, Next Week, Weekend, Next Month, Pick Date…
-  - One‑tap postpone without opening full editor.
-
-### 3) Subtask Progress Indicators
+### 2) Subtask Progress Indicators
 **Goal:** Make checklists actionable and visible at a glance.
 
 - **Core**
@@ -97,7 +87,7 @@ This document captures the phased product roadmap and how work splits between `@
   - Show `3/5` + small progress bar on task cards when checklist exists.
   - Inline expand/collapse checklist in list views.
 
-### 4) Collapsible Sidebar (Desktop)
+### 3) Collapsible Sidebar (Desktop)
 **Goal:** Improve focus and screen real estate for heavy users.
 
 - **Desktop**

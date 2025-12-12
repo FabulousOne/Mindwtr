@@ -1,6 +1,6 @@
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { useTaskStore, Task, getChecklistProgress, DeferPreset, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, getStatusColor, safeFormatDate, TaskStatus } from '@mindwtr/core';
+import { useTaskStore, Task, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, getStatusColor, safeFormatDate, TaskStatus } from '@mindwtr/core';
 import { useLanguage } from '../contexts/language-context';
 import { useRef, useState } from 'react';
 import { ThemeColors } from '../hooks/use-theme-colors';
@@ -45,7 +45,7 @@ export function SwipeableTaskItem({
 }: SwipeableTaskItemProps) {
     const swipeableRef = useRef<Swipeable>(null);
     const { t, language } = useLanguage();
-    const { updateTask, deferTask } = useTaskStore();
+    const { updateTask } = useTaskStore();
 
     // Status-aware left swipe action
     const getLeftAction = (): { label: string; color: string; action: TaskStatus } => {
@@ -66,27 +66,9 @@ export function SwipeableTaskItem({
 
     const leftAction = getLeftAction();
     const [showStatusMenu, setShowStatusMenu] = useState(false);
-    const [showDeferMenu, setShowDeferMenu] = useState(false);
     const [showChecklist, setShowChecklist] = useState(false);
 
     const checklistProgress = getChecklistProgress(task);
-
-    const deferPresets: { preset: DeferPreset; labelKey: string }[] = [
-        { preset: 'tomorrow', labelKey: 'defer.tomorrow' },
-        { preset: 'nextWeek', labelKey: 'defer.nextWeek' },
-        { preset: 'weekend', labelKey: 'defer.weekend' },
-        { preset: 'nextMonth', labelKey: 'defer.nextMonth' },
-        { preset: 'pickDate', labelKey: 'defer.pickDate' },
-    ];
-
-    const handleDefer = async (preset: DeferPreset) => {
-        setShowDeferMenu(false);
-        if (preset === 'pickDate') {
-            onPress();
-            return;
-        }
-        await deferTask(task.id, preset);
-    };
 
     const renderLeftActions = () => (
         <Pressable
@@ -135,11 +117,7 @@ export function SwipeableTaskItem({
     };
 
     const handleLongPress = () => {
-        if (selectionMode && onToggleSelect) {
-            onToggleSelect();
-            return;
-        }
-        setShowDeferMenu(true);
+        if (onToggleSelect) onToggleSelect();
     };
 
     return (
@@ -336,31 +314,6 @@ export function SwipeableTaskItem({
                     </View>
                 </Pressable>
             </Modal>
-
-            <Modal
-                visible={showDeferMenu}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowDeferMenu(false)}
-            >
-                <Pressable style={styles.modalOverlay} onPress={() => setShowDeferMenu(false)}>
-                    <View style={[styles.menuContainer, { backgroundColor: tc.cardBg }]}>
-                        <Text style={[styles.menuTitle, { color: tc.text }]}>{t('defer.title')}</Text>
-                        <View style={styles.deferList}>
-                            {deferPresets.map(({ preset, labelKey }) => (
-                                <Pressable
-                                    key={preset}
-                                    style={[styles.deferItem, { borderColor: tc.border }]}
-                                    onPress={() => handleDefer(preset)}
-                                    accessibilityRole="button"
-                                >
-                                    <Text style={[styles.deferText, { color: tc.text }]}>{t(labelKey)}</Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    </View>
-                </Pressable>
-            </Modal>
         </>
     );
 }
@@ -551,20 +504,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
         textTransform: 'capitalize',
-    },
-    deferList: {
-        gap: 8,
-    },
-    deferItem: {
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        borderRadius: 10,
-        borderWidth: 1,
-    },
-    deferText: {
-        fontSize: 14,
-        fontWeight: '500',
-        textAlign: 'center',
     },
     // Task Age Indicator styles
     ageBadge: {

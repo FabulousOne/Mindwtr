@@ -27,14 +27,6 @@ export const translations: Record<Language, Record<string, string>> = {
         'quickAdd.help': 'Quick add supports /due:<when>, /note:<text>, /next|/todo, @context, #tag, +Project.',
         'quickAdd.example': 'Example: Call mom /due:tomorrow 5pm @phone #family',
 
-        // Defer / Postpone
-        'defer.title': 'Defer',
-        'defer.tomorrow': 'Tomorrow',
-        'defer.nextWeek': 'Next Week',
-        'defer.weekend': 'This Weekend',
-        'defer.nextMonth': 'Next Month',
-        'defer.pickDate': 'Pick Date…',
-
         // Checklist
         'checklist.progress': 'Checklist progress',
 
@@ -519,14 +511,6 @@ export const translations: Record<Language, Record<string, string>> = {
         // Quick Add
         'quickAdd.help': '快速添加支持 /due:<时间>、/note:<备注>、/next|/todo、@情境、#标签、+项目。',
         'quickAdd.example': '示例：给妈妈打电话 /due:tomorrow 5pm @phone #family',
-
-        // Defer / Postpone
-        'defer.title': '延后',
-        'defer.tomorrow': '明天',
-        'defer.nextWeek': '下周',
-        'defer.weekend': '本周末',
-        'defer.nextMonth': '下个月',
-        'defer.pickDate': '选择日期…',
 
         // Checklist
         'checklist.progress': '清单进度',

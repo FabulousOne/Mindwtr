@@ -17,10 +17,11 @@ export interface TaskListProps {
   title: string;
   allowAdd?: boolean;
   projectId?: string;
+  enableBulkActions?: boolean;
 }
 
 // ... inside TaskList component
-export function TaskList({ statusFilter, title, allowAdd = true, projectId }: TaskListProps) {
+export function TaskList({ statusFilter, title, allowAdd = true, projectId, enableBulkActions = true }: TaskListProps) {
   const { isDark } = useTheme();
   const { t } = useLanguage();
   const { tasks, projects, addTask, updateTask, deleteTask, fetchData, batchMoveTasks, batchDeleteTasks, batchUpdateTasks, settings, updateSettings } = useTaskStore();
@@ -104,13 +105,14 @@ export function TaskList({ statusFilter, title, allowAdd = true, projectId }: Ta
   }, []);
 
   const toggleMultiSelect = useCallback((taskId: string) => {
+    if (!selectionMode) setSelectionMode(true);
     setMultiSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(taskId)) next.delete(taskId);
       else next.add(taskId);
       return next;
     });
-  }, []);
+  }, [selectionMode]);
 
   const handleBatchMove = useCallback(async (newStatus: TaskStatus) => {
     if (!hasSelection) return;
@@ -147,9 +149,9 @@ export function TaskList({ statusFilter, title, allowAdd = true, projectId }: Ta
       isDark={isDark}
       tc={themeColors}
       onPress={() => handleEditTask(item)}
-      selectionMode={selectionMode}
-      isMultiSelected={multiSelectedIds.has(item.id)}
-      onToggleSelect={() => toggleMultiSelect(item.id)}
+      selectionMode={enableBulkActions ? selectionMode : false}
+      isMultiSelected={enableBulkActions && multiSelectedIds.has(item.id)}
+      onToggleSelect={enableBulkActions ? () => toggleMultiSelect(item.id) : undefined}
       onStatusChange={(status) => updateTask(item.id, { status: status as TaskStatus })}
       onDelete={() => deleteTask(item.id)}
     />
@@ -173,23 +175,25 @@ export function TaskList({ statusFilter, title, allowAdd = true, projectId }: Ta
               {t(`sort.${sortBy}`)}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => (selectionMode ? exitSelectionMode() : setSelectionMode(true))}
-            style={[
-              styles.selectButton,
-              { borderColor: themeColors.border, backgroundColor: selectionMode ? themeColors.filterBg : 'transparent' }
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={selectionMode ? t('bulk.exitSelect') : t('bulk.select')}
-          >
-            <Text style={[styles.selectButtonText, { color: themeColors.text }]}>
-              {selectionMode ? t('bulk.exitSelect') : t('bulk.select')}
-            </Text>
-          </TouchableOpacity>
+          {enableBulkActions && (
+            <TouchableOpacity
+              onPress={() => (selectionMode ? exitSelectionMode() : setSelectionMode(true))}
+              style={[
+                styles.selectButton,
+                { borderColor: themeColors.border, backgroundColor: selectionMode ? themeColors.filterBg : 'transparent' }
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={selectionMode ? t('bulk.exitSelect') : t('bulk.select')}
+            >
+              <Text style={[styles.selectButtonText, { color: themeColors.text }]}>
+                {selectionMode ? t('bulk.exitSelect') : t('bulk.select')}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {selectionMode && (
+      {enableBulkActions && selectionMode && (
         <View style={[styles.bulkBar, { backgroundColor: themeColors.cardBg, borderBottomColor: themeColors.border }]}>
           <Text style={[styles.bulkCount, { color: themeColors.secondaryText }]}>
             {selectedIdsArray.length} {t('bulk.selected')}
