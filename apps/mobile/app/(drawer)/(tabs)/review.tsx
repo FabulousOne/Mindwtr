@@ -75,8 +75,8 @@ export default function ReviewScreen() {
   }, []);
 
   useEffect(() => {
-    if (selectionMode) exitSelectionMode();
-  }, [filterStatus, selectionMode, exitSelectionMode]);
+    exitSelectionMode();
+  }, [filterStatus, exitSelectionMode]);
 
   const toggleMultiSelect = useCallback((taskId: string) => {
     if (!selectionMode) setSelectionMode(true);

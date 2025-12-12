@@ -1,14 +1,15 @@
-import { useState } from 'react';
-import { useTaskStore, isDueForReview } from '@mindwtr/core';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { isDueForReview, sortTasksBy, useTaskStore, type Project, type Task, type TaskStatus, type TaskSortBy } from '@mindwtr/core';
+import { Archive, ArrowRight, Calendar, Check, CheckSquare, Layers, RefreshCw, X, type LucideIcon } from 'lucide-react';
+
 import { TaskItem } from '../TaskItem';
-import { CheckSquare, Calendar, Layers, Archive, ArrowRight, Check, RefreshCw, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../contexts/language-context';
 
-
 type ReviewStep = 'intro' | 'inbox' | 'calendar' | 'waiting' | 'projects' | 'someday' | 'completed';
 
-export function ReviewView() {
+function WeeklyReviewGuideModal({ onClose }: { onClose: () => void }) {
     const [currentStep, setCurrentStep] = useState<ReviewStep>('intro');
     const { tasks, projects } = useTaskStore();
     const { t } = useLanguage();
@@ -59,7 +60,7 @@ export function ReviewView() {
                     </div>
                 );
 
-            case 'inbox':
+            case 'inbox': {
                 const inboxTasks = tasks.filter(t => t.status === 'inbox');
                 return (
                     <div className="space-y-4">
@@ -81,9 +82,9 @@ export function ReviewView() {
                         </div>
                     </div>
                 );
+            }
 
             case 'calendar':
-                // Mock calendar review - in a real app this might show actual calendar events
                 return (
                     <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-6">
@@ -103,7 +104,7 @@ export function ReviewView() {
                     </div>
                 );
 
-            case 'waiting':
+            case 'waiting': {
                 const waitingTasks = tasks.filter(t => t.status === 'waiting');
                 const waitingDue = waitingTasks.filter(t => isDueForReview(t.reviewAt));
                 const waitingFuture = waitingTasks.filter(t => !isDueForReview(t.reviewAt));
@@ -125,7 +126,7 @@ export function ReviewView() {
                                     {waitingFuture.length > 0 && (
                                         <div className="pt-4">
                                             <h4 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                                                Not due yet
+                                                {t('review.notDueYet')}
                                             </h4>
                                             {waitingFuture.map(task => (
                                                 <TaskItem key={task.id} task={task} />
@@ -137,8 +138,9 @@ export function ReviewView() {
                         </div>
                     </div>
                 );
+            }
 
-            case 'projects':
+            case 'projects': {
                 const activeProjects = projects.filter(p => p.status === 'active');
                 const dueProjects = activeProjects.filter(p => isDueForReview(p.reviewAt));
                 const futureProjects = activeProjects.filter(p => !isDueForReview(p.reviewAt));
@@ -182,8 +184,9 @@ export function ReviewView() {
                         </div>
                     </div>
                 );
+            }
 
-            case 'someday':
+            case 'someday': {
                 const somedayTasks = tasks.filter(t => t.status === 'someday');
                 const somedayDue = somedayTasks.filter(t => isDueForReview(t.reviewAt));
                 const somedayFuture = somedayTasks.filter(t => !isDueForReview(t.reviewAt));
@@ -205,7 +208,7 @@ export function ReviewView() {
                                     {somedayFuture.length > 0 && (
                                         <div className="pt-4">
                                             <h4 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                                                Not due yet
+                                                {t('review.notDueYet')}
                                             </h4>
                                             {somedayFuture.map(task => (
                                                 <TaskItem key={task.id} task={task} />
@@ -217,6 +220,7 @@ export function ReviewView() {
                         </div>
                     </div>
                 );
+            }
 
             case 'completed':
                 return (
@@ -240,50 +244,278 @@ export function ReviewView() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto h-full flex flex-col">
-            {/* Header / Progress */}
-            <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        {(() => {
-                            const Icon = steps[currentStepIndex].icon;
-                            return Icon && <Icon className="w-6 h-6" />;
-                        })()}
-                        {steps[currentStepIndex].title}
-                    </h1>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+            <div
+                className="bg-card border border-border rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[85vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="p-6 border-b border-border flex items-center justify-between">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                        <RefreshCw className="w-5 h-5 text-primary" />
+                        {t('review.title')}
+                    </h3>
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={t('common.close')}
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <div className="p-6 flex flex-col flex-1 min-h-0">
+                    <div className="mb-6">
+                        <div className="flex items-center justify-between mb-3">
+                            <h1 className="text-2xl font-bold flex items-center gap-2">
+                                {(() => {
+                                    const Icon = steps[currentStepIndex].icon;
+                                    return Icon && <Icon className="w-6 h-6" />;
+                                })()}
+                                {steps[currentStepIndex].title}
+                            </h1>
+                            <span className="text-sm text-muted-foreground">
+                                {t('review.step')} {currentStepIndex + 1} {t('review.of')} {steps.length}
+                            </span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-primary transition-all duration-500 ease-in-out"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto pr-2">
+                        {renderStepContent()}
+                    </div>
+
+                    {currentStep !== 'intro' && currentStep !== 'completed' && (
+                        <div className="flex justify-between pt-4 border-t border-border mt-6">
+                            <button
+                                onClick={prevStep}
+                                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                {t('review.back')}
+                            </button>
+                            <button
+                                onClick={nextStep}
+                                className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                            >
+                                {t('review.nextStepBtn')}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export function ReviewView() {
+    const { tasks, projects, settings, batchMoveTasks, batchDeleteTasks, batchUpdateTasks } = useTaskStore();
+    const { t } = useLanguage();
+    const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all');
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
+    const [showGuide, setShowGuide] = useState(false);
+
+    const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
+
+    const projectMap = useMemo(() => {
+        return projects.reduce((acc, project) => {
+            acc[project.id] = project;
+            return acc;
+        }, {} as Record<string, Project>);
+    }, [projects]);
+
+    const tasksById = useMemo(() => {
+        return tasks.reduce((acc, task) => {
+            acc[task.id] = task;
+            return acc;
+        }, {} as Record<string, Task>);
+    }, [tasks]);
+
+    const activeTasks = useMemo(() => {
+        return tasks.filter((t) => !t.deletedAt && t.status !== 'archived');
+    }, [tasks]);
+
+    const statusOptions: TaskStatus[] = ['inbox', 'todo', 'next', 'in-progress', 'waiting', 'someday', 'done'];
+
+    const statusCounts = useMemo(() => {
+        const counts: Record<string, number> = { all: activeTasks.length };
+        for (const status of statusOptions) {
+            counts[status] = activeTasks.filter((t) => t.status === status).length;
+        }
+        return counts;
+    }, [activeTasks]);
+
+    const filteredTasks = useMemo(() => {
+        const list = filterStatus === 'all' ? activeTasks : activeTasks.filter((t) => t.status === filterStatus);
+        return sortTasksBy(list, sortBy);
+    }, [activeTasks, filterStatus, sortBy]);
+
+    const selectedIdsArray = useMemo(() => Array.from(multiSelectedIds), [multiSelectedIds]);
+
+    const exitSelectionMode = useCallback(() => {
+        setSelectionMode(false);
+        setMultiSelectedIds(new Set());
+    }, []);
+
+    useEffect(() => {
+        exitSelectionMode();
+    }, [filterStatus, exitSelectionMode]);
+
+    const toggleMultiSelect = useCallback((taskId: string) => {
+        if (!selectionMode) setSelectionMode(true);
+        setMultiSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(taskId)) next.delete(taskId);
+            else next.add(taskId);
+            return next;
+        });
+    }, [selectionMode]);
+
+    const handleBatchMove = useCallback(async (newStatus: TaskStatus) => {
+        if (selectedIdsArray.length === 0) return;
+        await batchMoveTasks(selectedIdsArray, newStatus);
+        exitSelectionMode();
+    }, [batchMoveTasks, selectedIdsArray, exitSelectionMode]);
+
+    const handleBatchDelete = useCallback(async () => {
+        if (selectedIdsArray.length === 0) return;
+        await batchDeleteTasks(selectedIdsArray);
+        exitSelectionMode();
+    }, [batchDeleteTasks, selectedIdsArray, exitSelectionMode]);
+
+    const handleBatchAddTag = useCallback(async () => {
+        if (selectedIdsArray.length === 0) return;
+        const input = window.prompt(t('bulk.addTag'));
+        if (!input) return;
+        const tag = input.startsWith('#') ? input : `#${input}`;
+        await batchUpdateTasks(selectedIdsArray.map((id) => {
+            const task = tasksById[id];
+            const existingTags = task?.tags || [];
+            const nextTags = Array.from(new Set([...existingTags, tag]));
+            return { id, updates: { tags: nextTags } };
+        }));
+        exitSelectionMode();
+    }, [batchUpdateTasks, selectedIdsArray, tasksById, t, exitSelectionMode]);
+
+    return (
+        <div className="space-y-6">
+            <header className="flex items-center justify-between">
+                <div className="space-y-1">
+                    <h2 className="text-3xl font-bold tracking-tight">
+                        {t('review.title')}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                        {filteredTasks.length} {t('common.tasks')}
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => {
+                            if (selectionMode) exitSelectionMode();
+                            else setSelectionMode(true);
+                        }}
+                        className={cn(
+                            "text-xs px-3 py-1 rounded-md border transition-colors",
+                            selectionMode
+                                ? "bg-primary/10 text-primary border-primary"
+                                : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                        )}
+                    >
+                        {selectionMode ? t('bulk.exitSelect') : t('bulk.select')}
+                    </button>
+                    <button
+                        onClick={() => setShowGuide(true)}
+                        className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                    >
+                        {t('review.openGuide')}
+                    </button>
+                </div>
+            </header>
+
+            <div className="flex flex-wrap items-center gap-2">
+                <button
+                    onClick={() => setFilterStatus('all')}
+                    className={cn(
+                        "px-3 py-1.5 text-sm rounded-full border transition-colors",
+                        filterStatus === 'all'
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                    )}
+                >
+                    {t('common.all')} ({statusCounts.all})
+                </button>
+                {statusOptions.map((status) => (
+                    <button
+                        key={status}
+                        onClick={() => setFilterStatus(status)}
+                        className={cn(
+                            "px-3 py-1.5 text-sm rounded-full border transition-colors",
+                            filterStatus === status
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                        )}
+                    >
+                        {t(`status.${status}`)} ({statusCounts[status]})
+                    </button>
+                ))}
+            </div>
+
+            {selectionMode && selectedIdsArray.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 bg-card border border-border rounded-lg p-3">
                     <span className="text-sm text-muted-foreground">
-                        Step {currentStepIndex + 1} of {steps.length}
+                        {selectedIdsArray.length} {t('bulk.selected')}
                     </span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-primary transition-all duration-500 ease-in-out"
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-            </div>
-
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto mb-8 pr-2">
-                {renderStepContent()}
-            </div>
-
-            {/* Navigation Footer */}
-            {currentStep !== 'intro' && currentStep !== 'completed' && (
-                <div className="flex justify-between pt-4 border-t border-border">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {(['inbox', 'todo', 'next', 'in-progress', 'waiting', 'someday'] as TaskStatus[]).map((status) => (
+                            <button
+                                key={status}
+                                onClick={() => handleBatchMove(status)}
+                                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors"
+                            >
+                                {t(`status.${status}`)}
+                            </button>
+                        ))}
+                    </div>
                     <button
-                        onClick={prevStep}
-                        className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={handleBatchAddTag}
+                        className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors"
                     >
-                        Back
+                        {t('bulk.addTag')}
                     </button>
                     <button
-                        onClick={nextStep}
-                        className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                        onClick={handleBatchDelete}
+                        className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
                     >
-                        Next Step
+                        {t('bulk.delete')}
                     </button>
                 </div>
+            )}
+
+            <div className="space-y-3">
+                {filteredTasks.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                        <p>{t('review.noTasks')}</p>
+                    </div>
+                ) : (
+                    filteredTasks.map((task) => (
+                        <TaskItem
+                            key={task.id}
+                            task={task}
+                            project={task.projectId ? projectMap[task.projectId] : undefined}
+                            selectionMode={selectionMode}
+                            isMultiSelected={multiSelectedIds.has(task.id)}
+                            onToggleSelect={() => toggleMultiSelect(task.id)}
+                        />
+                    ))
+                )}
+            </div>
+
+            {showGuide && (
+                <WeeklyReviewGuideModal onClose={() => setShowGuide(false)} />
             )}
         </div>
     );

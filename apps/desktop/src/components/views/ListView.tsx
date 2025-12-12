@@ -113,10 +113,8 @@ export function ListView({ title, statusFilter }: ListViewProps) {
 
     useEffect(() => {
         setSelectedIndex(0);
-        if (selectionMode) {
-            exitSelectionMode();
-        }
-    }, [statusFilter, selectedContext, selectionMode, exitSelectionMode]);
+        exitSelectionMode();
+    }, [statusFilter, selectedContext, exitSelectionMode]);
 
     useEffect(() => {
         if (filteredTasks.length === 0) {

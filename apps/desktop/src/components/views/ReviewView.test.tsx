@@ -11,33 +11,22 @@ const renderWithProviders = (ui: React.ReactElement) => {
     );
 };
 
-// Mock store - use vi.hoisted for proper hoisting
 const mockUseTaskStore = vi.hoisted(() => vi.fn(() => ({
     tasks: [],
     projects: [],
+    settings: {},
+    batchMoveTasks: vi.fn(),
+    batchDeleteTasks: vi.fn(),
+    batchUpdateTasks: vi.fn(),
 })));
 
-vi.mock('@mindwtr/core', () => ({
-    useTaskStore: mockUseTaskStore,
-    Task: {},
-    Project: {},
-    TaskStatus: {},
-    translations: {
-        en: {
-            'review.timeFor': 'Time for your Weekly Review',
-            'review.startReview': 'Start Review',
-            'review.inboxStep': 'Process Inbox',
-            'review.inboxZero': 'Inbox Zero Goal',
-            'review.calendarStep': 'Review Calendar',
-            'review.past14': 'Past 14 Days',
-            'review.waitingStep': 'Waiting For',
-            'review.projectsStep': 'Review Projects',
-            'review.somedayStep': 'Someday/Maybe',
-            'review.allDone': 'Review Complete!',
-            'review.finish': 'Finish'
-        }
-    }
-}));
+vi.mock('@mindwtr/core', async () => {
+    const actual = await vi.importActual<typeof import('@mindwtr/core')>('@mindwtr/core');
+    return {
+        ...actual,
+        useTaskStore: mockUseTaskStore,
+    };
+});
 
 // Mock TaskItem to simplify testing
 vi.mock('../TaskItem', () => ({
@@ -45,14 +34,18 @@ vi.mock('../TaskItem', () => ({
 }));
 
 describe('ReviewView', () => {
-    it('starts at the intro step', () => {
+    it('renders the review list with a guide button', () => {
         renderWithProviders(<ReviewView />);
-        expect(screen.getByText('Time for your Weekly Review')).toBeInTheDocument();
-        expect(screen.getByText('Start Review')).toBeInTheDocument();
+        expect(screen.getByText('Weekly Review')).toBeInTheDocument();
+        expect(screen.getByText('Weekly Review Guide')).toBeInTheDocument();
     });
 
     it('navigates through the wizard steps', () => {
         renderWithProviders(<ReviewView />);
+
+        // Open guide
+        fireEvent.click(screen.getByText('Weekly Review Guide'));
+        expect(screen.getByText('Time for your Weekly Review')).toBeInTheDocument();
 
         // Intro -> Inbox
         fireEvent.click(screen.getByText('Start Review'));
@@ -84,6 +77,10 @@ describe('ReviewView', () => {
 
     it('can navigate back', () => {
         renderWithProviders(<ReviewView />);
+
+        // Open guide
+        fireEvent.click(screen.getByText('Weekly Review Guide'));
+        expect(screen.getByText('Time for your Weekly Review')).toBeInTheDocument();
 
         // Go to Inbox
         fireEvent.click(screen.getByText('Start Review'));
