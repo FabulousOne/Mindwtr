@@ -9,13 +9,20 @@
 ```bash
 bun install                   # install all workspace deps
 bun desktop:dev               # run Tauri desktop app in dev
+bun desktop:web               # run desktop UI in browser (Vite)
 bun desktop:build             # production desktop bundle
+bun desktop:web:build         # browser build (PWA assets included)
 bun run --filter mindwtr lint        # desktop lint (ESLint)
 bun run --filter mindwtr test        # desktop unit/component tests (Vitest)
 bun run --filter @mindwtr/core test  # core unit tests (Vitest)
 bun mobile:start              # start Expo dev server
 bun mobile:android | ios      # launch Expo on emulator/simulator
 bun run --filter mobile test         # mobile unit tests (Vitest)
+
+# Automation
+bun mindwtr:cli -- add "Call mom /due:tomorrow 5pm @phone"
+bun mindwtr:api -- --port 4317   # local REST API (localhost)
+bun run --filter mindwtr-cloud dev -- --port 8787  # simple cloud sync server
 ```
 Run commands from the repo root. Tauri builds require Rust toolchain + system webview libs; Expo needs Android/iOS tooling or Expo Go.
 
