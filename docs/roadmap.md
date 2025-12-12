@@ -35,7 +35,6 @@ This document captures the phased product roadmap and how work splits between `@
 - ✅ Task Dependencies / Blocking
 - ✅ Hierarchical Contexts/Tags
 - ✅ Areas (Project Groups)
-- ✅ Accent Color / Theme Customization
 
 ---
 
@@ -48,34 +47,33 @@ This document captures the phased product roadmap and how work splits between `@
 
 ---
 
-## 🔜 Phase 5 — Expansion
+## ✅ Phase 5 — Expansion (In Progress)
 
-### 1) Android Widget
-**Goal:** Surface agenda on home screen.
-
-- **Mobile**
-  - Expo home screen widget showing today's focus and due tasks.
-  - Quick add from widget.
-
-### 2) Web App
+### ✅ Web App (PWA)
 **Goal:** Browser-based access for any device.
 
-- **Core**
-  - Ensure store works in browser context.
-- **Web**
-  - Next.js or similar web app sharing `@mindwtr/core`.
-  - PWA support for offline.
+- ✅ Desktop UI runs in normal browser using localStorage
+- ✅ PWA support with manifest and service worker
+- Run: `bun desktop:web` | Build: `bun desktop:web:build`
 
-### 3) Cloud Sync
+### ✅ Cloud Sync
 **Goal:** Optional cloud-based sync service.
 
-- **Core/Backend**
-  - Simple REST API for data sync.
-  - End-to-end encryption option.
+- ✅ Simple REST API server (`apps/cloud/src/server.ts`)
+- ✅ GET/PUT `/v1/data` with Bearer token auth
+- ✅ Desktop + Mobile sync to cloud backend
+- Run: `bun run --filter mindwtr-cloud dev -- --port 8787`
 
-### 4) Integrations & Automation
+### ✅ Integrations & Automation
 **Goal:** Enable power users to automate capture and review.
 
-- **Desktop/Core**
-  - Optional local API server for add/list/complete/search.
-  - CLI tool for scripting.
+- ✅ **CLI** (`scripts/mindwtr-cli.ts`): add, list, complete, search
+- ✅ **Local REST API** (`scripts/mindwtr-api.ts`): Full CRUD for tasks/projects
+- Run CLI: `bun mindwtr:cli -- add "Task title @context"`
+- Run API: `bun mindwtr:api -- --port 4317`
+
+### 🔜 Android Widget
+**Goal:** Surface agenda on home screen.
+
+- Placeholder stub added (`apps/mobile/lib/widget-service.ts`)
+- Full implementation requires EAS dev build + native code

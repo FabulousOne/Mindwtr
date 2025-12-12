@@ -91,7 +91,6 @@ export interface AppData {
         dailyDigestEveningTime?: string; // HH:mm
         savedSearches?: SavedSearch[];
         sidebarCollapsed?: boolean;
-        accentColor?: string;
         taskSortBy?: TaskSortBy;
         lastSyncAt?: string;
         lastSyncStatus?: 'idle' | 'syncing' | 'success' | 'error';

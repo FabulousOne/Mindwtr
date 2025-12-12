@@ -345,25 +345,6 @@ export default function SettingsPage() {
                             </View>
                         )}
 
-                        <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
-                            <View style={styles.settingInfo}>
-                                <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.accentColor')}</Text>
-                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>{t('settings.accentDesc')}</Text>
-                            </View>
-                            <View style={styles.colorPickerRow}>
-                                {['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'].map(color => (
-                                    <TouchableOpacity
-                                        key={color}
-                                        onPress={() => updateSettings({ accentColor: color })}
-                                        style={[
-                                            styles.colorDot,
-                                            { backgroundColor: color },
-                                            settings.accentColor === color && styles.colorDotSelected
-                                        ]}
-                                    />
-                                ))}
-                            </View>
-                        </View>
                     </View>
                 </ScrollView>
             </SafeAreaView>
@@ -664,7 +645,7 @@ export default function SettingsPage() {
                                     <TextInput
                                         value={webdavUrl}
                                         onChangeText={setWebdavUrl}
-                                        placeholder="https://example.com/remote.php/dav/files/user/mindwtr-sync.json"
+                                        placeholder="https://example.com/remote.php/dav/files/user/data.json"
                                         placeholderTextColor={tc.secondaryText}
                                         autoCapitalize="none"
                                         autoCorrect={false}
@@ -975,9 +956,6 @@ const styles = StyleSheet.create({
     settingDescription: { fontSize: 13, marginTop: 2 },
     settingValue: { fontSize: 16 },
     linkText: { fontSize: 16, color: '#3B82F6' },
-    colorPickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    colorDot: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: 'transparent' },
-    colorDotSelected: { borderColor: '#111827' },
     helpBox: { borderRadius: 12, padding: 16, marginBottom: 8, borderWidth: 1 },
     helpTitle: { fontSize: 15, fontWeight: '600', marginBottom: 8 },
     helpText: { fontSize: 13, lineHeight: 20 },

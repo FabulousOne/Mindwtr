@@ -19,7 +19,6 @@ React Native mobile app for the Mindwtr productivity system.
 - **Markdown Notes** - Rich text descriptions
 - **Attachments** - Files and links on tasks
 - **Share Sheet** - Capture from any app
-- **Accent Color** - Customize highlights
 
 ### Notifications
 - **Due Date Reminders** - Push notifications with snooze

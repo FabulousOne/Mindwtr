@@ -8,6 +8,8 @@ import { useTheme } from '../../contexts/theme-context';
 import { useLanguage } from '../../contexts/language-context';
 import { useTaskStore } from '@mindwtr/core';
 
+const PRIMARY_TINT = '#3B82F6';
+
 function CustomDrawerContent(props: any) {
   const { isDark } = useTheme();
   const { t } = useLanguage();
@@ -45,7 +47,7 @@ function CustomDrawerContent(props: any) {
               key={search.id}
               label={search.name}
               onPress={() => router.push(`/saved-search/${search.id}`)}
-              activeTintColor="#3B82F6"
+              activeTintColor={PRIMARY_TINT}
               inactiveTintColor={isDark ? '#F9FAFB' : '#111827'}
               labelStyle={{ fontSize: 14 }}
             />
@@ -59,13 +61,11 @@ function CustomDrawerContent(props: any) {
 export default function DrawerLayout() {
   const { isDark } = useTheme();
   const { t } = useLanguage();
-  const { settings } = useTaskStore();
-  const accentColor = settings?.accentColor || '#3B82F6';
 
   return (
     <Drawer
       screenOptions={{
-        drawerActiveTintColor: accentColor,
+        drawerActiveTintColor: PRIMARY_TINT,
         drawerInactiveTintColor: '#6B7280',
         headerShown: true,
         drawerStyle: {
@@ -88,6 +88,13 @@ export default function DrawerLayout() {
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
+      <Drawer.Screen
+        name="saved-search/[id]"
+        options={{
+          drawerItemStyle: { display: 'none' },
+          title: t('search.title'),
+        }}
+      />
       <Drawer.Screen
         name="(tabs)"
         options={{

@@ -156,7 +156,7 @@ export function AgendaView() {
                         <select
                             value={task.status}
                             onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                            className="text-xs px-2 py-1 rounded bg-muted border border-border"
+                            className="text-xs px-2 py-1 rounded bg-muted/50 text-foreground border border-border hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
                         >
                             <option value="todo">{t('status.todo')}</option>
                             <option value="next">{t('status.next')}</option>

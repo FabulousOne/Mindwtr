@@ -24,13 +24,13 @@ describe('TaskItem', () => {
         expect(getByText('Test Task')).toBeInTheDocument();
     });
 
-    it('enters edit mode on click', () => {
-        const { getByText, getByDisplayValue } = render(
+    it('enters edit mode when Edit is clicked', () => {
+        const { getByRole, getByDisplayValue } = render(
             <LanguageProvider>
                 <TaskItem task={mockTask} />
             </LanguageProvider>
         );
-        fireEvent.click(getByText('Test Task'));
+        fireEvent.click(getByRole('button', { name: 'Edit' }));
         expect(getByDisplayValue('Test Task')).toBeInTheDocument();
     });
 

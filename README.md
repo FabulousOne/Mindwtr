@@ -51,14 +51,20 @@ A complete Getting Things Done (GTD) productivity system for desktop and mobile.
 ### Data & Sync
 - 📁 **File Sync** - Dropbox, Google Drive, Syncthing, etc.
 - 🌐 **WebDAV Sync** - Nextcloud, ownCloud, self-hosted
+- ☁️ **Cloud Sync** - Self-hosted cloud backend
 - 🔀 **Smart Merge** - Last-write-wins prevents data loss
 - 📤 **Export/Backup** - Export data to JSON
+
+### Automation
+- 🔌 **CLI** - Add, list, complete, search from terminal
+- 🌐 **REST API** - Local API server for scripting
+- 🌍 **Web App (PWA)** - Browser access with offline support
 
 ### Cross-Platform
 - 🖥️ **Desktop** - Tauri v2 (macOS, Linux, Windows)
 - 📱 **Mobile** - React Native/Expo (iOS, Android)
 - ⌨️ **Keyboard Shortcuts** - Vim and Emacs presets
-- 🎨 **Themes** - Light/Dark with accent color
+- 🎨 **Themes** - Light/Dark
 - 🌍 **i18n** - English and Chinese
 
 ## Installation
@@ -111,10 +117,11 @@ iOS builds require an Apple Developer account ($99/year). Currently available as
 ## Data Storage
 
 Tasks and projects are stored locally on your device:
-- **Desktop**: `~/.config/mindwtr/data.json`
+- **Desktop**: `~/.config/mindwtr/data.json` (main data + sync file)
+- **Desktop config**: `~/.config/mindwtr/config.toml` (sync path and app settings)
 - **Mobile**: Device storage (AsyncStorage)
 
-Sync via File (Dropbox, etc.) or WebDAV (Nextcloud, etc.) can be configured in Settings.
+Sync via File (Dropbox, etc.), WebDAV (Nextcloud, etc.), or Cloud can be configured in Settings.
 
 ## Documentation
 
@@ -128,10 +135,10 @@ For developers, see the [Development Guide](docs/development.md).
 
 ## Roadmap
 
+- [x] ☁️ **Cloud Sync** - Self-hosted cloud backend
+- [x] 🌐 **Web App (PWA)** - Browser-based version
+- [x] 🔌 **CLI & API** - Automation and scripting support
 - [ ] 📱 **Android Widget** - Agenda widget for home screen
-- [ ] ☁️ **Cloud Sync** - Optional cloud-based sync service
-- [ ] 🌐 **Web App** - Browser-based version
-- [ ] 🔌 **API/CLI** - Automation and scripting support
 
 ## License
 

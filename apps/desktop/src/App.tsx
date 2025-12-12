@@ -19,42 +19,12 @@ import { KeybindingProvider } from './contexts/keybinding-context';
 import { QuickAddModal } from './components/QuickAddModal';
 import { startDesktopNotifications, stopDesktopNotifications } from './lib/notification-service';
 import { SyncService } from './lib/sync-service';
+import { isTauriRuntime } from './lib/runtime';
 
-function App() {
-    const [currentView, setCurrentView] = useState('inbox');
-    const { fetchData, settings } = useTaskStore();
-    const { t } = useLanguage();
-
-    const accentColor = settings?.accentColor;
-
-    useEffect(() => {
-        if (!accentColor) return;
-        const hex = accentColor.replace('#', '');
-        if (hex.length !== 6) return;
-        const r = parseInt(hex.slice(0, 2), 16) / 255;
-        const g = parseInt(hex.slice(2, 4), 16) / 255;
-        const b = parseInt(hex.slice(4, 6), 16) / 255;
-
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        const delta = max - min;
-
-        let h = 0;
-        if (delta !== 0) {
-            if (max === r) h = ((g - b) / delta) % 6;
-            else if (max === g) h = (b - r) / delta + 2;
-            else h = (r - g) / delta + 4;
-            h = Math.round(h * 60);
-            if (h < 0) h += 360;
-        }
-        const l = (max + min) / 2;
-        const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
-
-        const hsl = `${h} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-        const root = document.documentElement;
-        root.style.setProperty('--primary', hsl);
-        root.style.setProperty('--ring', hsl);
-    }, [accentColor]);
+    function App() {
+        const [currentView, setCurrentView] = useState('inbox');
+        const { fetchData } = useTaskStore();
+        const { t } = useLanguage();
 
     useEffect(() => {
         fetchData();
@@ -64,13 +34,13 @@ function App() {
         };
         window.addEventListener('beforeunload', handleUnload);
 
-        if ((window as any).__TAURI__) {
+        if (isTauriRuntime()) {
             startDesktopNotifications().catch(console.error);
         }
 
         let lastAutoSync = 0;
         const autoSync = async () => {
-            if (!(window as any).__TAURI__) return;
+            if (!isTauriRuntime()) return;
             const path = await SyncService.getSyncPath();
             if (!path) return;
             const now = Date.now();

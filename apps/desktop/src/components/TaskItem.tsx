@@ -1,6 +1,6 @@
 import { useState, memo } from 'react';
 
-import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Plus, Clock, Timer, Paperclip, Link2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Plus, Clock, Timer, Paperclip, Link2, Pencil } from 'lucide-react';
 import { useTaskStore, Attachment, Task, TaskStatus, TimeEstimate, generateUUID, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, getStatusColor, Project, safeFormatDate, safeParseDate, getChecklistProgress, getUnblocksCount, stripMarkdown } from '@mindwtr/core';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/language-context';
@@ -271,39 +271,39 @@ export const TaskItem = memo(function TaskItem({
 	                                    <input
                                         type="datetime-local"
                                         aria-label="Start time"
-                                        value={editStartTime}
-                                        onChange={(e) => setEditStartTime(e.target.value)}
-                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
-                                    />
+	                                        value={editStartTime}
+	                                        onChange={(e) => setEditStartTime(e.target.value)}
+	                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+	                                    />
                                 </div>
 		                                <div className="flex flex-col gap-1">
 		                                    <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.dueDateLabel')}</label>
 		                                    <input
 	                                        type="datetime-local"
 	                                        aria-label="Deadline"
-	                                        value={editDueDate}
-	                                        onChange={(e) => setEditDueDate(e.target.value)}
-	                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
-	                                    />
+		                                        value={editDueDate}
+		                                        onChange={(e) => setEditDueDate(e.target.value)}
+		                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+		                                    />
 	                                </div>
 		                                <div className="flex flex-col gap-1">
 		                                    <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.reviewDateLabel')}</label>
 		                                    <input
 	                                        type="datetime-local"
 	                                        aria-label="Review date"
-	                                        value={editReviewAt}
-	                                        onChange={(e) => setEditReviewAt(e.target.value)}
-	                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
-	                                    />
+		                                        value={editReviewAt}
+		                                        onChange={(e) => setEditReviewAt(e.target.value)}
+		                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+		                                    />
 	                                </div>
 		                                <div className="flex flex-col gap-1">
 		                                    <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.statusLabel')}</label>
 		                                    <select
-                                        value={task.status}
-                                        aria-label="Status"
-                                        onChange={handleStatusChange}
-                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
-		                                    >
+	                                        value={task.status}
+	                                        aria-label="Status"
+	                                        onChange={handleStatusChange}
+	                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+			                                    >
 		                                        <option value="inbox">{t('status.inbox')}</option>
 		                                        <option value="todo">{t('status.todo')}</option>
 		                                        <option value="next">{t('status.next')}</option>
@@ -317,11 +317,11 @@ export const TaskItem = memo(function TaskItem({
 		                                <div className="flex flex-col gap-1">
 		                                    <label className="text-xs text-muted-foreground font-medium">{t('projects.title')}</label>
 		                                    <select
-                                        value={editProjectId}
-                                        aria-label="Project"
-                                        onChange={(e) => setEditProjectId(e.target.value)}
-		                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
-		                                    >
+	                                        value={editProjectId}
+	                                        aria-label="Project"
+	                                        onChange={(e) => setEditProjectId(e.target.value)}
+			                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+			                                    >
 		                                        <option value="">{t('taskEdit.noProjectOption')}</option>
 			                                        {projects.map(p => (
 			                                            <option key={p.id} value={p.id}>{p.title}</option>
@@ -334,12 +334,12 @@ export const TaskItem = memo(function TaskItem({
 			                                        multiple
 			                                        value={editBlockedByTaskIds}
 			                                        aria-label="Blocked by"
-			                                        onChange={(e) => {
-			                                            const selected = Array.from(e.target.selectedOptions).map(o => o.value);
-			                                            setEditBlockedByTaskIds(selected);
-			                                        }}
-			                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 h-20"
-			                                    >
+				                                        onChange={(e) => {
+				                                            const selected = Array.from(e.target.selectedOptions).map(o => o.value);
+				                                            setEditBlockedByTaskIds(selected);
+				                                        }}
+				                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 h-20 text-foreground"
+				                                    >
                                         {(tasks ?? [])
                                             .filter(otherTask => otherTask.id !== task.id && !otherTask.deletedAt)
                                             .map(otherTask => (
@@ -354,20 +354,20 @@ export const TaskItem = memo(function TaskItem({
 			                                    <input
                                         type="text"
                                         aria-label="Location"
-                                        value={editLocation}
-                                        onChange={(e) => setEditLocation(e.target.value)}
-		                                        placeholder={t('taskEdit.locationPlaceholder')}
-		                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
-		                                    />
+	                                        value={editLocation}
+	                                        onChange={(e) => setEditLocation(e.target.value)}
+			                                        placeholder={t('taskEdit.locationPlaceholder')}
+			                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground placeholder:text-muted-foreground"
+			                                    />
 		                                </div>
 		                                <div className="flex flex-col gap-1 w-full">
 		                                    <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.recurrenceLabel')}</label>
 		                                    <select
-                                        value={editRecurrence}
-                                        aria-label="Recurrence"
-		                                        onChange={(e) => setEditRecurrence(e.target.value)}
-		                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full"
-		                                    >
+	                                        value={editRecurrence}
+	                                        aria-label="Recurrence"
+			                                        onChange={(e) => setEditRecurrence(e.target.value)}
+			                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
+			                                    >
 		                                        <option value="">{t('recurrence.none')}</option>
 		                                        <option value="daily">{t('recurrence.daily')}</option>
 		                                        <option value="weekly">{t('recurrence.weekly')}</option>
@@ -378,11 +378,11 @@ export const TaskItem = memo(function TaskItem({
 		                                <div className="flex flex-col gap-1 w-full">
 		                                    <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.timeEstimateLabel')}</label>
 		                                    <select
-                                        value={editTimeEstimate}
-                                        aria-label="Time estimate"
-		                                        onChange={(e) => setEditTimeEstimate(e.target.value as TimeEstimate | '')}
-		                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full"
-		                                    >
+	                                        value={editTimeEstimate}
+	                                        aria-label="Time estimate"
+			                                        onChange={(e) => setEditTimeEstimate(e.target.value as TimeEstimate | '')}
+			                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
+			                                    >
 		                                        <option value="">{t('common.none')}</option>
 		                                        <option value="5min">5m</option>
 		                                        <option value="15min">15m</option>
@@ -396,11 +396,11 @@ export const TaskItem = memo(function TaskItem({
 		                                    <input
                                         type="text"
                                         aria-label="Contexts"
-                                        value={editContexts}
-                                        onChange={(e) => setEditContexts(e.target.value)}
-                                        placeholder="@home, @work"
-                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full"
-                                    />
+	                                        value={editContexts}
+	                                        onChange={(e) => setEditContexts(e.target.value)}
+	                                        placeholder="@home, @work"
+	                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground placeholder:text-muted-foreground"
+	                                    />
                                     <div className="flex flex-wrap gap-2 pt-1">
                                         {['@home', '@work', '@errands', '@computer', '@phone'].map(tag => {
                                             const currentTags = editContexts.split(',').map(t => t.trim()).filter(Boolean);
@@ -436,11 +436,11 @@ export const TaskItem = memo(function TaskItem({
                                     <input
                                         type="text"
                                         aria-label="Tags"
-                                        value={editTags}
-                                        onChange={(e) => setEditTags(e.target.value)}
-                                        placeholder="#urgent, #idea"
-                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full"
-                                    />
+	                                        value={editTags}
+	                                        onChange={(e) => setEditTags(e.target.value)}
+	                                        placeholder="#urgent, #idea"
+	                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground placeholder:text-muted-foreground"
+	                                    />
                                     <div className="flex flex-wrap gap-2 pt-1">
                                         {((() => {
                                             // Compute most frequent tags (hashtags)
@@ -590,31 +590,24 @@ export const TaskItem = memo(function TaskItem({
                                 </button>
                             </div>
                         </form>
-                    ) : (
-                        <div
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`Edit task: ${task.title}, ${task.status}. Press Enter to edit.`}
-                            data-task-edit-trigger
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    if (selectionMode) {
-                                        onToggleSelect?.();
-                                    } else {
-                                        setIsEditing(true);
-                                    }
-                                }
-                            }}
-                            onClick={() => {
-                                if (selectionMode) {
-                                    onToggleSelect?.();
-                                } else {
-                                    setIsEditing(true);
-                                }
-                            }}
-                            className="group/content cursor-pointer rounded -ml-2 pl-2 pr-1 py-1 hover:bg-muted/40 focus:bg-muted/40 focus:ring-2 focus:ring-primary focus:outline-none transition-colors"
-                        >
+	                    ) : (
+	                        <div
+	                            data-task-edit-trigger
+	                            onClick={() => {
+	                                if (selectionMode) {
+	                                    onToggleSelect?.();
+	                                }
+	                            }}
+	                            onDoubleClick={() => {
+	                                if (!selectionMode) {
+	                                    setIsEditing(true);
+	                                }
+	                            }}
+	                            className={cn(
+	                                "group/content rounded -ml-2 pl-2 pr-1 py-1 transition-colors",
+	                                selectionMode ? "cursor-pointer hover:bg-muted/40" : "cursor-default",
+	                            )}
+	                        >
                             <div
                                 className={cn(
                                     "text-base font-medium truncate group-hover/content:text-primary transition-colors",
@@ -784,20 +777,28 @@ export const TaskItem = memo(function TaskItem({
                     )}
                 </div>
 
-                {!isEditing && (
-                    <div
-                        className="relative flex items-center gap-2"
-                        onPointerDown={(e) => e.stopPropagation()}
-                    >
-                        <select
-                            value={task.status}
-                            aria-label="Task status"
-                            onChange={handleStatusChange}
-                            className="text-xs px-2 py-1 rounded cursor-pointer bg-white text-black border border-slate-400 hover:bg-slate-100"
-                        >
-                            <option value="inbox">{t('status.inbox')}</option>
-                            <option value="todo">{t('status.todo')}</option>
-                            <option value="next">{t('status.next')}</option>
+	                {!isEditing && (
+	                    <div
+	                        className="relative flex items-center gap-2"
+	                        onPointerDown={(e) => e.stopPropagation()}
+	                    >
+	                        <button
+	                            type="button"
+	                            onClick={() => setIsEditing(true)}
+	                            aria-label={t('common.edit')}
+	                            className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted/50"
+	                        >
+	                            <Pencil className="w-4 h-4" />
+	                        </button>
+	                        <select
+	                            value={task.status}
+	                            aria-label="Task status"
+	                            onChange={handleStatusChange}
+	                            className="text-xs px-2 py-1 rounded cursor-pointer bg-muted/50 text-foreground border border-border hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+	                        >
+	                            <option value="inbox">{t('status.inbox')}</option>
+	                            <option value="todo">{t('status.todo')}</option>
+	                            <option value="next">{t('status.next')}</option>
                             <option value="in-progress">{t('status.in-progress')}</option>
                             <option value="someday">{t('status.someday')}</option>
                             <option value="waiting">{t('status.waiting')}</option>

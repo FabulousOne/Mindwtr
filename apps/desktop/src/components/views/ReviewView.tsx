@@ -486,7 +486,7 @@ export function ReviewView() {
                                     setMoveToStatus(nextStatus);
                                     await handleBatchMove(nextStatus);
                                 }}
-                                className="text-xs bg-muted/50 border border-border rounded px-2 py-1 hover:bg-muted transition-colors"
+                                className="text-xs bg-muted/50 text-foreground border border-border rounded px-2 py-1 hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
                             >
                                 <option value="" disabled>
                                     {t('bulk.moveTo')}

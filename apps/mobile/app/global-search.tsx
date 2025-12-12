@@ -7,6 +7,8 @@ import { Colors } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { Search, X, Folder, CheckCircle, ChevronRight } from 'lucide-react-native';
 
+const PRIMARY_TINT = '#3B82F6';
+
 export default function SearchScreen() {
     const { tasks, projects, settings, updateSettings } = useTaskStore();
     const { isDark } = useTheme();
@@ -29,7 +31,7 @@ export default function SearchScreen() {
         itemBg: isDark ? '#1F2937' : '#F9FAFB',
         border: isDark ? '#374151' : '#E5E7EB',
         placeholder: isDark ? '#6B7280' : '#9CA3AF',
-        tint: settings?.accentColor || (isDark ? Colors.dark.tint : Colors.light.tint),
+        tint: PRIMARY_TINT,
     };
 
     const trimmedQuery = query.trim();

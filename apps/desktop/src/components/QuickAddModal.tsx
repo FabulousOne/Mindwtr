@@ -15,16 +15,33 @@ export function QuickAddModal() {
         if (!isTauriRuntime()) return;
 
         let unlisten: (() => void) | undefined;
-        import('@tauri-apps/api/event')
-            .then(({ listen }) =>
-                listen('quick-add', () => {
-                    setIsOpen(true);
-                }),
-            )
-            .then((fn) => {
-                unlisten = fn;
-            })
-            .catch(console.error);
+        const openFromTauri = async () => {
+            setIsOpen(true);
+            try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                await invoke<boolean>('consume_quick_add_pending');
+            } catch (e) {
+                console.error(e);
+            }
+        };
+
+        const setup = async () => {
+            const [{ listen }, { invoke }] = await Promise.all([
+                import('@tauri-apps/api/event'),
+                import('@tauri-apps/api/core'),
+            ]);
+
+            unlisten = await listen('quick-add', () => {
+                openFromTauri().catch(console.error);
+            });
+
+            const pending = await invoke<boolean>('consume_quick_add_pending');
+            if (pending) {
+                setIsOpen(true);
+            }
+        };
+
+        setup().catch(console.error);
 
         return () => {
             if (unlisten) unlisten();

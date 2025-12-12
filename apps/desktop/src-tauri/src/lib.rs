@@ -1,50 +1,159 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
 use tauri::menu::{Menu, MenuItem};
+use tauri::path::BaseDirectory;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::image::Image;
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 /// App name used for config directories and files
 const APP_NAME: &str = "mindwtr";
+const CONFIG_FILE_NAME: &str = "config.toml";
+const DATA_FILE_NAME: &str = "data.json";
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-struct AppConfig {
+struct LegacyAppConfigJson {
     data_file_path: Option<String>,
     sync_path: Option<String>,
 }
 
-fn get_config_path(app: &tauri::AppHandle) -> PathBuf {
+#[derive(Debug, Default)]
+struct AppConfigToml {
+    sync_path: Option<String>,
+}
+
+struct QuickAddPending(AtomicBool);
+
+#[tauri::command]
+fn consume_quick_add_pending(state: tauri::State<'_, QuickAddPending>) -> bool {
+    state.0.swap(false, Ordering::SeqCst)
+}
+
+fn get_app_root_dir(app: &tauri::AppHandle) -> PathBuf {
     app.path()
-        .app_config_dir()
-        .expect("failed to get app config dir")
-        .join("config.json")
+        .resolve(APP_NAME, BaseDirectory::Config)
+        .expect("failed to resolve app config root dir")
+}
+
+fn get_config_path(app: &tauri::AppHandle) -> PathBuf {
+    get_app_root_dir(app).join(CONFIG_FILE_NAME)
 }
 
 fn get_data_path(app: &tauri::AppHandle) -> PathBuf {
-    let config_path = get_config_path(app);
-    if let Ok(content) = fs::read_to_string(&config_path) {
-        if let Ok(config) = serde_json::from_str::<AppConfig>(&content) {
-            if let Some(path) = config.data_file_path {
-                return PathBuf::from(path);
-            }
-        }
-    }
-    // Default data path: app_data_dir/data.json
-    app.path()
-        .app_data_dir()
-        .expect("failed to get app data dir")
-        .join("data.json")
+    get_app_root_dir(app).join(DATA_FILE_NAME)
 }
 
-fn ensure_data_file(app: &tauri::AppHandle) -> Result<(), String> {
-    let data_path = get_data_path(app);
-    if let Some(parent) = data_path.parent() {
+fn get_legacy_config_json_path(app: &tauri::AppHandle) -> PathBuf {
+    app.path()
+        .app_config_dir()
+        .expect("failed to get legacy app config dir")
+        .join("config.json")
+}
+
+fn get_legacy_data_json_path(app: &tauri::AppHandle) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .expect("failed to get legacy app data dir")
+        .join(DATA_FILE_NAME)
+}
+
+fn parse_toml_string_value(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(stripped) = trimmed.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+        return Some(stripped.replace("\\\"", "\"").replace("\\\\", "\\"));
+    }
+    if let Some(stripped) = trimmed.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')) {
+        return Some(stripped.to_string());
+    }
+    None
+}
+
+fn serialize_toml_string_value(value: &str) -> String {
+    // Use TOML basic strings with minimal escaping.
+    let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
+    format!("\"{}\"", escaped)
+}
+
+fn read_config_toml(path: &Path) -> AppConfigToml {
+    let Ok(content) = fs::read_to_string(path) else {
+        return AppConfigToml::default();
+    };
+
+    let mut config = AppConfigToml::default();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key.trim();
+        let value = value.trim();
+        if key == "sync_path" {
+            config.sync_path = parse_toml_string_value(value);
+        }
+    }
+    config
+}
+
+fn write_config_toml(path: &Path, config: &AppConfigToml) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push("# Mindwtr desktop config".to_string());
+    if let Some(sync_path) = &config.sync_path {
+        lines.push(format!("sync_path = {}", serialize_toml_string_value(sync_path)));
+    }
+    let content = format!("{}\n", lines.join("\n"));
+    fs::write(path, content).map_err(|e| e.to_string())
+}
+
+fn bootstrap_storage_layout(app: &tauri::AppHandle) -> Result<(), String> {
+    let root_dir = get_app_root_dir(app);
+    fs::create_dir_all(&root_dir).map_err(|e| e.to_string())?;
+
+    let legacy_config_path = get_legacy_config_json_path(app);
+    let legacy_config: LegacyAppConfigJson = if let Ok(content) = fs::read_to_string(&legacy_config_path) {
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        LegacyAppConfigJson::default()
+    };
+
+    let config_path = get_config_path(app);
+    if !config_path.exists() {
+        let config = AppConfigToml {
+            sync_path: legacy_config.sync_path.clone(),
+        };
+        write_config_toml(&config_path, &config)?;
+    }
+
+    let data_path = get_data_path(app);
     if !data_path.exists() {
+        if let Some(custom_path) = legacy_config.data_file_path.as_ref() {
+            let custom_path = PathBuf::from(custom_path);
+            if custom_path.exists() {
+                fs::copy(&custom_path, &data_path).map_err(|e| e.to_string())?;
+                return Ok(());
+            }
+        }
+
+        let legacy_data_path = get_legacy_data_json_path(app);
+        if legacy_data_path.exists() {
+            fs::copy(&legacy_data_path, &data_path).map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+
         let initial_data = serde_json::json!({
             "tasks": [],
             "projects": [],
@@ -53,7 +162,12 @@ fn ensure_data_file(app: &tauri::AppHandle) -> Result<(), String> {
         fs::write(&data_path, serde_json::to_string_pretty(&initial_data).unwrap())
             .map_err(|e| e.to_string())?;
     }
+
     Ok(())
+}
+
+fn ensure_data_file(app: &tauri::AppHandle) -> Result<(), String> {
+    bootstrap_storage_layout(app)
 }
 
 #[tauri::command]
@@ -78,13 +192,9 @@ fn get_data_path_cmd(app: tauri::AppHandle) -> String {
 
 #[tauri::command]
 fn get_sync_path(app: tauri::AppHandle) -> Result<String, String> {
-    let config_path = get_config_path(&app);
-    if let Ok(content) = fs::read_to_string(&config_path) {
-        if let Ok(config) = serde_json::from_str::<AppConfig>(&content) {
-            if let Some(path) = config.sync_path {
-                return Ok(path);
-            }
-        }
+    let config = read_config_toml(&get_config_path(&app));
+    if let Some(path) = config.sync_path {
+        return Ok(path);
     }
     // Default sync path: ~/Sync/{APP_NAME}
     // We try to use a safe home dir, falling back to error if not found
@@ -100,22 +210,9 @@ fn get_sync_path(app: tauri::AppHandle) -> Result<String, String> {
 fn set_sync_path(app: tauri::AppHandle, sync_path: String) -> Result<serde_json::Value, String> {
     let config_path = get_config_path(&app);
     
-    // Load existing config or create new
-    let mut config: AppConfig = if let Ok(content) = fs::read_to_string(&config_path) {
-        serde_json::from_str(&content).unwrap_or_default()
-    } else {
-        AppConfig::default()
-    };
-    
+    let mut config = read_config_toml(&config_path);
     config.sync_path = Some(sync_path.clone());
-    
-    // Ensure parent directory exists
-    if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    
-    fs::write(&config_path, serde_json::to_string_pretty(&config).unwrap())
-        .map_err(|e| e.to_string())?;
+    write_config_toml(&config_path, &config)?;
     
     Ok(serde_json::json!({
         "success": true,
@@ -127,9 +224,14 @@ fn set_sync_path(app: tauri::AppHandle, sync_path: String) -> Result<serde_json:
 #[tauri::command]
 fn read_sync_file(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
     let sync_path_str = get_sync_path(app)?;
-    let sync_file = PathBuf::from(&sync_path_str).join(format!("{}-sync.json", APP_NAME));
+    let sync_file = PathBuf::from(&sync_path_str).join(DATA_FILE_NAME);
     
     if !sync_file.exists() {
+        let legacy_sync_file = PathBuf::from(&sync_path_str).join(format!("{}-sync.json", APP_NAME));
+        if legacy_sync_file.exists() {
+            let content = fs::read_to_string(&legacy_sync_file).map_err(|e| e.to_string())?;
+            return serde_json::from_str(&content).map_err(|e| e.to_string());
+        }
         // Return empty app data structure if file doesn't exist
         return Ok(serde_json::json!({
             "tasks": [],
@@ -146,7 +248,7 @@ fn read_sync_file(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
 #[tauri::command]
 fn write_sync_file(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
     let sync_path_str = get_sync_path(app)?;
-    let sync_file = PathBuf::from(&sync_path_str).join(format!("{}-sync.json", APP_NAME));
+    let sync_file = PathBuf::from(&sync_path_str).join(DATA_FILE_NAME);
 
     if let Some(parent) = sync_file.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -161,6 +263,7 @@ fn write_sync_file(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(QuickAddPending(AtomicBool::new(false)))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -175,8 +278,11 @@ pub fn run() {
             let quit_item = MenuItem::with_id(handle, "quit", "Quit", true, None::<&str>)?;
             let tray_menu = Menu::with_items(handle, &[&quick_add_item, &show_item, &quit_item])?;
 
+            let tray_icon = Image::from_bytes(include_bytes!("../icons/tray.png"))
+                .unwrap_or_else(|_| handle.default_window_icon().unwrap().clone());
+
             TrayIconBuilder::new()
-                .icon(handle.default_window_icon().unwrap().clone())
+                .icon(tray_icon)
                 .menu(&tray_menu)
                 .on_menu_event(move |app, event| {
                     match event.id().as_ref() {
@@ -222,7 +328,8 @@ pub fn run() {
             get_sync_path,
             set_sync_path,
             read_sync_file,
-            write_sync_file
+            write_sync_file,
+            consume_quick_add_pending
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -237,5 +344,10 @@ fn show_main(app: &tauri::AppHandle) {
 
 fn show_main_and_emit(app: &tauri::AppHandle) {
     show_main(app);
-    let _ = app.emit("quick-add", ());
+    app.state::<QuickAddPending>().0.store(true, Ordering::SeqCst);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("quick-add", ());
+    } else {
+        let _ = app.emit("quick-add", ());
+    }
 }

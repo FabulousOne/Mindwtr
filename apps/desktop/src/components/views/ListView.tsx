@@ -391,7 +391,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                         value={sortBy}
                         onChange={(e) => updateSettings({ taskSortBy: e.target.value as TaskSortBy })}
                         aria-label={t('sort.label')}
-                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
+                        className="text-xs bg-muted/50 text-foreground border border-border rounded px-2 py-1 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
                     >
                         <option value="default">{t('sort.default')}</option>
                         <option value="due">{t('sort.due')}</option>
