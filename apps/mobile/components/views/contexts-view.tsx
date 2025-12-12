@@ -1,6 +1,5 @@
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
-import { useTaskStore, PRESET_CONTEXTS, sortTasksBy, matchesHierarchicalToken, type TaskSortBy } from '@mindwtr/core';
-import type { Task, TaskStatus } from '@mindwtr/core';
+import { useTaskStore, PRESET_CONTEXTS, sortTasksBy, matchesHierarchicalToken, type Task, type TaskSortBy, type TaskStatus } from '@mindwtr/core';
 import { useState } from 'react';
 import { useTheme } from '../../contexts/theme-context';
 import { useLanguage } from '../../contexts/language-context';

@@ -1,6 +1,6 @@
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { useTaskStore, Task, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, getStatusColor, safeFormatDate, TaskStatus } from '@mindwtr/core';
+import { useTaskStore, Task, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getStatusColor, safeFormatDate, TaskStatus } from '@mindwtr/core';
 import { useLanguage } from '../contexts/language-context';
 import { useRef, useState } from 'react';
 import { ThemeColors } from '../hooks/use-theme-colors';

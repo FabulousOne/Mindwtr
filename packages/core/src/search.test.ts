@@ -1,18 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { filterTasksBySearch } from './search';
 import type { Project, Task } from './types';
 
 describe('search', () => {
-    beforeEach(() => {
-        vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-        vi.useRealTimers();
-    });
-
     it('supports status, OR groups, and negation', () => {
-        vi.setSystemTime(new Date('2025-01-01T10:00:00Z'));
+        const now = new Date('2025-01-01T10:00:00Z');
 
         const tasks: Task[] = [
             {
@@ -45,12 +37,12 @@ describe('search', () => {
         ];
         const projects: Project[] = [];
 
-        const results = filterTasksBySearch(tasks, projects, 'status:inbox OR status:next -status:done');
+        const results = filterTasksBySearch(tasks, projects, 'status:inbox OR status:next -status:done', now);
         expect(results.map(t => t.id)).toEqual(['t1', 't2']);
     });
 
     it('supports relative date comparisons', () => {
-        vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
+        const now = new Date('2025-01-01T00:00:00Z');
         const tasks: Task[] = [
             {
                 id: 't1',
@@ -74,7 +66,7 @@ describe('search', () => {
             },
         ];
 
-        const results = filterTasksBySearch(tasks, [], 'due:<=7d');
+        const results = filterTasksBySearch(tasks, [], 'due:<=7d', now);
         expect(results.map(t => t.id)).toEqual(['t1']);
     });
 
@@ -107,4 +99,3 @@ describe('search', () => {
         expect(results).toHaveLength(1);
     });
 });
-

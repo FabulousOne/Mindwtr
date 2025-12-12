@@ -44,8 +44,6 @@
     "decode-uri-component": "^0.4.1",
     "escape-string-regexp": "^5.0.0",
     "event-target-shim": "^6.0.2",
-    "expo-asset": "^12.0.11",
-    "expo-modules-core": "^3.0.28",
     "fast-deep-equal": "^3.1.3",
     "fbjs": "^3.0.5",
     "filter-obj": "^6.1.0",
@@ -76,5 +74,5 @@
     "webidl-conversions": "^8.0.0",
     "whatwg-url-without-unicode": "^8.0.0-3"
   },
-  "version": "0.2.9"
+  "version": "0.3.0"
 }

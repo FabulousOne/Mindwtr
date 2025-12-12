@@ -131,7 +131,7 @@ export default function SearchScreen() {
                     trimmedQuery !== '' ? (
                         <View style={styles.emptyContainer}>
                             <Text style={[styles.emptyText, { color: tc.secondaryText }]}>
-                                {t('search.noResults')} "{trimmedQuery}"
+                                {t('search.noResults')} {'"'}{trimmedQuery}{'"'}
                             </Text>
                         </View>
                     ) : null

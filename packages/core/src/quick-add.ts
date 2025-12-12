@@ -99,7 +99,7 @@ function stripToken(source: string, token: string): string {
     return source.replace(token, '').replace(/\s{2,}/g, ' ').trim();
 }
 
-export function parseQuickAdd(input: string, projects?: Project[]): QuickAddResult {
+export function parseQuickAdd(input: string, projects?: Project[], now: Date = new Date()): QuickAddResult {
     let working = input.trim();
 
     const contexts = new Set<string>();
@@ -126,7 +126,7 @@ export function parseQuickAdd(input: string, projects?: Project[]): QuickAddResu
     const dueMatch = working.match(/\/due:([^/]+?)(?=\s\/|$)/i);
     if (dueMatch) {
         const dueText = dueMatch[1].trim();
-        const parsed = parseNaturalDate(dueText, new Date());
+        const parsed = parseNaturalDate(dueText, now);
         if (parsed) dueDate = parsed.toISOString();
         working = stripToken(working, dueMatch[0]);
     }
@@ -171,4 +171,3 @@ export function parseQuickAdd(input: string, projects?: Project[]): QuickAddResu
 
     return { title, props };
 }
-

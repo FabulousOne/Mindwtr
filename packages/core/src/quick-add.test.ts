@@ -1,18 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { parseQuickAdd } from './quick-add';
 
 describe('quick-add', () => {
-    beforeEach(() => {
-        vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-        vi.useRealTimers();
-    });
-
     it('parses status, due, note, tags, contexts', () => {
-        vi.setSystemTime(new Date('2025-01-01T10:00:00Z'));
-        const result = parseQuickAdd('Call mom @phone #family /next /due:tomorrow 5pm /note:ask about trip');
+        const now = new Date('2025-01-01T10:00:00Z');
+        const result = parseQuickAdd('Call mom @phone #family /next /due:tomorrow 5pm /note:ask about trip', undefined, now);
 
         expect(result.title).toBe('Call mom');
         expect(result.props.status).toBe('next');
@@ -24,19 +16,19 @@ describe('quick-add', () => {
     });
 
     it('matches project by title when provided', () => {
-        vi.setSystemTime(new Date('2025-01-01T10:00:00Z'));
+        const now = new Date('2025-01-01T10:00:00Z');
         const projects = [
             {
                 id: 'p1',
                 title: 'MyProject',
                 status: 'active',
                 color: '#000000',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
+                createdAt: now.toISOString(),
+                updatedAt: now.toISOString(),
             },
         ];
 
-        const result = parseQuickAdd('Write spec +MyProject', projects as any);
+        const result = parseQuickAdd('Write spec +MyProject', projects as any, now);
         expect(result.title).toBe('Write spec');
         expect(result.props.projectId).toBe('p1');
     });

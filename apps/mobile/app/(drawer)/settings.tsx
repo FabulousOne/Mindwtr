@@ -42,7 +42,7 @@ const LANGUAGES: { id: Language; native: string }[] = [
 export default function SettingsPage() {
     const { themeMode, setThemeMode, isDark } = useTheme();
     const { language, setLanguage, t } = useLanguage();
-    const { tasks, projects, settings, fetchData, updateSettings } = useTaskStore();
+    const { tasks, projects, settings, updateSettings } = useTaskStore();
     const [isSyncing, setIsSyncing] = useState(false);
     const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
     const [syncPath, setSyncPath] = useState<string | null>(null);
