@@ -33,13 +33,6 @@ export function WaitingView() {
 
   return (
     <View style={[styles.container, { backgroundColor: tc.bg }]}>
-      <View style={[styles.header, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
-        <Text style={[styles.title, { color: tc.text }]}>⏸️ {t('waiting.title')}</Text>
-        <Text style={[styles.subtitle, { color: tc.secondaryText }]}>
-          {t('waiting.subtitle')}
-        </Text>
-      </View>
-
       <View style={[styles.stats, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{waitingTasks.length}</Text>
@@ -84,22 +77,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
   },
   stats: {
     flexDirection: 'row',

@@ -59,16 +59,11 @@ export function ContextsView() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={[styles.container, { backgroundColor: tc.bg }]}>
-        <View style={[styles.header, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
-          <Text style={[styles.title, { color: tc.text }]}>{t('contexts.title')}</Text>
-          <Text style={[styles.subtitle, { color: tc.secondaryText }]}>{t('contexts.filter')}</Text>
-        </View>
-
         {/* Search box for contexts */}
         <View style={[styles.searchContainer, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
           <TextInput
             style={[styles.searchInput, { backgroundColor: tc.inputBg, color: tc.text }]}
-            placeholder={t('contexts.search') || 'Search contexts...'}
+            placeholder={t('contexts.search')}
             placeholderTextColor={tc.secondaryText}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -84,22 +79,35 @@ export function ContextsView() {
           <Pressable
             style={[
               styles.contextButton,
-              { backgroundColor: isDark ? '#374151' : '#F3F4F6' },
-              selectedContext === null && styles.contextButtonActive,
+              {
+                backgroundColor: selectedContext === null ? tc.tint : tc.filterBg,
+                borderColor: tc.border,
+              },
             ]}
             onPress={() => setSelectedContext(null)}
           >
             <Text
               style={[
                 styles.contextButtonText,
-                { color: isDark ? '#D1D5DB' : '#4B5563' },
-                selectedContext === null && styles.contextButtonTextActive,
+                { color: selectedContext === null ? '#FFFFFF' : tc.text },
               ]}
             >
               {t('contexts.all')}
             </Text>
-            <View style={styles.contextBadge}>
-              <Text style={styles.contextBadgeText}>
+            <View
+              style={[
+                styles.contextBadge,
+                {
+                  backgroundColor:
+                    selectedContext === null
+                      ? 'rgba(255, 255, 255, 0.25)'
+                      : isDark
+                        ? 'rgba(255, 255, 255, 0.12)'
+                        : 'rgba(0, 0, 0, 0.08)',
+                },
+              ]}
+            >
+              <Text style={[styles.contextBadgeText, { color: selectedContext === null ? '#FFFFFF' : tc.secondaryText }]}>
                 {activeTasks.filter((t) => (t.contexts?.length || 0) > 0 || (t.tags?.length || 0) > 0).length}
               </Text>
             </View>
@@ -107,27 +115,37 @@ export function ContextsView() {
 
           {filteredContexts.map((context) => {
             const count = activeTasks.filter((t) => matchesSelected(t, context)).length;
+            const isActive = selectedContext === context;
             return (
               <Pressable
                 key={context}
                 style={[
                   styles.contextButton,
-                  { backgroundColor: isDark ? '#374151' : '#F3F4F6' },
-                  selectedContext === context && styles.contextButtonActive,
+                  { backgroundColor: isActive ? tc.tint : tc.filterBg, borderColor: tc.border },
                 ]}
                 onPress={() => setSelectedContext(context)}
               >
                 <Text
                   style={[
                     styles.contextButtonText,
-                    { color: isDark ? '#D1D5DB' : '#4B5563' },
-                    selectedContext === context && styles.contextButtonTextActive,
+                    { color: isActive ? '#FFFFFF' : tc.text },
                   ]}
                 >
                   {context}
                 </Text>
-                <View style={styles.contextBadge}>
-                  <Text style={styles.contextBadgeText}>{count}</Text>
+                <View
+                  style={[
+                    styles.contextBadge,
+                    {
+                      backgroundColor: isActive
+                        ? 'rgba(255, 255, 255, 0.25)'
+                        : isDark
+                          ? 'rgba(255, 255, 255, 0.12)'
+                          : 'rgba(0, 0, 0, 0.08)',
+                    },
+                  ]}
+                >
+                  <Text style={[styles.contextBadgeText, { color: isActive ? '#FFFFFF' : tc.secondaryText }]}>{count}</Text>
                 </View>
               </Pressable>
             );
@@ -198,22 +216,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
   searchContainer: {
     padding: 12,
     backgroundColor: '#FFFFFF',
@@ -246,20 +248,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     backgroundColor: '#F3F4F6',
-  },
-  contextButtonActive: {
-    backgroundColor: '#3B82F6',
+    borderWidth: 1,
   },
   contextButtonText: {
     fontSize: 13,
     fontWeight: '500',
     color: '#4B5563',
   },
-  contextButtonTextActive: {
-    color: '#FFFFFF',
-  },
   contextBadge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 8,
@@ -269,7 +265,6 @@ const styles = StyleSheet.create({
   contextBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#374151',
   },
   content: {
     flex: 1,
