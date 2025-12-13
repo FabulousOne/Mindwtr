@@ -22,6 +22,11 @@ fi
 # Use Node.js script for safe JSON updates
 node scripts/update-versions.js "$NEW_VERSION"
 
+# Regenerate lockfile with new versions
+echo ""
+echo "Updating lockfile..."
+bun install
+
 echo ""
 echo "Done! Now you can:"
 echo "  git add -A"
