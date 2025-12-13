@@ -1,5 +1,6 @@
-import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, Text } from 'react-native';
+import { Link, Tabs } from 'expo-router';
+import { Search } from 'lucide-react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -17,12 +18,31 @@ export default function TabLayout() {
   return (
     <Tabs
       initialRouteName="inbox"
-      screenOptions={{
+      screenOptions={({ route }) => ({
         tabBarActiveTintColor: activeTint,
         tabBarInactiveTintColor: inactiveTint,
         tabBarActiveBackgroundColor: activeItemBg,
         tabBarInactiveBackgroundColor: 'transparent',
-        headerShown: false,
+        headerShown: true,
+        headerTitleAlign: 'center',
+        headerShadowVisible: false,
+        headerStyle: {
+          backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
+        },
+        headerTintColor: isDark ? '#F9FAFB' : '#111827',
+        headerTitleStyle: {
+          fontSize: 17,
+          fontWeight: '700',
+        },
+        headerRight: route.name === 'menu'
+          ? undefined
+          : () => (
+            <Link href="/global-search" asChild>
+              <TouchableOpacity style={styles.headerIconButton} accessibilityLabel={t('search.title')}>
+                <Search size={22} color={isDark ? '#F9FAFB' : '#111827'} />
+              </TouchableOpacity>
+            </Link>
+          ),
         tabBarButton: HapticTab,
         tabBarLabelStyle: {
           fontSize: 11,
@@ -30,7 +50,7 @@ export default function TabLayout() {
         },
         tabBarItemStyle: {
           borderRadius: 14,
-          marginHorizontal: 10,
+          marginHorizontal: 6,
           marginVertical: 6,
         },
         tabBarStyle: {
@@ -45,7 +65,8 @@ export default function TabLayout() {
             default: {},
           }),
         },
-      }}>
+      })}
+    >
       <Tabs.Screen
         name="inbox"
         options={{
@@ -83,6 +104,18 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="menu"
+        options={{
+          title: t('tab.menu'),
+          tabBarLabel: ({ focused, color }) => (
+            <Text style={[styles.tabLabel, { color, fontWeight: focused ? '700' : '600' }]}>{t('tab.menu')}</Text>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol size={focused ? 28 : 24} name="line.3.horizontal" color={color} style={{ opacity: focused ? 1 : 0.65 }} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="review"
         options={{
           title: t('tab.review'),
@@ -101,5 +134,9 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 11,
+  },
+  headerIconButton: {
+    marginRight: 16,
+    padding: 4,
   },
 });

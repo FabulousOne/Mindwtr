@@ -65,6 +65,7 @@ export const translations: Record<Language, Record<string, string>> = {
         'tab.inbox': 'Inbox',
         'tab.next': 'Next',
         'tab.board': 'Board',
+        'tab.menu': 'Menu',
         'tab.agenda': 'Agenda',
         'tab.review': 'Review',
 
@@ -610,6 +611,7 @@ export const translations: Record<Language, Record<string, string>> = {
         'tab.inbox': '收集箱',
         'tab.next': '下一步',
         'tab.board': '看板',
+        'tab.menu': '菜单',
         'tab.agenda': '日程',
         'tab.review': '回顾',
 

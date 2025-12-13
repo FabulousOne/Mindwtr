@@ -1,203 +1,32 @@
 
-import { DrawerContentScrollView, DrawerItem, DrawerItemList } from '@react-navigation/drawer';
-import { Link, usePathname, useRouter } from 'expo-router';
-import { Drawer } from 'expo-router/drawer';
-import { Search } from 'lucide-react-native';
-import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-
-import { useTaskStore } from '@mindwtr/core';
+import { Stack } from 'expo-router';
 
 import { useLanguage } from '../../contexts/language-context';
 import { useTheme } from '../../contexts/theme-context';
 
-const PRIMARY_TINT = '#3B82F6';
-
-function TabsHeaderTitle() {
-  const pathname = usePathname();
+export default function AppLayout() {
   const { isDark } = useTheme();
   const { t } = useLanguage();
 
-  const title = (() => {
-    if (pathname.startsWith('/next')) return t('tab.next');
-    if (pathname.startsWith('/board')) return t('tab.board');
-    if (pathname.startsWith('/review')) return t('tab.review');
-    return t('tab.inbox');
-  })();
-
   return (
-    <Text
-      style={{
-        color: isDark ? '#F9FAFB' : '#111827',
-        fontSize: 17,
-        fontWeight: '700',
-      }}
-      numberOfLines={1}
-      ellipsizeMode="tail"
-    >
-      {title}
-    </Text>
-  );
-}
-
-function CustomDrawerContent(props: any) {
-  const { isDark } = useTheme();
-  const { t } = useLanguage();
-  const { settings } = useTaskStore();
-  const router = useRouter();
-
-  const savedSearches = settings?.savedSearches || [];
-  const secondaryText = isDark ? '#9CA3AF' : '#6B7280';
-  const hiddenRouteName = 'saved-search/[id]';
-
-  const drawerState = (() => {
-    const routes = props.state?.routes?.filter((route: any) => route.name !== hiddenRouteName) ?? [];
-    const routeNames = props.state?.routeNames?.filter((name: string) => name !== hiddenRouteName) ?? [];
-    const currentName = props.state?.routes?.[props.state?.index]?.name;
-    const fallbackIndex = Math.max(0, routes.findIndex((route: any) => route.name === '(tabs)'));
-
-    const focusedIndex = routes.findIndex((route: any) => route.name === currentName);
-    const index = focusedIndex >= 0 ? focusedIndex : fallbackIndex;
-
-    return { ...props.state, routes, routeNames, index };
-  })();
-
-  return (
-    <DrawerContentScrollView {...props} contentContainerStyle={{ flexGrow: 1 }}>
-      <DrawerItemList {...props} state={drawerState} />
-      {savedSearches.length > 0 && (
-        <View style={{ marginTop: 12, paddingHorizontal: 16 }}>
-          <Text style={{ color: secondaryText, fontSize: 12, marginBottom: 8 }}>
-            {t('search.savedSearches')}
-          </Text>
-          {savedSearches.map((search) => (
-            <DrawerItem
-              key={search.id}
-              label={search.name}
-              onPress={() => router.push(`/saved-search/${search.id}`)}
-              activeTintColor={PRIMARY_TINT}
-              inactiveTintColor={isDark ? '#F9FAFB' : '#111827'}
-              labelStyle={{ fontSize: 14 }}
-            />
-          ))}
-        </View>
-      )}
-    </DrawerContentScrollView>
-  );
-}
-
-export default function DrawerLayout() {
-  const { isDark } = useTheme();
-  const { t } = useLanguage();
-  const { width: windowWidth } = useWindowDimensions();
-
-  const drawerWidth = Math.min(240, Math.round(windowWidth * 0.62));
-
-  return (
-    <Drawer
-      initialRouteName="(tabs)"
-      backBehavior="history"
+    <Stack
       screenOptions={{
-        drawerActiveTintColor: PRIMARY_TINT,
-        drawerInactiveTintColor: '#6B7280',
-        headerShown: true,
-        drawerStyle: {
-          backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
-          width: drawerWidth,
-        },
-        headerStyle: {
-          backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
-        },
+        headerStyle: { backgroundColor: isDark ? '#1F2937' : '#FFFFFF' },
         headerTintColor: isDark ? '#F9FAFB' : '#111827',
-        drawerLabelStyle: {
-          color: isDark ? '#F9FAFB' : '#111827',
-        },
-        headerRight: () => (
-          <Link href="/global-search" asChild>
-            <TouchableOpacity style={{ marginRight: 16 }}>
-              <Search size={24} color={isDark ? '#F9FAFB' : '#111827'} />
-            </TouchableOpacity>
-          </Link>
-        ),
+        headerTitleAlign: 'center',
+        headerShadowVisible: false,
       }}
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
-      <Drawer.Screen
-        name="(tabs)"
-        options={{
-          drawerLabel: t('nav.main'),
-          headerTitle: () => <TabsHeaderTitle />,
-          headerTitleAlign: 'center',
-          headerRight: () => <View style={{ width: 40 }} />,
-          headerShadowVisible: false,
-        }}
-      />
-      <Drawer.Screen
-        name="agenda"
-        options={{
-          drawerLabel: t('nav.agenda'),
-          title: t('agenda.title'),
-        }}
-      />
-      <Drawer.Screen
-        name="calendar"
-        options={{
-          drawerLabel: t('nav.calendar'),
-          title: t('calendar.title'),
-        }}
-      />
-      <Drawer.Screen
-        name="contexts"
-        options={{
-          drawerLabel: t('nav.contexts'),
-          title: t('contexts.title'),
-        }}
-      />
-      <Drawer.Screen
-        name="waiting"
-        options={{
-          drawerLabel: t('nav.waiting'),
-          title: t('waiting.title'),
-        }}
-      />
-      <Drawer.Screen
-        name="someday"
-        options={{
-          drawerLabel: t('nav.someday'),
-          title: t('someday.title'),
-        }}
-      />
-
-      <Drawer.Screen
-        name="projects-screen"
-        options={{
-          drawerLabel: t('nav.projects'),
-          title: t('projects.title'),
-        }}
-      />
-
-      <Drawer.Screen
-        name="archived"
-        options={{
-          drawerLabel: t('nav.archived') || 'Archived',
-          title: t('archived.title') || 'Archived',
-        }}
-      />
-
-      <Drawer.Screen
-        name="settings"
-        options={{
-          drawerLabel: t('nav.settings'),
-          title: t('settings.title'),
-        }}
-      />
-
-      <Drawer.Screen
-        name="saved-search/[id]"
-        options={{
-          drawerItemStyle: { display: 'none' },
-          title: t('search.title'),
-        }}
-      />
-    </Drawer>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="agenda" options={{ title: t('agenda.title') }} />
+      <Stack.Screen name="calendar" options={{ title: t('calendar.title') }} />
+      <Stack.Screen name="contexts" options={{ title: t('contexts.title') }} />
+      <Stack.Screen name="waiting" options={{ title: t('waiting.title') }} />
+      <Stack.Screen name="someday" options={{ title: t('someday.title') }} />
+      <Stack.Screen name="projects-screen" options={{ title: t('projects.title') }} />
+      <Stack.Screen name="archived" options={{ title: t('archived.title') || 'Archived' }} />
+      <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
+      <Stack.Screen name="saved-search/[id]" options={{ title: t('search.title') }} />
+    </Stack>
   );
 }

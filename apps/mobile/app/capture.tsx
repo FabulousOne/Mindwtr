@@ -44,7 +44,7 @@ export default function CaptureScreen() {
     const initialProps: Partial<Task> = { status: 'inbox', ...props };
     if (!props.status) initialProps.status = 'inbox';
     addTask(finalTitle, initialProps);
-    router.replace('/(drawer)/(tabs)/inbox');
+    router.replace('/inbox');
   };
 
   return (
@@ -122,4 +122,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

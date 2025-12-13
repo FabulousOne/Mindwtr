@@ -19,6 +19,7 @@ const MAPPING = {
   'arrow.right.circle.fill': '▶️',
   'folder.fill': '📁',
   'square.grid.2x2.fill': '🗂️',
+  'line.3.horizontal': '☰',
   'calendar.fill': '📅',
   'calendar': '📅',
   'checkmark.circle.fill': '✅',
