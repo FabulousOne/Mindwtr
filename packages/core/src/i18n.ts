@@ -271,8 +271,8 @@ export const translations: Record<Language, Record<string, string>> = {
         // Review Steps
         'review.title': 'Review',
         'review.intro': 'Get clear, get current, and get creative.',
-        'review.openGuide': 'Weekly Review Guide',
-        'dailyReview.openGuide': 'Daily Review Guide',
+        'review.openGuide': 'Weekly Review',
+        'dailyReview.openGuide': 'Daily Review',
         'dailyReview.title': 'Daily Review',
         'dailyReview.introTitle': 'Daily reset',
         'dailyReview.introDesc': 'A lightweight check-in to stay current.',
@@ -816,8 +816,8 @@ export const translations: Record<Language, Record<string, string>> = {
         // Review Steps
         'review.title': '回顾',
         'review.intro': '保持清晰、保持当前、保持创意。',
-        'review.openGuide': '周回顾指南',
-        'dailyReview.openGuide': '每日回顾指南',
+        'review.openGuide': '每周回顾',
+        'dailyReview.openGuide': '每日回顾',
         'dailyReview.title': '每日回顾',
         'dailyReview.introTitle': '每日整理',
         'dailyReview.introDesc': '一个轻量的快速检查，保持系统清晰。',

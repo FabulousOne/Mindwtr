@@ -118,13 +118,21 @@ export default function ReviewScreen() {
             style={[styles.guideButton, { borderColor: tc.border, backgroundColor: tc.filterBg }]}
             onPress={() => setShowDailyReviewModal(true)}
           >
-            <Text style={[styles.guideButtonText, { color: tc.text }]}>{t('dailyReview.title')}</Text>
+            <Text
+              style={[styles.guideButtonText, { color: tc.text }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {t('dailyReview.title')}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.guideButtonPrimary, { backgroundColor: tc.tint }]}
             onPress={() => setShowReviewModal(true)}
           >
-            <Text style={styles.guideButtonPrimaryText}>{t('review.openGuide')}</Text>
+            <Text style={styles.guideButtonPrimaryText} numberOfLines={1} ellipsizeMode="tail">
+              {t('review.openGuide')}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -389,6 +397,7 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
+    flexShrink: 1,
   },
   selectButton: {
     borderWidth: 1,

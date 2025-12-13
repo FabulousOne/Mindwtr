@@ -1,14 +1,43 @@
 
+import { DrawerContentScrollView, DrawerItem, DrawerItemList } from '@react-navigation/drawer';
+import { Link, usePathname, useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
-import { Link, useRouter } from 'expo-router';
-import { TouchableOpacity, View, Text, useWindowDimensions } from 'react-native';
-import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import { Search } from 'lucide-react-native';
-import { useTheme } from '../../contexts/theme-context';
-import { useLanguage } from '../../contexts/language-context';
+import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+
 import { useTaskStore } from '@mindwtr/core';
 
+import { useLanguage } from '../../contexts/language-context';
+import { useTheme } from '../../contexts/theme-context';
+
 const PRIMARY_TINT = '#3B82F6';
+
+function TabsHeaderTitle() {
+  const pathname = usePathname();
+  const { isDark } = useTheme();
+  const { t } = useLanguage();
+
+  const title = (() => {
+    if (pathname.startsWith('/next')) return t('tab.next');
+    if (pathname.startsWith('/board')) return t('tab.board');
+    if (pathname.startsWith('/review')) return t('tab.review');
+    return t('tab.inbox');
+  })();
+
+  return (
+    <Text
+      style={{
+        color: isDark ? '#F9FAFB' : '#111827',
+        fontSize: 17,
+        fontWeight: '700',
+      }}
+      numberOfLines={1}
+      ellipsizeMode="tail"
+    >
+      {title}
+    </Text>
+  );
+}
 
 function CustomDrawerContent(props: any) {
   const { isDark } = useTheme();
@@ -96,9 +125,9 @@ export default function DrawerLayout() {
         name="(tabs)"
         options={{
           drawerLabel: t('nav.main'),
-          title: '',
-          headerTitle: '',
-          headerRight: () => null,
+          headerTitle: () => <TabsHeaderTitle />,
+          headerTitleAlign: 'center',
+          headerRight: () => <View style={{ width: 40 }} />,
           headerShadowVisible: false,
         }}
       />
