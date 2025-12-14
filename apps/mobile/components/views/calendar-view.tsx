@@ -735,14 +735,16 @@ export function CalendarView() {
             const taskCount = getTaskCountForDate(date);
             const eventCount = getExternalEventsForDate(date).length;
             const isSelected = selectedDate && isSameDay(date, selectedDate);
+            const todayCellBg = isDark ? 'rgba(59,130,246,0.10)' : '#EFF6FF';
+            const selectedCellBg = isDark ? 'rgba(59,130,246,0.18)' : '#DBEAFE';
 
             return (
               <Pressable
                 key={day}
                 style={[
                   styles.dayCell,
-                  isToday(date) && styles.todayCell,
-                  isSelected && styles.selectedCell,
+                  isToday(date) && { backgroundColor: todayCellBg },
+                  isSelected && { backgroundColor: selectedCellBg },
                 ]}
                 onPress={() => setSelectedDate(date)}
               >
