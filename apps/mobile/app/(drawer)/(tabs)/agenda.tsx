@@ -230,7 +230,7 @@ export default function AgendaScreen() {
       )}
       <SectionList
         sections={sections}
-        keyExtractor={(item) => `${item.id}:${item.isFocusedToday ? 'focus' : 'normal'}`}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         contentContainerStyle={styles.content}
