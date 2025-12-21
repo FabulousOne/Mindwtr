@@ -428,6 +428,12 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode }: T
         setShowMoreOptions(false);
     }, [savedOrder, savedHidden]);
 
+    useEffect(() => {
+        if (visible) {
+            setShowMoreOptions(false);
+        }
+    }, [visible]);
+
     const compactFieldIds = useMemo(() => {
         return taskEditorOrder.filter((fieldId) => !hiddenSet.has(fieldId));
     }, [taskEditorOrder, hiddenSet]);

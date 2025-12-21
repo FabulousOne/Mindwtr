@@ -55,6 +55,8 @@ export function SettingsView() {
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [updateError, setUpdateError] = useState<string | null>(null);
     const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
+    const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
 
     const [syncPath, setSyncPath] = useState<string>('');
     const [isSyncing, setIsSyncing] = useState(false);
@@ -237,6 +239,8 @@ export function SettingsView() {
                 return;
             }
             setUpdateInfo(info);
+            setDownloadNotice(null);
+            setIsDownloadingUpdate(false);
             setShowUpdateModal(true);
         } catch (error) {
             console.error('Update check failed:', error);
@@ -249,6 +253,8 @@ export function SettingsView() {
 
     const handleDownloadUpdate = async () => {
         const targetUrl = updateInfo?.downloadUrl || updateInfo?.releaseUrl || GITHUB_RELEASES_URL;
+        setIsDownloadingUpdate(true);
+        setDownloadNotice(t.downloadStarting);
 
         try {
             if (isTauriRuntime()) {
@@ -257,9 +263,11 @@ export function SettingsView() {
             } else {
                 window.open(targetUrl, '_blank');
             }
+            setDownloadNotice(t.downloadStarted);
         } catch (error) {
             console.error('Failed to open update URL:', error);
             window.open(targetUrl, '_blank');
+            setDownloadNotice(t.downloadFailed);
         }
 
         if (isTauriRuntime()) {
@@ -273,7 +281,9 @@ export function SettingsView() {
             }
         }
 
-        setShowUpdateModal(false);
+        setTimeout(() => {
+            setIsDownloadingUpdate(false);
+        }, 1200);
     };
 
     const labels = {
@@ -352,6 +362,9 @@ export function SettingsView() {
             updateAvailable: 'Update Available',
             checkFailed: 'Failed to check for updates',
             download: 'Download',
+            downloadStarting: 'Opening download…',
+            downloadStarted: 'Download started in your browser.',
+            downloadFailed: 'Failed to open download link.',
             changelog: 'Changelog',
             noChangelog: 'No changelog available',
             later: 'Later',
@@ -437,6 +450,9 @@ export function SettingsView() {
             updateAvailable: '有可用更新',
             checkFailed: '检查更新失败',
             download: '下载',
+            downloadStarting: '正在打开下载…',
+            downloadStarted: '已在浏览器开始下载。',
+            downloadFailed: '打开下载链接失败。',
             changelog: '更新日志',
             noChangelog: '暂无更新日志',
             later: '稍后',
@@ -1174,20 +1190,43 @@ export function SettingsView() {
                             <div className="bg-muted/50 rounded-md p-4 text-sm whitespace-pre-wrap max-h-60 overflow-y-auto">
                                 {updateInfo.releaseNotes || t.noChangelog}
                             </div>
+                            {(isDownloadingUpdate || downloadNotice) && (
+                                <div className="mt-4 space-y-2">
+                                    {downloadNotice && (
+                                        <div className="text-xs text-muted-foreground">{downloadNotice}</div>
+                                    )}
+                                    {isDownloadingUpdate && (
+                                        <div className="h-2 w-full rounded bg-muted">
+                                            <div className="h-2 w-1/2 rounded bg-green-500 animate-pulse"></div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className="p-6 border-t border-border flex gap-3 justify-end">
                             <button
-                                onClick={() => setShowUpdateModal(false)}
+                                onClick={() => {
+                                    setShowUpdateModal(false);
+                                    setIsDownloadingUpdate(false);
+                                    setDownloadNotice(null);
+                                }}
+                                disabled={isDownloadingUpdate}
                                 className="px-4 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80 transition-colors"
                             >
                                 {t.later}
                             </button>
                             <button
                                 onClick={handleDownloadUpdate}
-                                className="px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors flex items-center gap-2"
+                                disabled={isDownloadingUpdate}
+                                className={cn(
+                                    "px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2",
+                                    isDownloadingUpdate
+                                        ? "bg-green-600/60 text-white cursor-not-allowed"
+                                        : "bg-green-600 text-white hover:bg-green-700"
+                                )}
                             >
                                 <ExternalLink className="w-4 h-4" />
-                                {t.download}
+                                {isDownloadingUpdate ? t.downloadStarting : t.download}
                             </button>
                         </div>
                     </div>

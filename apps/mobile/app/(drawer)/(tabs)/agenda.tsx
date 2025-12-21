@@ -1,7 +1,7 @@
 import { View, Text, SectionList, Pressable, StyleSheet } from 'react-native';
 import { useMemo, useState, useCallback } from 'react';
 
-import { useTaskStore, Task, safeFormatDate, safeParseDate, isDueForReview, type TaskStatus } from '@mindwtr/core';
+import { useTaskStore, Task, safeFormatDate, safeParseDate, isDueForReview, getChecklistProgress, type TaskStatus } from '@mindwtr/core';
 
 import { useLanguage } from '../../../contexts/language-context';
 import { useTheme } from '../../../contexts/theme-context';
@@ -9,7 +9,7 @@ import { useTheme } from '../../../contexts/theme-context';
 import { useThemeColors, ThemeColors } from '@/hooks/use-theme-colors';
 
 
-function TaskCard({ task, onPress, onToggleFocus, tc, isDark, focusedCount, projectTitle, projectColor }: {
+function TaskCard({ task, onPress, onToggleFocus, tc, isDark, focusedCount, projectTitle, projectColor, onUpdateTask, t }: {
   task: Task;
   onPress: () => void;
   onToggleFocus?: () => void;
@@ -18,7 +18,10 @@ function TaskCard({ task, onPress, onToggleFocus, tc, isDark, focusedCount, proj
   focusedCount?: number;
   projectTitle?: string;
   projectColor?: string;
+  onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
+  t: (key: string) => string;
 }) {
+  const [showChecklist, setShowChecklist] = useState(false);
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       next: '#3B82F6',
@@ -46,6 +49,7 @@ function TaskCard({ task, onPress, onToggleFocus, tc, isDark, focusedCount, proj
   const isOverdue = dueDate && dueDate < now;
   const isDueToday = dueDate && dueDate.toDateString() === now.toDateString();
   const resolvedProjectColor = projectColor || tc.tint;
+  const checklistProgress = getChecklistProgress(task);
 
   // Can focus if: already focused, or we have room for more
   const canFocus = task.isFocusedToday || (focusedCount !== undefined && focusedCount < 3);
@@ -101,6 +105,60 @@ function TaskCard({ task, onPress, onToggleFocus, tc, isDark, focusedCount, proj
             </Text>
           )}
         </View>
+
+        {checklistProgress && (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              setShowChecklist((v) => !v);
+            }}
+            style={styles.checklistRow}
+            accessibilityRole="button"
+            accessibilityLabel={t('checklist.progress')}
+          >
+            <Text style={[styles.checklistText, { color: tc.secondaryText }]}>
+              {checklistProgress.completed}/{checklistProgress.total}
+            </Text>
+            <View style={[styles.checklistBar, { backgroundColor: tc.border }]}>
+              <View
+                style={[
+                  styles.checklistBarFill,
+                  { width: `${Math.round(checklistProgress.percent * 100)}%`, backgroundColor: tc.tint }
+                ]}
+              />
+            </View>
+          </Pressable>
+        )}
+
+        {showChecklist && (task.checklist || []).length > 0 && (
+          <View style={styles.checklistItems}>
+            {(task.checklist || []).map((item, index) => (
+              <Pressable
+                key={item.id || index}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  const nextList = (task.checklist || []).map((it, i) =>
+                    i === index ? { ...it, isCompleted: !it.isCompleted } : it
+                  );
+                  onUpdateTask(task.id, { checklist: nextList });
+                }}
+                style={styles.checklistItem}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[
+                    styles.checklistItemText,
+                    { color: tc.secondaryText },
+                    item.isCompleted && styles.checklistItemCompleted
+                  ]}
+                  numberOfLines={1}
+                >
+                  {item.isCompleted ? '✓ ' : '○ '} {item.title}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         {task.contexts && task.contexts.length > 0 && (
           <View style={styles.contextsRow}>
@@ -232,8 +290,10 @@ export default function AgendaScreen() {
       tc={tc}
       projectTitle={item.projectId ? projectById[item.projectId]?.title : undefined}
       projectColor={item.projectId ? projectById[item.projectId]?.color : undefined}
+      onUpdateTask={updateTask}
+      t={t}
     />
-  ), [handleTaskPress, handleToggleFocus, focusedCount, isDark, tc, projectById]);
+  ), [handleTaskPress, handleToggleFocus, focusedCount, isDark, tc, projectById, updateTask, t]);
 
   const renderSectionHeader = useCallback(({ section: { title } }: { section: { title: string } }) => (
     <View style={[styles.sectionHeaderContainer, { backgroundColor: tc.bg }]}>
@@ -446,6 +506,40 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(59,130,246,0.18)',
     borderWidth: 1,
     borderColor: 'rgba(59,130,246,0.35)',
+  },
+  checklistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  checklistText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  checklistBar: {
+    flex: 1,
+    height: 6,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  checklistBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  checklistItems: {
+    gap: 6,
+    marginBottom: 8,
+  },
+  checklistItem: {
+    paddingVertical: 4,
+  },
+  checklistItemText: {
+    fontSize: 12,
+  },
+  checklistItemCompleted: {
+    textDecorationLine: 'line-through',
+    opacity: 0.7,
   },
   emptyState: {
     alignItems: 'center',

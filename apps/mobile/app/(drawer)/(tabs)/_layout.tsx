@@ -46,15 +46,17 @@ export default function TabLayout() {
           ),
         tabBarButton: HapticTab,
         tabBarItemStyle: {
-          borderRadius: 14,
-          marginHorizontal: 6,
-          marginVertical: 6,
+          borderRadius: 0,
+          marginHorizontal: 0,
+          marginVertical: 0,
+          paddingVertical: 6,
         },
         tabBarStyle: {
           backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
           borderTopColor: isDark ? '#374151' : '#E5E7EB',
-          paddingTop: 6,
+          paddingTop: 0,
           height: 58,
+          paddingHorizontal: 0,
           ...Platform.select({
             ios: {
               position: 'absolute',
