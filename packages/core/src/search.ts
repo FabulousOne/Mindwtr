@@ -231,7 +231,9 @@ export function matchesProject(term: SearchTerm, project: Project, now: Date): b
 
 export function filterTasksBySearch(tasks: Task[], projects: Project[], query: string, now: Date = new Date()): Task[] {
     const ast = parseSearchQuery(query);
-    if (ast.clauses.length === 0) return [];
+    if (ast.clauses.length === 0) {
+        return tasks.filter((task) => !task.deletedAt);
+    }
 
     return tasks.filter((task) => {
         if (task.deletedAt) return false;
@@ -242,7 +244,9 @@ export function filterTasksBySearch(tasks: Task[], projects: Project[], query: s
 export function filterProjectsBySearch(projects: Project[], tasks: Task[], query: string, now: Date = new Date()): Project[] {
     void tasks;
     const ast = parseSearchQuery(query);
-    if (ast.clauses.length === 0) return [];
+    if (ast.clauses.length === 0) {
+        return projects.filter((project) => !project.deletedAt);
+    }
 
     return projects.filter((project) => {
         if (project.deletedAt) return false;

@@ -75,6 +75,24 @@ function isAbortError(error: unknown): boolean {
     return typeof error === 'object' && error !== null && 'name' in error && (error as any).name === 'AbortError';
 }
 
+function isAllowedInsecureUrl(rawUrl: string): boolean {
+    try {
+        const parsed = new URL(rawUrl);
+        if (parsed.protocol === 'https:') return true;
+        if (parsed.protocol !== 'http:') return false;
+        const host = parsed.hostname;
+        return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '10.0.2.2';
+    } catch {
+        return false;
+    }
+}
+
+function assertSecureUrl(url: string) {
+    if (!isAllowedInsecureUrl(url)) {
+        throw new Error('WebDAV requires HTTPS (except localhost).');
+    }
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
     const abortController = typeof AbortController === 'function' ? new AbortController() : null;
     const timeoutId = abortController ? setTimeout(() => abortController.abort(), timeoutMs) : null;
@@ -105,6 +123,7 @@ export async function webdavGetJson<T>(
     url: string,
     options: WebDavOptions = {}
 ): Promise<T | null> {
+    assertSecureUrl(url);
     const res = await fetchWithTimeout(
         url,
         {
@@ -129,6 +148,7 @@ export async function webdavPutJson(
     data: unknown,
     options: WebDavOptions = {}
 ): Promise<void> {
+    assertSecureUrl(url);
     const headers = buildHeaders(options);
     headers['Content-Type'] = headers['Content-Type'] || 'application/json';
 

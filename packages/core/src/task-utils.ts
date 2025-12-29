@@ -30,6 +30,12 @@ export const STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; borde
     'archived': { bg: '#6B728020', text: '#6B7280', border: '#6B7280' },
 };
 
+const safeTime = (value: string | undefined, fallback: number): number => {
+    if (!value) return fallback;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 /**
  * Sort tasks by status, due date, and creation time.
  * Order: inbox → next → waiting → someday → done → archived
@@ -45,17 +51,17 @@ export function sortTasks(tasks: Task[]): Task[] {
             return statusA - statusB;
         }
 
-        // 2. Sort by Due Date (tasks with due dates first)
-        if (a.dueDate && !b.dueDate) return -1;
-        if (!a.dueDate && b.dueDate) return 1;
-        if (a.dueDate && b.dueDate) {
-            const timeA = new Date(a.dueDate).getTime();
-            const timeB = new Date(b.dueDate).getTime();
-            if (timeA !== timeB) return timeA - timeB;
-        }
+        // 2. Sort by Due Date (tasks with valid due dates first)
+        const dueA = safeTime(a.dueDate, Number.NaN);
+        const dueB = safeTime(b.dueDate, Number.NaN);
+        const hasDueA = Number.isFinite(dueA);
+        const hasDueB = Number.isFinite(dueB);
+        if (hasDueA && !hasDueB) return -1;
+        if (!hasDueA && hasDueB) return 1;
+        if (hasDueA && hasDueB && dueA !== dueB) return dueA - dueB;
 
         // 3. Created At (oldest first for FIFO)
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        return safeTime(a.createdAt, 0) - safeTime(b.createdAt, 0);
     });
 }
 
@@ -70,18 +76,14 @@ export function sortTasksBy(tasks: Task[], sortBy: TaskSortBy = 'default'): Task
 
     const copy = [...tasks];
 
-    const timeOrInfinity = (value?: string) => {
-        if (!value) return Infinity;
-        const parsed = new Date(value).getTime();
-        return Number.isFinite(parsed) ? parsed : Infinity;
-    };
+    const timeOrInfinity = (value?: string) => safeTime(value, Infinity);
 
     switch (sortBy) {
         case 'title':
             return copy.sort((a, b) => {
                 const cmp = a.title.localeCompare(b.title);
                 if (cmp !== 0) return cmp;
-                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                return safeTime(a.createdAt, 0) - safeTime(b.createdAt, 0);
             });
         case 'due':
             return copy.sort((a, b) => {

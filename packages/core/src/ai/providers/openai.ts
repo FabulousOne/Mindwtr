@@ -1,6 +1,7 @@
 import type { AIProvider, AIProviderConfig, BreakdownInput, BreakdownResponse, ClarifyInput, ClarifyResponse, CopilotInput, CopilotResponse, ReviewAnalysisInput, ReviewAnalysisResponse } from '../types';
 import { buildBreakdownPrompt, buildClarifyPrompt, buildCopilotPrompt, buildReviewAnalysisPrompt } from '../prompts';
 import { normalizeTags, normalizeTimeEstimate, parseJson } from '../utils';
+import { isBreakdownResponse, isClarifyResponse, isCopilotResponse, isReviewAnalysisResponse } from '../validators';
 
 const OPENAI_BASE_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -51,22 +52,22 @@ export function createOpenAIProvider(config: AIProviderConfig): AIProvider {
         clarifyTask: async (input: ClarifyInput): Promise<ClarifyResponse> => {
             const prompt = buildClarifyPrompt(input);
             const text = await requestOpenAI(config, prompt);
-            return parseJson<ClarifyResponse>(text);
+            return parseJson<ClarifyResponse>(text, isClarifyResponse);
         },
         breakDownTask: async (input: BreakdownInput): Promise<BreakdownResponse> => {
             const prompt = buildBreakdownPrompt(input);
             const text = await requestOpenAI(config, prompt);
-            return parseJson<BreakdownResponse>(text);
+            return parseJson<BreakdownResponse>(text, isBreakdownResponse);
         },
         analyzeReview: async (input: ReviewAnalysisInput): Promise<ReviewAnalysisResponse> => {
             const prompt = buildReviewAnalysisPrompt(input.items);
             const text = await requestOpenAI(config, prompt);
-            return parseJson<ReviewAnalysisResponse>(text);
+            return parseJson<ReviewAnalysisResponse>(text, isReviewAnalysisResponse);
         },
         predictMetadata: async (input: CopilotInput): Promise<CopilotResponse> => {
             const prompt = buildCopilotPrompt(input);
             const text = await requestOpenAI(config, prompt);
-            const parsed = parseJson<CopilotResponse>(text);
+            const parsed = parseJson<CopilotResponse>(text, isCopilotResponse);
             const context = typeof parsed.context === 'string' ? parsed.context : undefined;
             const timeEstimate = typeof parsed.timeEstimate === 'string' ? parsed.timeEstimate : undefined;
             const tags = Array.isArray(parsed.tags) ? normalizeTags(parsed.tags) : [];

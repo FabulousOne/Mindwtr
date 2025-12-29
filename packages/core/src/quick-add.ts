@@ -15,7 +15,9 @@ const STATUS_TOKENS: Record<string, TaskStatus> = {
     done: 'done',
 };
 
-const DOW_MAP: Record<string, number> = {
+type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+const DOW_MAP: Partial<Record<string, DayOfWeek>> = {
     sun: 0,
     sunday: 0,
     mon: 1,
@@ -75,11 +77,14 @@ function parseNaturalDate(raw: string, now: Date): Date | null {
         base = addMonths(now, 1);
     } else if (text === 'next year') {
         base = addYears(now, 1);
-    } else if (DOW_MAP[text] !== undefined) {
-        base = nextDay(now, DOW_MAP[text] as any);
-    } else if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
-        const parsed = parseISO(text);
-        if (isValid(parsed)) base = parsed;
+    } else {
+        const dow = DOW_MAP[text];
+        if (dow !== undefined) {
+            base = nextDay(now, dow);
+        } else if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+            const parsed = parseISO(text);
+            if (isValid(parsed)) base = parsed;
+        }
     }
 
     if (!base || !isValid(base)) return null;

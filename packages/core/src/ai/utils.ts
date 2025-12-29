@@ -1,4 +1,4 @@
-export function parseJson<T>(raw: string): T {
+export function parseJson<T>(raw: string, validator?: (value: unknown) => value is T): T {
     const trimmed = raw.trim();
     if (!trimmed) {
         throw new Error('AI response was empty.');
@@ -8,19 +8,31 @@ export function parseJson<T>(raw: string): T {
         .replace(/```$/i, '')
         .trim();
     try {
-        return JSON.parse(cleaned) as T;
+        const parsed = JSON.parse(cleaned) as unknown;
+        if (validator && !validator(parsed)) {
+            throw new Error('AI response failed validation.');
+        }
+        return parsed as T;
     } catch (error) {
         const objectStart = cleaned.indexOf('{');
         const objectEnd = cleaned.lastIndexOf('}');
         if (objectStart !== -1 && objectEnd > objectStart) {
             const sliced = cleaned.slice(objectStart, objectEnd + 1);
-            return JSON.parse(sliced) as T;
+            const parsed = JSON.parse(sliced) as unknown;
+            if (validator && !validator(parsed)) {
+                throw new Error('AI response failed validation.');
+            }
+            return parsed as T;
         }
         const arrayStart = cleaned.indexOf('[');
         const arrayEnd = cleaned.lastIndexOf(']');
         if (arrayStart !== -1 && arrayEnd > arrayStart) {
             const sliced = cleaned.slice(arrayStart, arrayEnd + 1);
-            return JSON.parse(sliced) as T;
+            const parsed = JSON.parse(sliced) as unknown;
+            if (validator && !validator(parsed)) {
+                throw new Error('AI response failed validation.');
+            }
+            return parsed as T;
         }
         const message = error instanceof Error ? error.message : String(error);
         const preview = cleaned.length > 240 ? `${cleaned.slice(0, 240)}…` : cleaned;

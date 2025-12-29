@@ -184,11 +184,19 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                 allTasks = allTasks.map((task) => {
                     if (task.deletedAt) return task;
                     if (task.status !== 'done') return task;
-                    const completedAt = task.completedAt ? new Date(task.completedAt).getTime() : NaN;
-                    if (!Number.isFinite(completedAt) || completedAt <= 0) return task;
-                    if (completedAt >= cutoffMs) return task;
+                    const completedAt = task.completedAt ? Date.parse(task.completedAt) : NaN;
+                    const updatedAt = task.updatedAt ? Date.parse(task.updatedAt) : NaN;
+                    const resolvedCompletedAt = Number.isFinite(completedAt) ? completedAt : updatedAt;
+                    if (!Number.isFinite(resolvedCompletedAt) || resolvedCompletedAt <= 0) return task;
+                    if (resolvedCompletedAt >= cutoffMs) return task;
                     didAutoArchive = true;
-                    return { ...task, status: 'archived', isFocusedToday: false, updatedAt: nowIso };
+                    return {
+                        ...task,
+                        status: 'archived',
+                        completedAt: Number.isFinite(completedAt) ? task.completedAt : task.updatedAt || nowIso,
+                        isFocusedToday: false,
+                        updatedAt: nowIso,
+                    };
                 });
             }
             const allProjects = data.projects || [];

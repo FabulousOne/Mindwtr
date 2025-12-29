@@ -1,6 +1,7 @@
 import type { AIProvider, AIProviderConfig, BreakdownInput, BreakdownResponse, ClarifyInput, ClarifyResponse, CopilotInput, CopilotResponse, ReviewAnalysisInput, ReviewAnalysisResponse } from '../types';
 import { buildBreakdownPrompt, buildClarifyPrompt, buildCopilotPrompt, buildReviewAnalysisPrompt } from '../prompts';
 import { normalizeTags, normalizeTimeEstimate, parseJson } from '../utils';
+import { isBreakdownResponse, isClarifyResponse, isCopilotResponse, isReviewAnalysisResponse } from '../validators';
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -10,6 +11,10 @@ type GeminiSchema = {
     required?: string[];
     items?: Record<string, unknown>;
 };
+
+interface GeminiResponse {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
+}
 
 const CLARIFY_SCHEMA: GeminiSchema = {
     type: 'object',
@@ -125,9 +130,7 @@ async function requestGemini(config: AIProviderConfig, prompt: { system: string;
         throw new Error(`Gemini error: ${response.status} ${text}`);
     }
 
-    const result = await response.json() as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }, finishReason?: string }>;
-    };
+    const result = await response.json() as GeminiResponse;
 
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
@@ -142,49 +145,49 @@ export function createGeminiProvider(config: AIProviderConfig): AIProvider {
             const prompt = buildClarifyPrompt(input);
             const text = await requestGemini(config, prompt, CLARIFY_SCHEMA);
             try {
-                return parseJson<ClarifyResponse>(text);
+                return parseJson<ClarifyResponse>(text, isClarifyResponse);
             } catch (error) {
                 const retryPrompt = {
                     system: prompt.system,
                     user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
                 };
                 const retryText = await requestGemini(config, retryPrompt, CLARIFY_SCHEMA);
-                return parseJson<ClarifyResponse>(retryText);
+                return parseJson<ClarifyResponse>(retryText, isClarifyResponse);
             }
         },
         breakDownTask: async (input: BreakdownInput): Promise<BreakdownResponse> => {
             const prompt = buildBreakdownPrompt(input);
             const text = await requestGemini(config, prompt, BREAKDOWN_SCHEMA);
             try {
-                return parseJson<BreakdownResponse>(text);
+                return parseJson<BreakdownResponse>(text, isBreakdownResponse);
             } catch (error) {
                 const retryPrompt = {
                     system: prompt.system,
                     user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
                 };
                 const retryText = await requestGemini(config, retryPrompt, BREAKDOWN_SCHEMA);
-                return parseJson<BreakdownResponse>(retryText);
+                return parseJson<BreakdownResponse>(retryText, isBreakdownResponse);
             }
         },
         analyzeReview: async (input: ReviewAnalysisInput): Promise<ReviewAnalysisResponse> => {
             const prompt = buildReviewAnalysisPrompt(input.items);
             const text = await requestGemini(config, prompt, REVIEW_SCHEMA);
             try {
-                return parseJson<ReviewAnalysisResponse>(text);
+                return parseJson<ReviewAnalysisResponse>(text, isReviewAnalysisResponse);
             } catch (error) {
                 const retryPrompt = {
                     system: prompt.system,
                     user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
                 };
                 const retryText = await requestGemini(config, retryPrompt, REVIEW_SCHEMA);
-                return parseJson<ReviewAnalysisResponse>(retryText);
+                return parseJson<ReviewAnalysisResponse>(retryText, isReviewAnalysisResponse);
             }
         },
         predictMetadata: async (input: CopilotInput): Promise<CopilotResponse> => {
             const prompt = buildCopilotPrompt(input);
             const text = await requestGemini(config, prompt, COPILOT_SCHEMA);
             try {
-                const parsed = parseJson<CopilotResponse>(text);
+                const parsed = parseJson<CopilotResponse>(text, isCopilotResponse);
                 const context = typeof parsed.context === 'string' ? parsed.context : undefined;
                 const timeEstimate = typeof parsed.timeEstimate === 'string' ? parsed.timeEstimate : undefined;
                 const tags = Array.isArray(parsed.tags) ? normalizeTags(parsed.tags) : [];
@@ -199,7 +202,7 @@ export function createGeminiProvider(config: AIProviderConfig): AIProvider {
                     user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
                 };
                 const retryText = await requestGemini(config, retryPrompt, COPILOT_SCHEMA);
-                const parsed = parseJson<CopilotResponse>(retryText);
+                const parsed = parseJson<CopilotResponse>(retryText, isCopilotResponse);
                 const context = typeof parsed.context === 'string' ? parsed.context : undefined;
                 const timeEstimate = typeof parsed.timeEstimate === 'string' ? parsed.timeEstimate : undefined;
                 const tags = Array.isArray(parsed.tags) ? normalizeTags(parsed.tags) : [];
