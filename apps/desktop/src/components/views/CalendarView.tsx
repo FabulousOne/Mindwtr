@@ -594,5 +594,6 @@ export function CalendarView() {
                 </div>
             )}
         </div>
+        </div>
     );
 }
