@@ -82,6 +82,7 @@ export interface AIProviderConfig {
     endpoint?: string;
     reasoningEffort?: AIReasoningEffort;
     thinkingBudget?: number;
+    timeoutMs?: number;
 }
 
 export interface AIProvider {

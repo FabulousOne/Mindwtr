@@ -4,6 +4,9 @@ import { normalizeTags, normalizeTimeEstimate, parseJson } from '../utils';
 import { isBreakdownResponse, isClarifyResponse, isCopilotResponse, isReviewAnalysisResponse } from '../validators';
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 2;
+const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
 type GeminiSchema = {
     type: 'object' | 'array';
@@ -14,6 +17,23 @@ type GeminiSchema = {
 
 interface GeminiResponse {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+    const abortController = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeoutId = abortController ? setTimeout(() => abortController.abort(), timeoutMs) : null;
+    try {
+        return await fetch(url, { ...init, signal: abortController?.signal ?? init.signal });
+    } catch (error) {
+        if (abortController?.signal.aborted) {
+            throw new Error('Gemini request timed out');
+        }
+        throw error;
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+    }
 }
 
 const CLARIFY_SCHEMA: GeminiSchema = {
@@ -116,18 +136,42 @@ async function requestGemini(config: AIProviderConfig, prompt: { system: string;
         },
     };
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': config.apiKey,
-        },
-        body: JSON.stringify(body),
-    });
+    let response: Response | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+        try {
+            response = await fetchWithTimeout(
+                url,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': config.apiKey,
+                    },
+                    body: JSON.stringify(body),
+                },
+                config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+            );
+        } catch (error) {
+            if (attempt < MAX_RETRIES) {
+                await sleep(400 * Math.pow(2, attempt));
+                continue;
+            }
+            throw error;
+        }
 
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Gemini error: ${response.status} ${text}`);
+        if (!response.ok) {
+            if (RETRYABLE_STATUSES.has(response.status) && attempt < MAX_RETRIES) {
+                await sleep(400 * Math.pow(2, attempt));
+                continue;
+            }
+            const text = await response.text();
+            throw new Error(`Gemini error: ${response.status} ${text}`);
+        }
+        break;
+    }
+
+    if (!response) {
+        throw new Error('Gemini request failed to start.');
     }
 
     const result = await response.json() as GeminiResponse;
