@@ -1,4 +1,5 @@
-import { Colors } from '../constants/theme';
+import { Platform } from 'react-native';
+import { Colors, Material3 } from '../constants/theme';
 import { useTheme } from '../contexts/theme-context';
 
 export interface ThemeColors {
@@ -17,7 +18,26 @@ export interface ThemeColors {
 }
 
 export function useThemeColors() {
-    const { isDark } = useTheme();
+    const { isDark, themeStyle } = useTheme();
+    const useMaterial3 = themeStyle === 'material3' && Platform.OS === 'android';
+
+    if (useMaterial3) {
+        const palette = isDark ? Material3.dark : Material3.light;
+        return {
+            bg: palette.background,
+            cardBg: palette.surfaceContainer,
+            taskItemBg: palette.surfaceContainerHigh,
+            text: palette.text,
+            secondaryText: palette.secondaryText,
+            border: palette.outline,
+            tint: palette.primary,
+            inputBg: palette.surfaceVariant,
+            danger: palette.error,
+            success: palette.success,
+            warning: palette.warning,
+            filterBg: palette.surfaceVariant,
+        };
+    }
 
     const tc: ThemeColors = {
         bg: isDark ? Colors.dark.background : Colors.light.background,

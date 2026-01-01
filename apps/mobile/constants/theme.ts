@@ -27,6 +27,47 @@ export const Colors = {
   },
 };
 
+export const Material3 = {
+  light: {
+    primary: '#1B6EF3',
+    onPrimary: '#FFFFFF',
+    primaryContainer: '#D7E2FF',
+    onPrimaryContainer: '#001B3E',
+    secondary: '#58616E',
+    onSecondary: '#FFFFFF',
+    background: '#F9FAFF',
+    surface: '#F9FAFF',
+    surfaceContainer: '#EEF1F7',
+    surfaceContainerHigh: '#E5E9F0',
+    surfaceVariant: '#DFE3EB',
+    outline: '#73777F',
+    text: '#1A1C1E',
+    secondaryText: '#43474F',
+    error: '#BA1A1A',
+    success: '#0F7B3D',
+    warning: '#8C5A00',
+  },
+  dark: {
+    primary: '#AAC7FF',
+    onPrimary: '#003063',
+    primaryContainer: '#00458B',
+    onPrimaryContainer: '#D7E2FF',
+    secondary: '#C1C7D4',
+    onSecondary: '#2B313C',
+    background: '#111318',
+    surface: '#111318',
+    surfaceContainer: '#1B1E24',
+    surfaceContainerHigh: '#22252B',
+    surfaceVariant: '#43474E',
+    outline: '#8D9199',
+    text: '#E3E2E6',
+    secondaryText: '#C3C6CF',
+    error: '#FFB4AB',
+    success: '#7CDC94',
+    warning: '#F2C16E',
+  },
+};
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

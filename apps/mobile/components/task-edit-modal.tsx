@@ -53,7 +53,7 @@ const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'checklist',
 ];
 
-const DEFAULT_TASK_EDITOR_HIDDEN = DEFAULT_TASK_EDITOR_ORDER.filter((id) => !['status', 'priority', 'contexts', 'description'].includes(id));
+const DEFAULT_TASK_EDITOR_HIDDEN = DEFAULT_TASK_EDITOR_ORDER.filter((id) => !['status', 'priority', 'contexts', 'description', 'recurrence'].includes(id));
 
 type TaskEditTab = 'task' | 'view';
 

@@ -139,7 +139,7 @@ Download the disk image (`.dmg`) from [GitHub Releases](https://github.com/dongd
 Download the APK from [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases).
 
 **iOS:**
-iOS builds require an Apple Developer account ($99/year). Currently available as simulator builds only.
+iOS builds require an Apple Developer account ($99/year). Currently available as simulator builds only. If you want iOS builds, please consider [sponsoring the developer](https://github.com/sponsors/dongdongbh) so we can fund the Apple Developer account.
 
 ## Data Storage
 
@@ -164,4 +164,3 @@ Sync via File (Dropbox, etc.), WebDAV (Nextcloud, etc.), or Cloud can be configu
 ## Development
 
 For developers, see the [Development Guide](docs/development.md).
-

@@ -91,7 +91,7 @@ const maskCalendarUrl = (url: string): string => {
 };
 
 export default function SettingsPage() {
-    const { themeMode, setThemeMode, isDark } = useTheme();
+    const { themeMode, themeStyle, setThemeMode, setThemeStyle, isDark } = useTheme();
     const { language, setLanguage, t } = useLanguage();
     const { tasks, projects, settings, updateSettings } = useTaskStore();
     const [isSyncing, setIsSyncing] = useState(false);
@@ -465,6 +465,21 @@ export default function SettingsPage() {
                                 <Switch
                                     value={isDark}
                                     onValueChange={toggleDarkMode}
+                                    trackColor={{ false: '#767577', true: '#3B82F6' }}
+                                />
+                            </View>
+                        )}
+                        {Platform.OS === 'android' && (
+                            <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.material3Theme')}</Text>
+                                    <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                        {t('settings.material3ThemeDesc')}
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={themeStyle === 'material3'}
+                                    onValueChange={(value) => setThemeStyle(value ? 'material3' : 'default')}
                                     trackColor={{ false: '#767577', true: '#3B82F6' }}
                                 />
                             </View>
@@ -1081,7 +1096,7 @@ export default function SettingsPage() {
             'checklist',
         ];
 
-        const defaultTaskEditorHidden = defaultTaskEditorOrder.filter((id) => !['status', 'priority', 'contexts', 'description'].includes(id));
+        const defaultTaskEditorHidden = defaultTaskEditorOrder.filter((id) => !['status', 'priority', 'contexts', 'description', 'recurrence'].includes(id));
         const known = new Set(defaultTaskEditorOrder);
         const savedOrder = (settings.gtd?.taskEditor?.order ?? []).filter((id) => known.has(id));
         const taskEditorOrder = [...savedOrder, ...defaultTaskEditorOrder.filter((id) => !savedOrder.includes(id))];
