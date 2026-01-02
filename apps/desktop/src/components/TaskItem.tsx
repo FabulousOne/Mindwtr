@@ -1010,7 +1010,7 @@ export const TaskItem = memo(function TaskItem({
         <>
         <div
             data-task-id={task.id}
-            onClickCapture={() => onSelect?.()}
+            onClickCapture={onSelect ? () => onSelect?.() : undefined}
             className={cn(
                 "group bg-card border border-border rounded-lg p-4 hover:shadow-md transition-all animate-in fade-in slide-in-from-bottom-2 border-l-4",
                 isSelected && "ring-2 ring-primary/40",
@@ -1252,25 +1252,10 @@ export const TaskItem = memo(function TaskItem({
                         </form>
 	                    ) : (
                         <div
-                            onClick={(e) => {
-                                if (selectionMode) {
-                                    onToggleSelect?.();
-                                    return;
-                                }
-                                const target = e.target as HTMLElement | null;
-                                if (target?.closest('button, a, input, select, textarea')) return;
-                                setIsViewOpen((prev) => !prev);
-                            }}
-                            onDoubleClick={() => {
-                                if (!selectionMode) {
-                                    setIsEditing(true);
-                                }
-                            }}
                             className={cn(
                                 "group/content rounded -ml-2 pl-2 pr-1 py-1 transition-colors",
                                 selectionMode ? "cursor-pointer hover:bg-muted/40" : "cursor-default",
                             )}
-                            aria-expanded={isViewOpen}
                         >
                             <button
                                 type="button"
@@ -1280,23 +1265,44 @@ export const TaskItem = memo(function TaskItem({
                                 aria-hidden="true"
                                 tabIndex={-1}
                             />
-                            <div
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (selectionMode) {
+                                        onToggleSelect?.();
+                                        return;
+                                    }
+                                    setIsViewOpen((prev) => !prev);
+                                }}
+                                onDoubleClick={() => {
+                                    if (!selectionMode) {
+                                        setIsEditing(true);
+                                    }
+                                }}
                                 className={cn(
-                                    "text-base font-medium truncate group-hover/content:text-primary transition-colors",
-                                    task.status === 'done' && "line-through text-muted-foreground"
+                                    "w-full text-left rounded px-0.5 py-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40",
+                                    selectionMode ? "cursor-pointer" : "cursor-default"
                                 )}
+                                aria-expanded={isViewOpen}
+                                aria-label="Toggle task details"
                             >
-                                {task.title}
-                            </div>
-
-                            {isViewOpen && (
-                                <div onClick={(e) => e.stopPropagation()}>
+                                <div
+                                    className={cn(
+                                        "text-base font-medium truncate group-hover/content:text-primary transition-colors",
+                                        task.status === 'done' && "line-through text-muted-foreground"
+                                    )}
+                                >
+                                    {task.title}
+                                </div>
                                 {task.description && (
                                     <p className="text-sm text-muted-foreground mt-1">
                                         {stripMarkdown(task.description)}
                                     </p>
                                 )}
+                            </button>
 
+                            {isViewOpen && (
+                                <div onClick={(e) => e.stopPropagation()}>
 	                            {visibleAttachments.length > 0 && (
 	                                <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
 	                                    <Paperclip className="w-3 h-3" />

@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { addDays } from 'date-fns';
+import { safeParseDate } from './date';
 import { useTaskStore, flushPendingSave, setStorageAdapter } from './store';
 import type { StorageAdapter } from './storage';
 
@@ -18,6 +20,7 @@ describe('TaskStore', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+        vi.restoreAllMocks();
     });
 
     it('should add a task', () => {
@@ -131,7 +134,6 @@ describe('TaskStore', () => {
     });
 
     it('should roll a fluid recurring task from completion date', () => {
-        vi.setSystemTime(new Date('2023-01-10T09:00:00.000Z'));
         const { addTask, updateTask, moveTask } = useTaskStore.getState();
         addTask('Fluid Task', {
             status: 'next',
@@ -148,7 +150,10 @@ describe('TaskStore', () => {
         const nextInstance = state._allTasks.find(t => t.id !== original.id)!;
 
         expect(completed.completedAt).toBeTruthy();
-        expect(nextInstance.dueDate).toBe('2023-01-11T09:00:00.000Z');
+        const completedAt = completed.completedAt!;
+        const base = safeParseDate(completedAt) ?? new Date(completedAt);
+        const expectedNext = addDays(base, 1).toISOString();
+        expect(nextInstance.dueDate).toBe(expectedNext);
     });
 
     it('should increment pushCount when dueDate is pushed later', () => {
