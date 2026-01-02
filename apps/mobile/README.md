@@ -140,10 +140,10 @@ If you already have `apps/mobile/android` on disk, run prebuild so the ABI split
 npx expo prebuild --clean --platform android
 ```
 
-Then build locally:
+Then build locally (recommended):
 
 ```bash
-EAS_LOCAL_BUILD_ARTIFACTS_DIR=./build/android npx eas-cli build --platform android --profile production --local
+ARCHS=arm64-v8a bash ./scripts/android_build.sh
 ```
 
 After the build, grab the APKs from:
@@ -158,7 +158,13 @@ For IzzyOnDroid, upload the arm64 build:
 app-arm64-v8a-release.apk
 ```
 
-To change which ABIs are built, edit the `architectures` list for `./plugins/abi-splits` in `apps/mobile/app.json`.
+The build script also writes a versioned copy:
+
+```
+mindwtr-<version>-arm64-v8a.apk
+```
+
+To change which ABIs are built by default, edit the `architectures` list for `./plugins/abi-splits` in `apps/mobile/app.json`.
 
 ### 4. Upload to GitHub Release
 

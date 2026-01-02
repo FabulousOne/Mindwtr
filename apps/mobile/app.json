@@ -68,7 +68,10 @@
             "armeabi-v7a",
             "x86",
             "x86_64"
-          ]
+          ],
+          "enableMinifyInReleaseBuilds": true,
+          "enableShrinkResourcesInReleaseBuilds": true,
+          "useLegacyPackaging": true
         }
       ],
       "expo-build-properties"

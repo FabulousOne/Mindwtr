@@ -132,12 +132,26 @@ jobs:
   # Optional Android build (only when manually triggered with build_apk=true)
   android:
     runs-on: ubuntu-latest
-    name: Android Build (EAS)
+    name: Android Build (Gradle)
     if: ${{ github.event.inputs.build_apk == 'true' }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -147,37 +161,16 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Setup EAS CLI
-        run: npm install -g eas-cli
-
       - name: Build Android APKs (ABI split)
         run: |
           cd apps/mobile
-          eas build --platform android --profile production --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Download APKs from EAS
-        run: |
-          cd apps/mobile
-          eas build:list --platform android --status finished --limit 1 --json > build.json
-          BUILD_URL=$(cat build.json | jq -r '.[0].artifacts.buildUrl')
-          curl -L -o android-artifact "$BUILD_URL"
-          mkdir -p android-build
-          if tar -tf android-artifact >/dev/null 2>&1; then
-            tar -xzf android-artifact -C android-build
-          else
-            mv android-artifact android-build/android-app.apk
-          fi
-          find android-build -name "*.apk" -maxdepth 3 -print
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          ARCHS=arm64-v8a bash ./scripts/android_build.sh
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: apps/mobile/android-build/**/*.apk
+          path: apps/mobile/build/*.apk
           if-no-files-found: error
 
   # Optional iOS build (only when manually triggered with build_ios=true)

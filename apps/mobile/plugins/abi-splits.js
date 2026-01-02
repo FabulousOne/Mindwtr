@@ -31,6 +31,25 @@ function withAbiSplits(config, props = {}) {
         } else {
             config.modResults.push({ type: 'property', key: 'reactNativeArchitectures', value });
         }
+
+        const minify = props.enableMinifyInReleaseBuilds ?? true;
+        const shrink = props.enableShrinkResourcesInReleaseBuilds ?? true;
+        const legacyPackaging = props.useLegacyPackaging ?? true;
+        const gradleFlags = [
+            ['android.enableMinifyInReleaseBuilds', String(minify)],
+            ['android.enableShrinkResourcesInReleaseBuilds', String(shrink)],
+            ['expo.useLegacyPackaging', String(legacyPackaging)],
+        ];
+
+        for (const [key, flagValue] of gradleFlags) {
+            const entry = config.modResults.find((item) => item.type === 'property' && item.key === key);
+            if (entry) {
+                entry.value = flagValue;
+            } else {
+                config.modResults.push({ type: 'property', key, value: flagValue });
+            }
+        }
+
         return config;
     });
 

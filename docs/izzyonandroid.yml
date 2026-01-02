@@ -1,0 +1,38 @@
+# Draft IzzyOnDroid rbtlog recipe for Mindwtr.
+# Expected rbtlog filename: recipes/tech.dongdongbh.mindwtr.yml (Android applicationId).
+# Update tags/URLs per release before submitting.
+
+repository: https://github.com/dongdongbh/Mindwtr
+updates: releases
+labels:
+  - expo
+  - react-native
+versions:
+  - tag: v0.4.2
+    apks:
+      - apk_pattern: app-arm64-v8a-release.*\\.apk
+        apk_url: https://github.com/dongdongbh/Mindwtr/releases/download/v0.4.2/app-arm64-v8a-release.apk
+        build:
+          # Ensure a clean tree at the tag before building.
+          - git status --porcelain
+          - rm -rf apps/mobile/android
+          - cd apps/mobile
+          # Bun is used by this repo; install it in your builder if missing.
+          - bun install
+          # Build arm64 APK and place outputs under apps/mobile/build
+          - ARCHS=arm64-v8a OUTPUT_DIR=./build bash ./scripts/android_build.sh
+          - find ./build -name '*.apk' -maxdepth 2
+        build_timeout: 40
+        build_user: build
+        provisioning:
+          android_home: /opt/android
+          cmdline_tools:
+            version: '19.0'
+            url: https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+            sha256: 7ec965280a073311c339e571cd5de778b9975026cfcbe79f2b1cdcb1e15317ee
+          extra_packages:
+            - xz-utils
+            - python3
+          image: ubuntu:jammy
+          jdk: openjdk-17-jdk-headless
+          verify_gradle_wrapper: true
