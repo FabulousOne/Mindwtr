@@ -117,7 +117,7 @@ export function AgendaView() {
         });
         const nextActions = filteredActiveTasks.filter(t =>
             t.status === 'next' && !t.isFocusedToday
-        ).slice(0, 5);
+        );
 
         const reviewDue = filteredActiveTasks.filter(t =>
             (t.status === 'waiting' || t.status === 'someday') &&

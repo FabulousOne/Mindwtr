@@ -15,7 +15,7 @@ import { MarkdownText } from '../../components/markdown-text';
 import { ListSectionHeader, defaultListContentStyle } from '@/components/list-layout';
 
 export default function ProjectsScreen() {
-  const { projects, tasks, areas, addProject, updateProject, deleteProject, toggleProjectFocus, addArea, deleteArea } = useTaskStore();
+  const { projects, tasks, areas, addProject, updateProject, deleteProject, toggleProjectFocus, addArea, deleteArea, reorderAreas } = useTaskStore();
   const { t } = useLanguage();
   const tc = useThemeColors();
   const statusPalette: Record<Project['status'], { text: string; bg: string; border: string }> = {
@@ -53,7 +53,6 @@ export default function ProjectsScreen() {
   };
 
   const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-  const [selectedColor, setSelectedColor] = useState(colors[0]);
 
   const sortedAreas = useMemo(() => [...areas].sort((a, b) => a.order - b.order), [areas]);
   const areaById = useMemo(() => new Map(sortedAreas.map((area) => [area.id, area])), [sortedAreas]);
@@ -95,6 +94,37 @@ export default function ProjectsScreen() {
     const trimmed = value.trim();
     if (!trimmed) return '';
     return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  };
+
+  const moveArea = (areaId: string, delta: number) => {
+    const ids = sortedAreas.map((area) => area.id);
+    const index = ids.indexOf(areaId);
+    const nextIndex = index + delta;
+    if (index < 0 || nextIndex < 0 || nextIndex >= ids.length) return;
+    const reordered = [...ids];
+    [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+    reorderAreas(reordered);
+  };
+
+  const sortAreasByName = () => {
+    const reordered = [...sortedAreas]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((area) => area.id);
+    reorderAreas(reordered);
+  };
+
+  const sortAreasByColor = () => {
+    const reordered = [...sortedAreas]
+      .sort((a, b) => {
+        const colorA = (a.color || '').toLowerCase();
+        const colorB = (b.color || '').toLowerCase();
+        if (colorA && colorB && colorA !== colorB) return colorA.localeCompare(colorB);
+        if (colorA && !colorB) return -1;
+        if (!colorA && colorB) return 1;
+        return a.name.localeCompare(b.name);
+      })
+      .map((area) => area.id);
+    reorderAreas(reordered);
   };
 
   const toggleProjectTag = (tag: string) => {
@@ -143,7 +173,8 @@ export default function ProjectsScreen() {
 
   const handleAddProject = () => {
     if (newProjectTitle.trim()) {
-      addProject(newProjectTitle, selectedColor, {
+      const areaColor = newProjectAreaId ? areaById.get(newProjectAreaId)?.color : undefined;
+      addProject(newProjectTitle, areaColor || '#94a3b8', {
         areaId: newProjectAreaId || undefined,
       });
       setNewProjectTitle('');
@@ -373,19 +404,6 @@ export default function ProjectsScreen() {
             )}
           </View>
         </View>
-        <View style={styles.colorPicker}>
-          {colors.map((color) => (
-            <TouchableOpacity
-              key={color}
-              style={[
-                styles.colorOption,
-                { backgroundColor: color },
-                selectedColor === color && styles.colorOptionSelected,
-              ]}
-              onPress={() => setSelectedColor(color)}
-            />
-          ))}
-        </View>
         <TouchableOpacity
           onPress={handleAddProject}
           style={[styles.addButton, !newProjectTitle.trim() && styles.addButtonDisabled]}
@@ -412,6 +430,7 @@ export default function ProjectsScreen() {
           const nextAction = projTasks.find((task) => task.status === 'next');
           const focusedCount = projects.filter(p => p.isFocused).length;
           const showFocusedWarning = item.isFocused && !nextAction && projTasks.length > 0;
+          const projectColor = item.areaId ? areaById.get(item.areaId)?.color : undefined;
 
           return (
             <View style={[
@@ -443,7 +462,7 @@ export default function ProjectsScreen() {
                   setLinkInput('');
                 }}
               >
-                <View style={[styles.projectColor, { backgroundColor: item.color }]} />
+                <View style={[styles.projectColor, { backgroundColor: projectColor || '#6B7280' }]} />
                 <View style={styles.projectContent}>
                   <View style={styles.projectTitleRow}>
                     <Text style={[styles.projectTitle, { color: tc.text }]}>{item.title}</Text>
@@ -630,28 +649,6 @@ export default function ProjectsScreen() {
                       })}
                     </View>
                   )}
-                </View>
-
-                <View style={[styles.reviewContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
-                  <Text style={[styles.reviewLabel, { color: tc.text }]}>
-                    {t('projects.color') || 'Color'}
-                  </Text>
-                  <View style={styles.colorPicker}>
-                    {colors.map((color) => (
-                      <TouchableOpacity
-                        key={color}
-                        style={[
-                          styles.colorOption,
-                          { backgroundColor: color, borderColor: color === selectedProject.color ? tc.text : 'transparent' },
-                        ]}
-                        onPress={() => {
-                          if (selectedProject.color === color) return;
-                          updateProject(selectedProject.id, { color });
-                          setSelectedProject({ ...selectedProject, color });
-                        }}
-                      />
-                    ))}
-                  </View>
                 </View>
 
                 <View style={[styles.reviewContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
@@ -929,18 +926,44 @@ export default function ProjectsScreen() {
       >
         <Pressable style={styles.overlay} onPress={() => setShowAreaManager(false)}>
           <Pressable style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]} onPress={(e) => e.stopPropagation()}>
-            <Text style={[styles.linkModalTitle, { color: tc.text }]}>{t('projects.areaLabel')}</Text>
+            <View style={styles.areaManagerHeader}>
+              <Text style={[styles.linkModalTitle, { color: tc.text }]}>{t('projects.areaLabel')}</Text>
+              <View style={styles.areaSortButtons}>
+                <TouchableOpacity onPress={sortAreasByName} style={[styles.areaSortButton, { borderColor: tc.border }]}>
+                  <Text style={[styles.areaSortText, { color: tc.secondaryText }]}>{t('projects.sortByName')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={sortAreasByColor} style={[styles.areaSortButton, { borderColor: tc.border }]}>
+                  <Text style={[styles.areaSortText, { color: tc.secondaryText }]}>{t('projects.sortByColor')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             {sortedAreas.length === 0 ? (
               <Text style={[styles.helperText, { color: tc.secondaryText }]}>{t('projects.noArea')}</Text>
             ) : (
               <View style={styles.areaManagerList}>
-                {sortedAreas.map((area) => {
+                {sortedAreas.map((area, index) => {
                   const inUse = (areaUsage.get(area.id) || 0) > 0;
                   return (
                     <View key={area.id} style={[styles.areaManagerRow, { borderColor: tc.border }]}>
                       <View style={styles.areaManagerInfo}>
                         <View style={[styles.areaDot, { backgroundColor: area.color || tc.tint }]} />
                         <Text style={[styles.areaManagerText, { color: tc.text }]}>{area.name}</Text>
+                      </View>
+                      <View style={styles.areaOrderButtons}>
+                        <TouchableOpacity
+                          onPress={() => moveArea(area.id, -1)}
+                          disabled={index === 0}
+                          style={[styles.areaOrderButton, index === 0 && styles.areaOrderButtonDisabled]}
+                        >
+                          <Text style={[styles.areaOrderText, { color: index === 0 ? tc.secondaryText : tc.text }]}>↑</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => moveArea(area.id, 1)}
+                          disabled={index === sortedAreas.length - 1}
+                          style={[styles.areaOrderButton, index === sortedAreas.length - 1 && styles.areaOrderButtonDisabled]}
+                        >
+                          <Text style={[styles.areaOrderText, { color: index === sortedAreas.length - 1 ? tc.secondaryText : tc.text }]}>↓</Text>
+                        </TouchableOpacity>
                       </View>
                       <TouchableOpacity
                         disabled={inUse}
@@ -1464,6 +1487,27 @@ const styles = StyleSheet.create({
   areaManagerList: {
     marginBottom: 12,
   },
+  areaManagerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  areaSortButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  areaSortButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  areaSortText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   areaManagerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1479,6 +1523,26 @@ const styles = StyleSheet.create({
   areaManagerText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  areaOrderButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginRight: 8,
+  },
+  areaOrderButton: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  areaOrderButtonDisabled: {
+    opacity: 0.5,
+  },
+  areaOrderText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   areaDeleteButton: {
     paddingHorizontal: 6,

@@ -190,7 +190,7 @@ function TaskCard({ task, onPress, onToggleFocus, tc, isDark, focusedCount, proj
 }
 
 export default function AgendaScreen() {
-  const { tasks, projects, updateTask, settings } = useTaskStore();
+  const { tasks, projects, areas, updateTask, settings } = useTaskStore();
 
   const { t } = useLanguage();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -276,32 +276,31 @@ export default function AgendaScreen() {
         // Today's Focus: tasks marked as isFocusedToday
         const focusedTasks = filteredActiveTasks.filter(t => t.isFocusedToday);
 
-    const overdueTasks = filteredActiveTasks.filter(t => {
-      const dd = safeParseDate(t.dueDate);
-      return dd && dd < new Date() && !t.isFocusedToday;
-    });
-    const todayTasks = filteredActiveTasks.filter(t => {
-      const dd = safeParseDate(t.dueDate);
-      return dd && dd.toDateString() === new Date().toDateString() &&
-        !t.isFocusedToday;
-    });
-    const nextTasks = filteredActiveTasks.filter(t => t.status === 'next' && !t.isFocusedToday).slice(0, 5);
-    const reviewDueTasks = filteredActiveTasks.filter(t =>
-      (t.status === 'waiting' || t.status === 'someday') &&
-      isDueForReview(t.reviewAt, new Date()) &&
-      !t.isFocusedToday
-    );
-    const upcomingTasks = filteredActiveTasks
-      .filter(t => {
-        const dd = safeParseDate(t.dueDate);
-        return dd && dd > new Date() && !t.isFocusedToday;
-      })
-      .sort((a, b) => {
-        const da = safeParseDate(a.dueDate);
-        const db = safeParseDate(b.dueDate);
-        return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
-      })
-      .slice(0, 5);
+        const overdueTasks = filteredActiveTasks.filter(t => {
+          const dd = safeParseDate(t.dueDate);
+          return dd && dd < new Date() && !t.isFocusedToday;
+        });
+        const todayTasks = filteredActiveTasks.filter(t => {
+          const dd = safeParseDate(t.dueDate);
+          return dd && dd.toDateString() === new Date().toDateString() &&
+            !t.isFocusedToday;
+        });
+        const nextTasks = filteredActiveTasks.filter(t => t.status === 'next' && !t.isFocusedToday);
+        const reviewDueTasks = filteredActiveTasks.filter(t =>
+          (t.status === 'waiting' || t.status === 'someday') &&
+          isDueForReview(t.reviewAt, new Date()) &&
+          !t.isFocusedToday
+        );
+        const upcomingTasks = filteredActiveTasks
+          .filter(t => {
+            const dd = safeParseDate(t.dueDate);
+            return dd && dd > new Date() && !t.isFocusedToday;
+          })
+          .sort((a, b) => {
+            const da = safeParseDate(a.dueDate);
+            const db = safeParseDate(b.dueDate);
+            return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+          });
 
     if (isZenMode) {
       const limitedToday = todayTasks.slice(0, 3);
@@ -361,12 +360,14 @@ export default function AgendaScreen() {
     }
   };
 
+  const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
   const projectById = useMemo(() => {
-    return projects.reduce<Record<string, { title: string; color: string }>>((acc, project) => {
-      acc[project.id] = { title: project.title, color: project.color };
+    return projects.reduce<Record<string, { title: string; color?: string }>>((acc, project) => {
+      const projectColor = project.areaId ? areaById.get(project.areaId)?.color : undefined;
+      acc[project.id] = { title: project.title, color: projectColor };
       return acc;
     }, {});
-  }, [projects]);
+  }, [projects, areaById]);
 
   const renderItem = useCallback(({ item }: { item: Task }) => (
     <TaskCard

@@ -18,7 +18,8 @@ type CalendarReviewEntry = {
 
 function WeeklyReviewGuideModal({ onClose }: { onClose: () => void }) {
     const [currentStep, setCurrentStep] = useState<ReviewStep>('intro');
-    const { tasks, projects, settings, batchUpdateTasks } = useTaskStore();
+    const { tasks, projects, areas, settings, batchUpdateTasks } = useTaskStore();
+    const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const { t } = useLanguage();
     const [aiSuggestions, setAiSuggestions] = useState<ReviewSuggestion[]>([]);
     const [aiSelectedIds, setAiSelectedIds] = useState<Set<string>>(new Set());
@@ -380,7 +381,7 @@ function WeeklyReviewGuideModal({ onClose }: { onClose: () => void }) {
                                     <div key={project.id} className="border border-border rounded-lg p-4">
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: project.color }} />
+                                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: (project.areaId ? areaById.get(project.areaId)?.color : undefined) || '#94a3b8' }} />
                                                 <h3 className="font-semibold">{project.title}</h3>
                                             </div>
                                             <div className={cn("text-xs px-2 py-1 rounded-full", hasNextAction ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600")}>

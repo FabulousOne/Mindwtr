@@ -6,6 +6,7 @@ import { cn } from '../../lib/utils';
 interface TaskItemDisplayProps {
     task: Task;
     project?: Project;
+    projectColor?: string;
     selectionMode: boolean;
     isViewOpen: boolean;
     onToggleSelect?: () => void;
@@ -51,6 +52,7 @@ const getPriorityBadge = (priority: TaskPriority) => {
 export function TaskItemDisplay({
     task,
     project,
+    projectColor,
     selectionMode,
     isViewOpen,
     onToggleSelect,
@@ -148,7 +150,7 @@ export function TaskItemDisplay({
                         <div className="flex flex-wrap items-center gap-4 mt-2 text-xs">
                             {project && (
                                 <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/50 text-accent-foreground font-medium text-[10px]">
-                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: projectColor || '#94a3b8' }} />
                                     {project.title}
                                 </div>
                             )}

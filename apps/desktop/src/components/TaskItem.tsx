@@ -111,7 +111,7 @@ export const TaskItem = memo(function TaskItem({
     isMultiSelected = false,
     onToggleSelect,
 }: TaskItemProps) {
-    const { updateTask, deleteTask, moveTask, projects, tasks, settings, duplicateTask, resetTaskChecklist, highlightTaskId, setHighlightTask, addProject } = useTaskStore();
+    const { updateTask, deleteTask, moveTask, projects, tasks, areas, settings, duplicateTask, resetTaskChecklist, highlightTaskId, setHighlightTask, addProject } = useTaskStore();
     const { t } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
@@ -161,6 +161,7 @@ export const TaskItem = memo(function TaskItem({
     }, [isHighlighted, setHighlightTask]);
 
     const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+    const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
 
     const projectContext = useMemo(() => {
         const projectId = editProjectId || task.projectId;
@@ -198,7 +199,7 @@ export const TaskItem = memo(function TaskItem({
         const taskContexts = tasks.flatMap((t) => t.contexts || []);
         return Array.from(new Set([...PRESET_CONTEXTS, ...taskContexts])).sort();
     }, [tasks]);
-    const DEFAULT_PROJECT_COLOR = '#3b82f6';
+    const DEFAULT_PROJECT_COLOR = '#94a3b8';
     const handleCreateProject = useCallback(async (title: string) => {
         const trimmed = title.trim();
         if (!trimmed) return null;
@@ -993,6 +994,7 @@ export const TaskItem = memo(function TaskItem({
     };
 
     const project = propProject || (task.projectId ? projectById.get(task.projectId) : undefined);
+    const projectColor = project?.areaId ? areaById.get(project.areaId)?.color : undefined;
 
     return (
         <>
@@ -1084,6 +1086,7 @@ export const TaskItem = memo(function TaskItem({
                     <TaskItemDisplay
                         task={task}
                         project={project}
+                        projectColor={projectColor}
                         selectionMode={selectionMode}
                         isViewOpen={isViewOpen}
                         onToggleSelect={onToggleSelect}

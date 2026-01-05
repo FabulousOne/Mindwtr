@@ -22,7 +22,7 @@ const EMPTY_PRIORITIES: TaskPriority[] = [];
 const EMPTY_ESTIMATES: TimeEstimate[] = [];
 
 export function ListView({ title, statusFilter }: ListViewProps) {
-    const { tasks, projects, settings, updateSettings, addTask, addProject, updateTask, deleteTask, moveTask, batchMoveTasks, batchDeleteTasks, batchUpdateTasks, queryTasks, lastDataChangeAt } = useTaskStore();
+    const { tasks, projects, areas, settings, updateSettings, addTask, addProject, updateTask, deleteTask, moveTask, batchMoveTasks, batchDeleteTasks, batchUpdateTasks, queryTasks, lastDataChangeAt } = useTaskStore();
     const { t } = useLanguage();
     const { registerTaskListScope } = useKeybindings();
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
@@ -86,6 +86,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const allTokens = useMemo(() => {
         return Array.from(new Set([...allContexts, ...allTags])).sort();
     }, [allContexts, allTags]);
+    const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
 
     useEffect(() => {
         setAiKey(loadAIKey(aiProvider));
@@ -382,7 +383,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             const finalTitle = parsedTitle || newTaskTitle;
             const initialProps: Partial<Task> = { ...props };
             if (!initialProps.projectId && projectTitle) {
-                const created = await addProject(projectTitle, '#3b82f6');
+                const created = await addProject(projectTitle, '#94a3b8');
                 initialProps.projectId = created.id;
             }
             // Only set status if we have an explicit filter and parser didn't set one
@@ -544,7 +545,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             return;
         }
         const existing = projects.find((project) => project.title.toLowerCase() === projectTitle.toLowerCase());
-        const project = existing ?? await addProject(projectTitle, '#3b82f6');
+        const project = existing ?? await addProject(projectTitle, '#94a3b8');
         applyProcessingEdits({
             title: nextAction,
             status: 'next',
@@ -1036,7 +1037,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                                                     handleSetProject(existing.id);
                                                     return;
                                                 }
-                                                const created = await addProject(title, '#3b82f6');
+                                                const created = await addProject(title, '#94a3b8');
                                                 handleSetProject(created.id);
                                                 setProjectSearch('');
                                             }}
@@ -1049,7 +1050,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                                                 onClick={async () => {
                                                     const title = projectSearch.trim();
                                                     if (!title) return;
-                                                    const created = await addProject(title, '#3b82f6');
+                                                    const created = await addProject(title, '#94a3b8');
                                                     handleSetProject(created.id);
                                                     setProjectSearch('');
                                                 }}
@@ -1079,7 +1080,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                                                 >
                                                     <div
                                                         className="w-3 h-3 rounded-full"
-                                                        style={{ backgroundColor: project.color || '#6B7280' }}
+                                                        style={{ backgroundColor: (project.areaId ? areaById.get(project.areaId)?.color : undefined) || '#6B7280' }}
                                                     />
                                                     <span>{project.title}</span>
                                                 </button>
@@ -1219,7 +1220,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                         projects={projects}
                         contexts={allContexts}
                         onCreateProject={async (title) => {
-                            const created = await addProject(title, '#3b82f6');
+                            const created = await addProject(title, '#94a3b8');
                             return created.id;
                         }}
                         onChange={(next) => {

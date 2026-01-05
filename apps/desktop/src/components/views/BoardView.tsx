@@ -66,7 +66,7 @@ function DraggableTask({ task }: { task: Task }) {
 }
 
 export function BoardView() {
-    const { tasks, moveTask, settings, projects } = useTaskStore();
+    const { tasks, moveTask, settings, projects, areas } = useTaskStore();
     const { t } = useLanguage();
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
 
@@ -77,6 +77,7 @@ export function BoardView() {
     const NO_PROJECT_FILTER = '__no_project__';
     const hasProjectFilters = selectedProjectIds.length > 0;
     const showFiltersPanel = filtersOpen || hasProjectFilters;
+    const areaById = React.useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const sortedProjects = React.useMemo(
         () => projects.filter(p => !p.deletedAt).sort((a, b) => a.title.localeCompare(b.title)),
         [projects]
@@ -169,6 +170,7 @@ export function BoardView() {
                             </button>
                             {sortedProjects.map((project) => {
                                 const isActive = selectedProjectIds.includes(project.id);
+                                const projectColor = project.areaId ? areaById.get(project.areaId)?.color : undefined;
                                 return (
                                     <button
                                         key={project.id}
@@ -181,7 +183,10 @@ export function BoardView() {
                                                 : "bg-muted hover:bg-muted/80 text-muted-foreground"
                                         }`}
                                     >
-                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
+                                        <span
+                                            className="w-2 h-2 rounded-full"
+                                            style={{ backgroundColor: projectColor || "#6B7280" }}
+                                        />
                                         <span className="truncate max-w-[140px]">{project.title}</span>
                                     </button>
                                 );

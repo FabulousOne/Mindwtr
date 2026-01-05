@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTaskStore, Attachment, Task, type Project, generateUUID, safeFormatDate, safeParseDate, parseQuickAdd, PRESET_CONTEXTS } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { TaskInput } from '../Task/TaskInput';
-import { Plus, Folder, Trash2, ListOrdered, ChevronRight, ChevronDown, Archive as ArchiveIcon, RotateCcw, Paperclip, Link2 } from 'lucide-react';
+import { Plus, Folder, Trash2, ListOrdered, ChevronRight, ChevronDown, Archive as ArchiveIcon, RotateCcw, Paperclip, Link2, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../contexts/language-context';
 import { Markdown } from '../Markdown';
@@ -18,12 +18,11 @@ function toDateTimeLocalValue(dateStr: string | undefined): string {
 }
 
 export function ProjectsView() {
-    const { projects, tasks, areas, addArea, updateArea, deleteArea, addProject, updateProject, deleteProject, addTask, toggleProjectFocus, queryTasks, lastDataChangeAt } = useTaskStore();
+    const { projects, tasks, areas, addArea, updateArea, deleteArea, reorderAreas, addProject, updateProject, deleteProject, addTask, toggleProjectFocus, queryTasks, lastDataChangeAt } = useTaskStore();
     const { t } = useLanguage();
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [newProjectTitle, setNewProjectTitle] = useState('');
-    const [newProjectColor, setNewProjectColor] = useState('#3b82f6'); // Default blue
     const [notesExpanded, setNotesExpanded] = useState(false);
     const [showNotesPreview, setShowNotesPreview] = useState(false);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -44,7 +43,6 @@ export function ProjectsView() {
     const NO_TAGS = '__none__';
     const [selectedArea, setSelectedArea] = useState(ALL_AREAS);
     const [selectedTag, setSelectedTag] = useState(ALL_TAGS);
-    const projectColorInputRef = useRef<HTMLInputElement | null>(null);
 
     useEffect(() => {
         setAttachmentError(null);
@@ -74,6 +72,45 @@ export function ProjectsView() {
 
     const toggleAreaCollapse = (areaId: string) => {
         setCollapsedAreas((prev) => ({ ...prev, [areaId]: !prev[areaId] }));
+    };
+
+    const getProjectColor = (project: Project) => {
+        if (project.areaId) {
+            const area = areaById.get(project.areaId);
+            if (area?.color) return area.color;
+        }
+        return '#94a3b8';
+    };
+
+    const moveArea = (areaId: string, delta: number) => {
+        const ids = sortedAreas.map((area) => area.id);
+        const index = ids.indexOf(areaId);
+        const nextIndex = index + delta;
+        if (index < 0 || nextIndex < 0 || nextIndex >= ids.length) return;
+        const reordered = [...ids];
+        [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+        reorderAreas(reordered);
+    };
+
+    const sortAreasByName = () => {
+        const reordered = [...sortedAreas]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((area) => area.id);
+        reorderAreas(reordered);
+    };
+
+    const sortAreasByColor = () => {
+        const reordered = [...sortedAreas]
+            .sort((a, b) => {
+                const colorA = (a.color || '').toLowerCase();
+                const colorB = (b.color || '').toLowerCase();
+                if (colorA && colorB && colorA !== colorB) return colorA.localeCompare(colorB);
+                if (colorA && !colorB) return -1;
+                if (!colorA && colorB) return 1;
+                return a.name.localeCompare(b.name);
+            })
+            .map((area) => area.id);
+        reorderAreas(reordered);
     };
 
     // Group tasks by project to avoid O(N*M) filtering
@@ -165,7 +202,10 @@ export function ProjectsView() {
     const handleCreateProject = (e: React.FormEvent) => {
         e.preventDefault();
         if (newProjectTitle.trim()) {
-            addProject(newProjectTitle, newProjectColor);
+            const resolvedAreaId =
+                selectedArea !== ALL_AREAS && selectedArea !== NO_AREA ? selectedArea : undefined;
+            const areaColor = resolvedAreaId ? areaById.get(resolvedAreaId)?.color : undefined;
+            addProject(newProjectTitle, areaColor || '#94a3b8', resolvedAreaId ? { areaId: resolvedAreaId } : undefined);
             setNewProjectTitle('');
             setIsCreating(false);
         }
@@ -343,15 +383,6 @@ export function ProjectsView() {
                             placeholder={t('projects.projectName')}
                             className="w-full bg-transparent border-b border-primary/50 p-1 text-sm focus:outline-none"
                         />
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="color"
-                                value={newProjectColor}
-                                onChange={(e) => setNewProjectColor(e.target.value)}
-                                className="w-6 h-6 rounded cursor-pointer border-0 p-0"
-                            />
-                            <span className="text-xs text-muted-foreground">{t('projects.color')}</span>
-                        </div>
                         <div className="flex gap-2 justify-end">
                             <button
                                 type="button"
@@ -445,7 +476,7 @@ export function ProjectsView() {
                                                 >
                                                     {project.isFocused ? '⭐' : '☆'}
                                                 </button>
-                                                <Folder className="w-4 h-4" style={{ color: project.color }} />
+                                                <Folder className="w-4 h-4" style={{ color: getProjectColor(project) }} />
                                                 <span className="flex-1 truncate">{project.title}</span>
                                                 <span className="text-xs text-muted-foreground">
                                                     {projTasks.length}
@@ -517,7 +548,7 @@ export function ProjectsView() {
                                                         onClick={() => setSelectedProjectId(project.id)}
                                                     >
                                                         <div className="flex items-center gap-2 p-2">
-                                                            <Folder className="w-4 h-4" style={{ color: project.color }} />
+                                                            <Folder className="w-4 h-4" style={{ color: getProjectColor(project) }} />
                                                             <span className="flex-1 truncate">{project.title}</span>
                                                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground uppercase">
                                                                 {t(`status.${project.status}`) || project.status}
@@ -548,20 +579,9 @@ export function ProjectsView() {
                         <header className="mb-6 space-y-3">
                             <div className="flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <button
-                                        type="button"
-                                        onClick={() => projectColorInputRef.current?.click()}
-                                        className="w-4 h-4 rounded-full border border-border"
-                                        style={{ backgroundColor: selectedProject.color }}
-                                        title={t('projects.color')}
-                                        aria-label={t('projects.color')}
-                                    />
-                                    <input
-                                        ref={projectColorInputRef}
-                                        type="color"
-                                        value={selectedProject.color}
-                                        onChange={(e) => updateProject(selectedProject.id, { color: e.target.value })}
-                                        className="sr-only"
+                                    <span
+                                        className="w-3 h-3 rounded-full border border-border"
+                                        style={{ backgroundColor: getProjectColor(selectedProject) }}
                                         aria-hidden="true"
                                     />
                                     <div className="flex flex-col min-w-0">
@@ -892,7 +912,7 @@ export function ProjectsView() {
                                     if (!props.status) initialProps.status = 'next';
                                     if (!props.projectId) initialProps.projectId = selectedProject.id;
                                     if (!initialProps.projectId && projectTitle) {
-                                        const created = await addProject(projectTitle, '#3b82f6');
+                                        const created = await addProject(projectTitle, '#94a3b8');
                                         initialProps.projectId = created.id;
                                     }
                                     await addTask(finalTitle, initialProps);
@@ -905,7 +925,7 @@ export function ProjectsView() {
                                     projects={projects}
                                     contexts={allContexts}
                                     onCreateProject={async (title) => {
-                                        const created = await addProject(title, '#3b82f6');
+                                        const created = await addProject(title, '#94a3b8');
                                         return created.id;
                                     }}
                                     onChange={(next) => setProjectTaskTitle(next)}
@@ -954,8 +974,26 @@ export function ProjectsView() {
                     className="w-full max-w-lg bg-popover text-popover-foreground rounded-xl border shadow-2xl overflow-hidden flex flex-col"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="px-4 py-3 border-b flex items-center justify-between">
-                        <h3 className="font-semibold">Manage Areas</h3>
+                    <div className="px-4 py-3 border-b flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">Manage Areas</h3>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={sortAreasByName}
+                                    className="text-xs px-2 py-1 rounded border border-border bg-muted/50 hover:bg-muted"
+                                >
+                                    {t('projects.sortByName')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={sortAreasByColor}
+                                    className="text-xs px-2 py-1 rounded border border-border bg-muted/50 hover:bg-muted"
+                                >
+                                    {t('projects.sortByColor')}
+                                </button>
+                            </div>
+                        </div>
                         <button
                             type="button"
                             onClick={() => setShowAreaManager(false)}
@@ -971,7 +1009,7 @@ export function ProjectsView() {
                                     {t('projects.noArea')}
                                 </div>
                             )}
-                            {sortedAreas.map((area) => (
+                            {sortedAreas.map((area, index) => (
                                 <div key={area.id} className="flex items-center gap-2">
                                     <input
                                         type="color"
@@ -1001,6 +1039,26 @@ export function ProjectsView() {
                                         }}
                                         className="flex-1 bg-muted/50 border border-border rounded px-2 py-1 text-sm"
                                     />
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => moveArea(area.id, -1)}
+                                            className="h-8 w-8 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+                                            title={t('projects.moveUp')}
+                                            disabled={index === 0}
+                                        >
+                                            <ArrowUp className="w-4 h-4 mx-auto" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => moveArea(area.id, 1)}
+                                            className="h-8 w-8 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+                                            title={t('projects.moveDown')}
+                                            disabled={index === sortedAreas.length - 1}
+                                        >
+                                            <ArrowDown className="w-4 h-4 mx-auto" />
+                                        </button>
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={async () => {

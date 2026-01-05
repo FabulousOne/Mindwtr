@@ -258,7 +258,7 @@ export function TaskList({
     if (!props.status) initialProps.status = defaultStatus;
     if (!props.projectId && projectId) initialProps.projectId = projectId;
     if (!initialProps.projectId && projectTitle) {
-      const created = await addProject(projectTitle, '#3b82f6');
+      const created = await addProject(projectTitle, '#94a3b8');
       initialProps.projectId = created.id;
     }
     if (copilotContext) {
@@ -285,7 +285,7 @@ export function TaskList({
     if (option.kind === 'create') {
       const title = option.value.trim();
       if (title) {
-        await addProject(title, '#3b82f6');
+        await addProject(title, '#94a3b8');
       }
     }
     if (trigger.type === 'project') {

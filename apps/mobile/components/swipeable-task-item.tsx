@@ -48,10 +48,12 @@ export function SwipeableTaskItem({
     const swipeableRef = useRef<Swipeable>(null);
     const ignorePressUntil = useRef<number>(0);
     const { t, language } = useLanguage();
-    const { updateTask, projects, settings } = useTaskStore();
+    const { updateTask, projects, areas, settings } = useTaskStore();
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
 
+    const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const project: Project | undefined = task.projectId ? projects.find(p => p.id === task.projectId) : undefined;
+    const projectColor = project?.areaId ? areaById.get(project.areaId)?.color : undefined;
 
     // Status-aware left swipe action
     const getLeftAction = (): { label: string; color: string; action: TaskStatus } => {
@@ -217,8 +219,8 @@ export function SwipeableTaskItem({
                             </Text>
                         )}
                         {project && (
-                            <View style={[styles.projectBadge, { backgroundColor: project.color + '20', borderColor: project.color }]}>
-                                <Text style={[styles.projectBadgeText, { color: project.color }]} numberOfLines={1}>
+                            <View style={[styles.projectBadge, { backgroundColor: (projectColor || tc.tint) + '20', borderColor: projectColor || tc.tint }]}>
+                                <Text style={[styles.projectBadgeText, { color: projectColor || tc.tint }]} numberOfLines={1}>
                                     📁 {project.title}
                                 </Text>
                             </View>

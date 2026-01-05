@@ -14,7 +14,7 @@ import { buildAIConfig, loadAIKey } from '../../../lib/ai-config';
 
 export default function InboxScreen() {
 
-  const { tasks, projects, settings, updateTask, deleteTask, addProject } = useTaskStore();
+  const { tasks, projects, areas, settings, updateTask, deleteTask, addProject } = useTaskStore();
   const { t } = useLanguage();
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -111,6 +111,7 @@ export default function InboxScreen() {
   };
 
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
+  const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
 
   const filteredProjects = useMemo(() => {
     if (!projectSearch.trim()) return projects;
@@ -766,7 +767,7 @@ export default function InboxScreen() {
                           handleSetProject(existing.id);
                           return;
                         }
-                        const created = await addProject(title, '#3b82f6');
+                        const created = await addProject(title, '#94a3b8');
                         handleSetProject(created.id);
                         setProjectSearch('');
                       }}
@@ -778,7 +779,7 @@ export default function InboxScreen() {
                         onPress={async () => {
                           const title = projectSearch.trim();
                           if (!title) return;
-                          const created = await addProject(title, '#3b82f6');
+                          const created = await addProject(title, '#94a3b8');
                           handleSetProject(created.id);
                           setProjectSearch('');
                         }}
@@ -795,16 +796,19 @@ export default function InboxScreen() {
 	                  >
 	                    <Text style={styles.projectChipText}>✓ {t('inbox.noProject')}</Text>
 	                  </TouchableOpacity>
-                  {filteredProjects.map(proj => (
-                    <TouchableOpacity
-                      key={proj.id}
-                      style={[styles.projectChip, { backgroundColor: tc.cardBg, borderWidth: 1, borderColor: tc.border }]}
-                      onPress={() => handleSetProject(proj.id)}
-                    >
-                      <View style={[styles.projectDot, { backgroundColor: proj.color || '#6B7280' }]} />
-                      <Text style={[styles.projectChipText, { color: tc.text }]}>{proj.title}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {filteredProjects.map(proj => {
+                    const projectColor = proj.areaId ? areaById.get(proj.areaId)?.color : undefined;
+                    return (
+                      <TouchableOpacity
+                        key={proj.id}
+                        style={[styles.projectChip, { backgroundColor: tc.cardBg, borderWidth: 1, borderColor: tc.border }]}
+                        onPress={() => handleSetProject(proj.id)}
+                      >
+                        <View style={[styles.projectDot, { backgroundColor: projectColor || '#6B7280' }]} />
+                        <Text style={[styles.projectChipText, { color: tc.text }]}>{proj.title}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </View>
             )}

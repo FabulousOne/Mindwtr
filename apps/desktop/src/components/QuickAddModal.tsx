@@ -70,7 +70,7 @@ export function QuickAddModal() {
         if (!finalTitle.trim()) return;
         let projectId = props.projectId;
         if (!projectId && projectTitle) {
-            const created = await addProject(projectTitle, '#3b82f6');
+            const created = await addProject(projectTitle, '#94a3b8');
             projectId = created.id;
         }
         const initialProps: Partial<Task> = { status: 'inbox', ...props, projectId };
@@ -110,7 +110,7 @@ export function QuickAddModal() {
                         projects={projects}
                         contexts={PRESET_CONTEXTS}
                         onCreateProject={async (title) => {
-                            const created = await addProject(title, '#3b82f6');
+                            const created = await addProject(title, '#94a3b8');
                             return created.id;
                         }}
                         onChange={(next) => setValue(next)}

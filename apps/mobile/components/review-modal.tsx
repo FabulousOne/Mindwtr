@@ -117,7 +117,8 @@ const getReviewLabels = (lang: string) => {
 };
 
 export function ReviewModal({ visible, onClose }: ReviewModalProps) {
-    const { tasks, projects, updateTask, deleteTask, settings, batchUpdateTasks } = useTaskStore();
+    const { tasks, projects, areas, updateTask, deleteTask, settings, batchUpdateTasks } = useTaskStore();
+    const areaById = React.useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const { isDark } = useTheme();
     const { language } = useLanguage();
     const [currentStep, setCurrentStep] = useState<ReviewStep>('intro');
@@ -477,7 +478,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                                                 onPress={() => setExpandedProject(isExpanded ? null : project.id)}
                                             >
                                                 <View style={styles.projectHeader}>
-                                                    <View style={[styles.projectDot, { backgroundColor: project.color }]} />
+                                                    <View style={[styles.projectDot, { backgroundColor: (project.areaId ? areaById.get(project.areaId)?.color : undefined) || tc.tint }]} />
                                                     <Text style={[styles.projectTitle, { color: tc.text }]}>{project.title}</Text>
                                                     <View style={[styles.statusBadge, { backgroundColor: hasNextAction ? '#10B98120' : '#EF444420' }]}>
                                                         <Text style={[styles.statusText, { color: hasNextAction ? '#10B981' : '#EF4444' }]}>

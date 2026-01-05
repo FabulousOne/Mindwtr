@@ -100,6 +100,7 @@ function DraggableTask({ task, isDark, currentColumnIndex, onDrop, onTap, onDele
     return estimate;
   })();
 
+  const resolvedProjectColor = projectColor || '#6B7280';
   const showMetaRow = Boolean(projectTitle) || (task.tags?.length ?? 0) > 0 || (task.contexts?.length ?? 0) > 0 || Boolean(timeEstimateLabel);
 
   return (
@@ -125,9 +126,9 @@ function DraggableTask({ task, isDark, currentColumnIndex, onDrop, onTap, onDele
 	            </Text>
               {showMetaRow && (
                 <View style={styles.contextsRow}>
-                  {projectTitle && projectColor && (
-                    <View style={[styles.projectBadge, { backgroundColor: projectColor + '20', borderColor: projectColor }]}>
-                      <Text style={[styles.projectBadgeText, { color: projectColor }]} numberOfLines={1}>
+                  {projectTitle && (
+                    <View style={[styles.projectBadge, { backgroundColor: resolvedProjectColor + '20', borderColor: resolvedProjectColor }]}>
+                      <Text style={[styles.projectBadgeText, { color: resolvedProjectColor }]} numberOfLines={1}>
                         📁 {projectTitle}
                       </Text>
                     </View>
@@ -221,18 +222,20 @@ function Column({ columnIndex, label, color, tasks, isDark, onDrop, onTap, onDel
 }
 
 export function BoardView() {
-  const { tasks, projects, updateTask, deleteTask } = useTaskStore();
+  const { tasks, projects, areas, updateTask, deleteTask } = useTaskStore();
   const { isDark } = useTheme();
   const { t } = useLanguage();
   const timeEstimatesEnabled = useTaskStore((state) => state.settings?.features?.timeEstimates === true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
+  const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
   const projectById = useMemo(() => {
     return projects.reduce((acc, project) => {
-      acc[project.id] = { title: project.title, color: project.color };
+      const projectColor = project.areaId ? areaById.get(project.areaId)?.color : undefined;
+      acc[project.id] = { title: project.title, color: projectColor };
       return acc;
-    }, {} as Record<string, { title: string; color: string }>);
-  }, [projects]);
+    }, {} as Record<string, { title: string; color?: string }>);
+  }, [projects, areaById]);
 
   // Filter active tasks and group by status
   const tasksByStatus = useMemo(() => {
