@@ -17,6 +17,7 @@ type NotificationResponse = {
       };
     };
   };
+  actionIdentifier?: string;
 };
 type Subscription = { remove: () => void };
 
@@ -338,7 +339,7 @@ export async function startMobileNotifications() {
 
   responseSubscription?.remove();
   responseSubscription = api.addNotificationResponseReceivedListener((response: NotificationResponse) => {
-    const taskId = (response.notification.request.content.data as any)?.taskId as string | undefined;
+    const taskId = (response.notification?.request?.content?.data as any)?.taskId as string | undefined;
     if (response.actionIdentifier === 'snooze10' && taskId) {
       snoozeTask(api, taskId, 10).catch(console.error);
     }
