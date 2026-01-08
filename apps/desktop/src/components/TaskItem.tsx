@@ -238,10 +238,6 @@ export const TaskItem = memo(function TaskItem({
         [taskEditorOrder]
     );
 
-    const showProjectField = useMemo(() => {
-        return showDetails || !hiddenSet.has('project') || hasValue('project');
-    }, [hasValue, hiddenSet, showDetails]);
-
     const hasValue = useCallback((fieldId: TaskEditorFieldId) => {
         switch (fieldId) {
             case 'status':
@@ -291,6 +287,10 @@ export const TaskItem = memo(function TaskItem({
         timeEstimatesEnabled,
         visibleEditAttachments.length,
     ]);
+
+    const showProjectField = useMemo(() => {
+        return showDetails || !hiddenSet.has('project') || hasValue('project');
+    }, [hasValue, hiddenSet, showDetails]);
 
     const fieldIdsToRender = useMemo(() => {
         if (showDetails) return editorFieldIds;

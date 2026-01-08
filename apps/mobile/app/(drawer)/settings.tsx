@@ -1353,6 +1353,7 @@ export default function SettingsPage() {
 
         const baseTaskEditorOrder: TaskEditorFieldId[] = [
             'status',
+            'project',
             'priority',
             'contexts',
             'description',
@@ -1366,7 +1367,7 @@ export default function SettingsPage() {
             'checklist',
         ];
         const defaultTaskEditorOrder = baseTaskEditorOrder.filter((fieldId) => !featureHiddenFields.has(fieldId));
-        const alwaysVisible: TaskEditorFieldId[] = ['status', 'priority', 'contexts', 'description', 'recurrence'];
+        const alwaysVisible: TaskEditorFieldId[] = ['status', 'project', 'priority', 'contexts', 'description', 'recurrence'];
         const defaultTaskEditorHidden = defaultTaskEditorOrder.filter((id) => !alwaysVisible.includes(id));
         const known = new Set(defaultTaskEditorOrder);
         const savedOrder = (settings.gtd?.taskEditor?.order ?? []).filter((id) => known.has(id));
@@ -1375,12 +1376,14 @@ export default function SettingsPage() {
         const savedHidden = settings.gtd?.taskEditor?.hidden ?? defaultTaskEditorHidden;
         const hiddenSet = new Set(savedHidden.filter((id) => known.has(id)));
 
-        const fieldLabel = (fieldId: TaskEditorFieldId) => {
-            switch (fieldId) {
-                case 'status':
-                    return t('taskEdit.statusLabel');
-                case 'priority':
-                    return t('taskEdit.priorityLabel');
+            const fieldLabel = (fieldId: TaskEditorFieldId) => {
+                switch (fieldId) {
+                    case 'status':
+                        return t('taskEdit.statusLabel');
+                    case 'project':
+                        return t('taskEdit.projectLabel');
+                    case 'priority':
+                        return t('taskEdit.priorityLabel');
                 case 'contexts':
                     return t('taskEdit.contextsLabel');
                 case 'description':

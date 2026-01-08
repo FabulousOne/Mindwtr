@@ -46,6 +46,7 @@ const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'do
 
 const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'status',
+    'project',
     'priority',
     'contexts',
     'description',
@@ -698,6 +699,11 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         return [...normalized, ...missing].filter((id) => !disabledFields.has(id));
     }, [savedOrder, disabledFields]);
 
+    const hiddenSet = useMemo(() => {
+        const known = new Set(taskEditorOrder);
+        return new Set((settings.gtd?.taskEditor?.hidden ?? []).filter((id) => known.has(id)));
+    }, [settings.gtd?.taskEditor?.hidden, taskEditorOrder]);
+
     const primaryFieldIds = useMemo(() => new Set<TaskEditorFieldId>(['dueDate']), []);
 
     useEffect(() => {
@@ -713,6 +719,8 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         switch (fieldId) {
             case 'status':
                 return Boolean(mergedTask.status);
+            case 'project':
+                return Boolean(mergedTask.projectId);
             case 'priority':
                 return prioritiesEnabled && Boolean(mergedTask.priority);
             case 'contexts':
@@ -741,11 +749,11 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     };
 
     const compactFieldIds = useMemo(() => {
-        return taskEditorOrder.filter((fieldId) => primaryFieldIds.has(fieldId) || hasFieldValue(fieldId));
-    }, [taskEditorOrder, primaryFieldIds, mergedTask]);
+        return taskEditorOrder.filter((fieldId) => primaryFieldIds.has(fieldId) || !hiddenSet.has(fieldId) || hasFieldValue(fieldId));
+    }, [taskEditorOrder, primaryFieldIds, hiddenSet, mergedTask]);
 
     const fieldIdsToRender = showMoreOptions ? taskEditorOrder : compactFieldIds;
-    const hasHiddenFields = taskEditorOrder.some((fieldId) => !primaryFieldIds.has(fieldId) && !hasFieldValue(fieldId));
+    const hasHiddenFields = taskEditorOrder.some((fieldId) => hiddenSet.has(fieldId) && !hasFieldValue(fieldId));
 
     const recurrenceOptions: { value: RecurrenceRule | ''; label: string }[] = [
         { value: '', label: t('recurrence.none') },
@@ -1008,6 +1016,30 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                     </Text>
                                 </TouchableOpacity>
                             ))}
+                        </View>
+                    </View>
+                );
+            case 'project':
+                return (
+                    <View style={styles.formGroup}>
+                        <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.projectLabel')}</Text>
+                        <View style={styles.dateRow}>
+                            <TouchableOpacity
+                                style={[styles.dateBtn, styles.flex1, { backgroundColor: tc.inputBg, borderColor: tc.border }]}
+                                onPress={() => setShowProjectPicker(true)}
+                            >
+                                <Text style={{ color: tc.text }}>
+                                    {projects.find((p) => p.id === editedTask.projectId)?.title || t('taskEdit.noProjectOption')}
+                                </Text>
+                            </TouchableOpacity>
+                            {!!editedTask.projectId && (
+                                <TouchableOpacity
+                                    style={[styles.clearDateBtn, { borderColor: tc.border, backgroundColor: tc.filterBg }]}
+                                    onPress={() => setEditedTask(prev => ({ ...prev, projectId: undefined }))}
+                                >
+                                    <Text style={[styles.clearDateText, { color: tc.secondaryText }]}>{t('common.clear')}</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
                 );
@@ -1712,28 +1744,6 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                             placeholderTextColor={tc.secondaryText}
                                         />
                                     </View>
-                                    <View style={styles.formGroup}>
-                                        <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.projectLabel')}</Text>
-                                        <View style={styles.dateRow}>
-                                            <TouchableOpacity
-                                                style={[styles.dateBtn, styles.flex1, { backgroundColor: tc.inputBg, borderColor: tc.border }]}
-                                                onPress={() => setShowProjectPicker(true)}
-                                            >
-                                                <Text style={{ color: tc.text }}>
-                                                    {projects.find((p) => p.id === editedTask.projectId)?.title || t('taskEdit.noProjectOption')}
-                                                </Text>
-                                            </TouchableOpacity>
-                                            {!!editedTask.projectId && (
-                                                <TouchableOpacity
-                                                    style={[styles.clearDateBtn, { borderColor: tc.border, backgroundColor: tc.filterBg }]}
-                                                    onPress={() => setEditedTask(prev => ({ ...prev, projectId: undefined }))}
-                                                >
-                                                    <Text style={[styles.clearDateText, { color: tc.secondaryText }]}>{t('common.clear')}</Text>
-                                                </TouchableOpacity>
-                                            )}
-                                        </View>
-                                    </View>
-
                                     {aiEnabled && (
                                         <View style={styles.aiRow}>
                                             <TouchableOpacity
@@ -1897,6 +1907,18 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                 style={[styles.modalInput, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
                                 autoCapitalize="none"
                                 autoCorrect={false}
+                                returnKeyType="done"
+                                onSubmitEditing={async () => {
+                                    const title = projectQuery.trim();
+                                    if (!title || hasExactProjectMatch) return;
+                                    try {
+                                        const created = await addProject(title, '#94a3b8');
+                                        setEditedTask(prev => ({ ...prev, projectId: created.id }));
+                                        setShowProjectPicker(false);
+                                    } catch (error) {
+                                        console.error('Failed to create project', error);
+                                    }
+                                }}
                             />
                             {!hasExactProjectMatch && projectQuery.trim() && (
                                 <Pressable
