@@ -23,6 +23,7 @@ export default function TabLayout() {
   const iconTint = isDark ? '#E5E7EB' : '#1F2937';
   const inactiveTint = isDark ? '#9CA3AF' : '#9CA3AF';
   const activeIndicator = isDark ? '#60A5FA' : '#2563EB';
+  const captureColor = isDark ? '#F472B6' : '#FF2D55';
 
   return (
     <>
@@ -119,8 +120,8 @@ export default function TabLayout() {
               accessibilityLabel={t('nav.addTask')}
               style={styles.captureButton}
             >
-              <View style={[styles.captureButtonInner, { backgroundColor: activeIndicator }]}>
-                <Plus size={26} color="#FFFFFF" strokeWidth={3} />
+              <View style={[styles.captureButtonInner, { backgroundColor: captureColor }]}>
+                <Plus size={24} color="#FFFFFF" strokeWidth={3} />
               </View>
             </TouchableOpacity>
           ),
@@ -161,12 +162,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   captureButtonInner: {
-    width: 54,
-    height: 54,
-    borderRadius: 28,
+    width: 62,
+    height: 46,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -8,
+    marginTop: -10,
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 6,

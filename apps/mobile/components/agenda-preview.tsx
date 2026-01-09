@@ -66,31 +66,34 @@ export function AgendaPreview({ onEdit }: { onEdit: (task: Task) => void }) {
 
   const sections = useMemo(() => buildSections(agendaTasks), [agendaTasks]);
 
-  if (sections.length === 0) {
-    return null;
-  }
-
   return (
     <View style={styles.container}>
       <Text style={[styles.heading, { color: tc.text }]}>{t('agenda.title')}</Text>
-      {sections.map((section) => (
-        <View key={section.key} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: tc.secondaryText }]}>{t(section.titleKey)}</Text>
-          <View style={styles.sectionList}>
-            {section.data.map((task) => (
-              <SwipeableTaskItem
-                key={task.id}
-                task={task}
-                isDark={isDark}
-                tc={tc}
-                onPress={() => onEdit(task)}
-                onStatusChange={(status: TaskStatus) => updateTask(task.id, { status })}
-                onDelete={() => deleteTask(task.id)}
-              />
-            ))}
-          </View>
+      {sections.length === 0 ? (
+        <View style={[styles.emptyCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
+          <Text style={[styles.emptyTitle, { color: tc.text }]}>{t('agenda.allClear')}</Text>
+          <Text style={[styles.emptySubtitle, { color: tc.secondaryText }]}>{t('agenda.noTasks')}</Text>
         </View>
-      ))}
+      ) : (
+        sections.map((section) => (
+          <View key={section.key} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: tc.secondaryText }]}>{t(section.titleKey)}</Text>
+            <View style={styles.sectionList}>
+              {section.data.map((task) => (
+                <SwipeableTaskItem
+                  key={task.id}
+                  task={task}
+                  isDark={isDark}
+                  tc={tc}
+                  onPress={() => onEdit(task)}
+                  onStatusChange={(status: TaskStatus) => updateTask(task.id, { status })}
+                  onDelete={() => deleteTask(task.id)}
+                />
+              ))}
+            </View>
+          </View>
+        ))
+      )}
     </View>
   );
 }

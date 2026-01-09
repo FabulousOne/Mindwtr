@@ -70,7 +70,7 @@ const en: Record<string, string> = {
 
         // Tabs (Mobile)
         'tab.inbox': 'Inbox',
-        'tab.next': 'Next',
+        'tab.next': 'Focus',
         'tab.board': 'Board',
         'tab.menu': 'Menu',
         'tab.agenda': 'Agenda',
@@ -838,7 +838,7 @@ const zh: Record<string, string> = {
 
         // Tabs (Mobile)
         'tab.inbox': '收集箱',
-        'tab.next': '下一步',
+        'tab.next': '专注',
         'tab.board': '看板',
         'tab.menu': '菜单',
         'tab.agenda': '日程',
