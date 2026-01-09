@@ -89,7 +89,7 @@ export function InboxProcessor({
     const hydrateProcessingTask = useCallback((task: Task) => {
         setProcessingTask(task);
         setProcessingStep('refine');
-        setSelectedContexts([]);
+        setSelectedContexts(task.contexts ?? []);
         setCustomContext('');
         setProjectSearch('');
         setProcessingTitle(task.title);
@@ -169,7 +169,7 @@ export function InboxProcessor({
     };
 
     const handleDefer = () => {
-        setSelectedContexts([]);
+        setSelectedContexts(processingTask?.contexts ?? []);
         setProcessingStep('context');
     };
 
