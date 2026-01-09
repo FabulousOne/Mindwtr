@@ -1,4 +1,5 @@
 import { Check, Link2, Paperclip, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     buildRRuleString,
     generateUUID,
@@ -122,6 +123,43 @@ export function TaskItemFieldRenderer({
         updateTask,
         resetTaskChecklist,
     } = handlers;
+
+    const [checklistDraft, setChecklistDraft] = useState<Task['checklist']>(task.checklist || []);
+    const checklistDraftRef = useRef<Task['checklist']>(task.checklist || []);
+    const checklistDirtyRef = useRef(false);
+    const checklistInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+    useEffect(() => {
+        setChecklistDraft(task.checklist || []);
+        checklistDraftRef.current = task.checklist || [];
+        checklistDirtyRef.current = false;
+        checklistInputRefs.current = [];
+    }, [task.id, task.checklist]);
+
+    const updateChecklistDraft = useCallback((next: Task['checklist']) => {
+        setChecklistDraft(next);
+        checklistDraftRef.current = next;
+        checklistDirtyRef.current = true;
+    }, []);
+
+    const commitChecklistDraft = useCallback((next?: Task['checklist']) => {
+        const payload = next ?? checklistDraftRef.current;
+        if (!checklistDirtyRef.current && next === undefined) return;
+        checklistDirtyRef.current = false;
+        updateTask(taskId, { checklist: payload });
+    }, [taskId, updateTask]);
+
+    useEffect(() => () => {
+        if (checklistDirtyRef.current) {
+            updateTask(taskId, { checklist: checklistDraftRef.current });
+        }
+    }, [taskId, updateTask]);
+
+    const focusChecklistIndex = useCallback((index: number) => {
+        window.requestAnimationFrame(() => {
+            checklistInputRefs.current[index]?.focus();
+        });
+    }, []);
 
     switch (fieldId) {
         case 'description':
@@ -509,14 +547,17 @@ export function TaskItemFieldRenderer({
                 <div className="flex flex-col gap-2 w-full pt-2 border-t border-border/50">
                     <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.checklist')}</label>
                     <div className="space-y-2">
-                        {(task.checklist || []).map((item, index) => (
+                        {(checklistDraft || []).map((item, index) => (
                             <div key={item.id || index} className="flex items-center gap-2 group/item">
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        const newList = (task.checklist || []).map((entry, i) =>
+                                        const newList = (checklistDraft || []).map((entry, i) =>
                                             i === index ? { ...entry, isCompleted: !entry.isCompleted } : entry
                                         );
+                                        setChecklistDraft(newList);
+                                        checklistDraftRef.current = newList;
+                                        checklistDirtyRef.current = false;
                                         updateTask(taskId, { checklist: newList });
                                     }}
                                     className={cn(
@@ -531,11 +572,44 @@ export function TaskItemFieldRenderer({
                                 <input
                                     type="text"
                                     value={item.title}
+                                    ref={(node) => {
+                                        checklistInputRefs.current[index] = node;
+                                    }}
                                     onChange={(e) => {
-                                        const newList = (task.checklist || []).map((entry, i) =>
+                                        const newList = (checklistDraft || []).map((entry, i) =>
                                             i === index ? { ...entry, title: e.target.value } : entry
                                         );
-                                        updateTask(taskId, { checklist: newList });
+                                        updateChecklistDraft(newList);
+                                    }}
+                                    onBlur={() => {
+                                        commitChecklistDraft();
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            const newItem = {
+                                                id: generateUUID(),
+                                                title: '',
+                                                isCompleted: false,
+                                            };
+                                            const nextList = [...(checklistDraft || [])];
+                                            nextList.splice(index + 1, 0, newItem);
+                                            setChecklistDraft(nextList);
+                                            checklistDraftRef.current = nextList;
+                                            checklistDirtyRef.current = false;
+                                            updateTask(taskId, { checklist: nextList });
+                                            focusChecklistIndex(index + 1);
+                                            return;
+                                        }
+                                        if (e.key === 'Tab') {
+                                            const nextIndex = e.shiftKey ? index - 1 : index + 1;
+                                            if (nextIndex >= 0 && nextIndex < (checklistDraft || []).length) {
+                                                e.preventDefault();
+                                                focusChecklistIndex(nextIndex);
+                                            } else {
+                                                commitChecklistDraft();
+                                            }
+                                        }
                                     }}
                                     className={cn(
                                         "flex-1 bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-primary/50 px-1",
@@ -545,8 +619,12 @@ export function TaskItemFieldRenderer({
                                 />
                                 <button
                                     type="button"
+                                    tabIndex={-1}
                                     onClick={() => {
-                                        const newList = (task.checklist || []).filter((_, i) => i !== index);
+                                        const newList = (checklistDraft || []).filter((_, i) => i !== index);
+                                        setChecklistDraft(newList);
+                                        checklistDraftRef.current = newList;
+                                        checklistDirtyRef.current = false;
                                         updateTask(taskId, { checklist: newList });
                                     }}
                                     className="opacity-0 group-hover/item:opacity-100 text-muted-foreground hover:text-destructive p-1"
@@ -557,25 +635,46 @@ export function TaskItemFieldRenderer({
                         ))}
                         <button
                             type="button"
+                            tabIndex={-1}
                             onClick={() => {
                                 const newItem = {
                                     id: generateUUID(),
                                     title: '',
                                     isCompleted: false,
                                 };
-                                updateTask(taskId, {
-                                    checklist: [...(task.checklist || []), newItem],
-                                });
+                                const nextList = [...(checklistDraft || []), newItem];
+                                setChecklistDraft(nextList);
+                                checklistDraftRef.current = nextList;
+                                checklistDirtyRef.current = false;
+                                updateTask(taskId, { checklist: nextList });
+                                focusChecklistIndex(nextList.length - 1);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const newItem = {
+                                        id: generateUUID(),
+                                        title: '',
+                                        isCompleted: false,
+                                    };
+                                    const nextList = [...(checklistDraft || []), newItem];
+                                    setChecklistDraft(nextList);
+                                    checklistDraftRef.current = nextList;
+                                    checklistDirtyRef.current = false;
+                                    updateTask(taskId, { checklist: nextList });
+                                    focusChecklistIndex(nextList.length - 1);
+                                }
                             }}
                             className="text-xs text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1"
                         >
                             <Plus className="w-3 h-3" />
                             {t('taskEdit.addItem')}
                         </button>
-                        {(task.checklist || []).length > 0 && (
+                        {(checklistDraft || []).length > 0 && (
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
+                                    tabIndex={-1}
                                     onClick={() => resetTaskChecklist(taskId)}
                                     className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors text-muted-foreground"
                                 >
