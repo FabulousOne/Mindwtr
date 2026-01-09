@@ -694,6 +694,8 @@ const en: Record<string, string> = {
         'agenda.upcoming': 'Upcoming',
         'agenda.allClear': 'All Clear!',
         'agenda.noTasks': 'No urgent tasks right now.',
+        'focus.schedule': 'Today',
+        'focus.nextActions': 'Next Actions',
 
         // Task Age
         'taskAge.day': 'day old',
@@ -1461,6 +1463,8 @@ const zh: Record<string, string> = {
         'agenda.upcoming': '即将到来',
         'agenda.allClear': '全部完成！',
         'agenda.noTasks': '目前没有紧急任务。',
+        'focus.schedule': '今天',
+        'focus.nextActions': '下一步行动',
 
         // Task Age
         'taskAge.day': '天前',

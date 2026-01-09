@@ -101,7 +101,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="next"
+        name="focus"
         options={{
           title: t('tab.next'),
           tabBarIcon: ({ color, focused }) => (
@@ -162,12 +162,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   captureButtonInner: {
-    width: 62,
-    height: 46,
-    borderRadius: 14,
+    width: 54,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -10,
+    marginTop: -8,
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 6,

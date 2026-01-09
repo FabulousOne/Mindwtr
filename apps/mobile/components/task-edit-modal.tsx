@@ -1723,11 +1723,21 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                         ref={scrollRef}
                         horizontal
                         pagingEnabled
+                        snapToInterval={containerWidth || 1}
+                        snapToAlignment="start"
+                        decelerationRate="fast"
                         scrollEventThrottle={16}
                         showsHorizontalScrollIndicator={false}
                         directionalLockEnabled
                         onScrollBeginDrag={() => {
                             isUserSwipe.current = true;
+                        }}
+                        onScrollEndDrag={(event) => {
+                            if (!containerWidth) return;
+                            const offsetX = event.nativeEvent.contentOffset.x;
+                            const target = offsetX >= containerWidth / 2 ? 'view' : 'task';
+                            scrollToTab(target);
+                            setModeTab(target);
                         }}
                         onScroll={Animated.event(
                             [{ nativeEvent: { contentOffset: { x: scrollX } } }],
