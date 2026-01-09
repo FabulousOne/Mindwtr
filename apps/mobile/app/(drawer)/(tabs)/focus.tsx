@@ -79,7 +79,10 @@ export default function FocusScreen() {
         sections={sections}
         keyExtractor={(item) => item.id}
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          schedule.length === 0 && nextActions.length === 0 && { flex: 1, justifyContent: 'center' },
+        ]}
         ListHeaderComponent={(
           <View style={styles.header}>
             <Text style={[styles.dateText, { color: tc.secondaryText }]}>
