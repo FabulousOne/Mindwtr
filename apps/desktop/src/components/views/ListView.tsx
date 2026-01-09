@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { Plus, Play, Filter } from 'lucide-react';
 import { useTaskStore, TaskStatus, Task, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate, createAIProvider, type AIProviderId } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
@@ -19,6 +19,66 @@ interface ListViewProps {
 
 const EMPTY_PRIORITIES: TaskPriority[] = [];
 const EMPTY_ESTIMATES: TimeEstimate[] = [];
+const VIRTUALIZATION_THRESHOLD = 80;
+const VIRTUAL_ROW_ESTIMATE = 120;
+const VIRTUAL_OVERSCAN = 600;
+
+type VirtualTaskRowProps = {
+    task: Task;
+    project?: Project;
+    top: number;
+    isSelected: boolean;
+    selectionMode: boolean;
+    isMultiSelected: boolean;
+    onSelect: () => void;
+    onToggleSelect: () => void;
+    onMeasure: (id: string, height: number) => void;
+};
+
+const VirtualTaskRow = React.memo(function VirtualTaskRow({
+    task,
+    project,
+    top,
+    isSelected,
+    selectionMode,
+    isMultiSelected,
+    onSelect,
+    onToggleSelect,
+    onMeasure,
+}: VirtualTaskRowProps) {
+    const rowRef = useRef<HTMLDivElement | null>(null);
+
+    useLayoutEffect(() => {
+        const node = rowRef.current;
+        if (!node) return undefined;
+        const measure = () => {
+            const nextHeight = Math.ceil(node.getBoundingClientRect().height);
+            onMeasure(task.id, nextHeight);
+        };
+        measure();
+        if (typeof ResizeObserver === 'undefined') return undefined;
+        const observer = new ResizeObserver(() => measure());
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [task.id, onMeasure]);
+
+    return (
+        <div ref={rowRef} style={{ position: 'absolute', top, left: 0, right: 0 }}>
+            <div className="pb-3">
+                <TaskItem
+                    key={task.id}
+                    task={task}
+                    project={project}
+                    isSelected={isSelected}
+                    onSelect={onSelect}
+                    selectionMode={selectionMode}
+                    isMultiSelected={isMultiSelected}
+                    onToggleSelect={onToggleSelect}
+                />
+            </div>
+        </div>
+    );
+});
 
 export function ListView({ title, statusFilter }: ListViewProps) {
     const { tasks, projects, areas, settings, updateSettings, addTask, addProject, updateTask, deleteTask, moveTask, batchMoveTasks, batchDeleteTasks, batchUpdateTasks, queryTasks, lastDataChangeAt } = useTaskStore();
@@ -38,6 +98,11 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const [tagPromptOpen, setTagPromptOpen] = useState(false);
     const [tagPromptIds, setTagPromptIds] = useState<string[]>([]);
     const addInputRef = useRef<HTMLInputElement>(null);
+    const listScrollRef = useRef<HTMLDivElement>(null);
+    const rowHeightsRef = useRef<Map<string, number>>(new Map());
+    const [listScrollTop, setListScrollTop] = useState(0);
+    const [listHeight, setListHeight] = useState(0);
+    const [measureVersion, setMeasureVersion] = useState(0);
     const [aiKey, setAiKey] = useState('');
     const [copilotSuggestion, setCopilotSuggestion] = useState<{ context?: string; tags?: string[] } | null>(null);
     const [copilotApplied, setCopilotApplied] = useState(false);
@@ -238,6 +303,86 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         return sortTasksBy(filtered, sortBy);
     }, [baseTasks, projects, statusFilter, selectedTokens, activePriorities, activeTimeEstimates, sequentialProjectFirstTasks, projectMap, sortBy]);
 
+    const shouldVirtualize = filteredTasks.length > VIRTUALIZATION_THRESHOLD;
+
+    const handleListScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+        setListScrollTop(event.currentTarget.scrollTop);
+    }, []);
+
+    const handleRowMeasure = useCallback((id: string, height: number) => {
+        const nextHeight = Math.max(40, height);
+        const prevHeight = rowHeightsRef.current.get(id);
+        if (prevHeight !== nextHeight) {
+            rowHeightsRef.current.set(id, nextHeight);
+            setMeasureVersion((version) => version + 1);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!shouldVirtualize) return;
+        const container = listScrollRef.current;
+        if (!container) return;
+        const updateHeight = () => setListHeight(container.clientHeight);
+        updateHeight();
+        if (typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(updateHeight);
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [shouldVirtualize]);
+
+    useEffect(() => {
+        if (!shouldVirtualize) return;
+        const activeIds = new Set(filteredTasks.map((task) => task.id));
+        for (const id of rowHeightsRef.current.keys()) {
+            if (!activeIds.has(id)) {
+                rowHeightsRef.current.delete(id);
+            }
+        }
+    }, [filteredTasks, shouldVirtualize]);
+
+    const rowHeights = useMemo(() => {
+        if (!shouldVirtualize) return [];
+        return filteredTasks.map((task) => rowHeightsRef.current.get(task.id) ?? VIRTUAL_ROW_ESTIMATE);
+    }, [filteredTasks, measureVersion, shouldVirtualize]);
+
+    const { rowOffsets, totalHeight } = useMemo(() => {
+        if (!shouldVirtualize) return { rowOffsets: [] as number[], totalHeight: 0 };
+        let offset = 0;
+        const offsets = rowHeights.map((height) => {
+            const top = offset;
+            offset += height;
+            return top;
+        });
+        return { rowOffsets: offsets, totalHeight: offset };
+    }, [rowHeights, shouldVirtualize]);
+
+    const { startIndex, endIndex } = useMemo(() => {
+        if (!shouldVirtualize) return { startIndex: 0, endIndex: filteredTasks.length };
+        const count = rowOffsets.length;
+        if (count === 0) return { startIndex: 0, endIndex: 0 };
+        const targetStart = Math.max(0, listScrollTop - VIRTUAL_OVERSCAN);
+        let low = 0;
+        let high = count - 1;
+        while (low <= high) {
+            const mid = (low + high) >> 1;
+            const midBottom = rowOffsets[mid] + rowHeights[mid];
+            if (midBottom < targetStart) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        const start = Math.min(low, count - 1);
+        const targetEnd = listScrollTop + listHeight + VIRTUAL_OVERSCAN;
+        let end = start;
+        while (end < count && rowOffsets[end] < targetEnd) {
+            end += 1;
+        }
+        return { startIndex: start, endIndex: end };
+    }, [shouldVirtualize, rowOffsets, rowHeights, listScrollTop, listHeight, filteredTasks.length]);
+
+    const visibleTasks = shouldVirtualize ? filteredTasks.slice(startIndex, endIndex) : filteredTasks;
+
     useEffect(() => {
         setSelectedIndex(0);
         exitSelectionMode();
@@ -259,8 +404,12 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         const el = document.querySelector(`[data-task-id="${task.id}"]`) as HTMLElement | null;
         if (el && typeof (el as any).scrollIntoView === 'function') {
             el.scrollIntoView({ block: 'nearest' });
+            return;
         }
-    }, [filteredTasks, selectedIndex]);
+        if (shouldVirtualize && listScrollRef.current && rowOffsets[selectedIndex] !== undefined) {
+            listScrollRef.current.scrollTo({ top: rowOffsets[selectedIndex], behavior: 'auto' });
+        }
+    }, [filteredTasks, selectedIndex, shouldVirtualize, rowOffsets]);
 
     const selectNext = useCallback(() => {
         if (filteredTasks.length === 0) return;
@@ -624,7 +773,8 @@ export function ListView({ title, statusFilter }: ListViewProps) {
 
     return (
         <>
-        <div className="space-y-6">
+        <div className="flex h-full flex-col">
+            <div className="space-y-6">
             <header className="flex items-center justify-between">
                 <h2 className="text-3xl font-bold tracking-tight">
                     {title}
@@ -941,30 +1091,58 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                     {t('quickAdd.help')}
                 </p>
             )}
-
-            <div className="space-y-3">
+            </div>
+            <div
+                ref={listScrollRef}
+                onScroll={handleListScroll}
+                className="flex-1 min-h-0 overflow-y-auto pt-3"
+            >
                 {filteredTasks.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                         <p>
                             {hasFilters ? t('filters.noMatch') : t('list.noTasks') || `${t('contexts.noTasks')}`}
                         </p>
                     </div>
+                ) : shouldVirtualize ? (
+                    <div style={{ height: totalHeight, position: 'relative' }}>
+                        {visibleTasks.map((task, index) => {
+                            const actualIndex = startIndex + index;
+                            return (
+                                <VirtualTaskRow
+                                    key={task.id}
+                                    task={task}
+                                    project={task.projectId ? projectMap[task.projectId] : undefined}
+                                    top={rowOffsets[actualIndex] ?? 0}
+                                    isSelected={actualIndex === selectedIndex}
+                                    onSelect={() => {
+                                        if (!selectionMode) setSelectedIndex(actualIndex);
+                                    }}
+                                    selectionMode={selectionMode}
+                                    isMultiSelected={multiSelectedIds.has(task.id)}
+                                    onToggleSelect={() => toggleMultiSelect(task.id)}
+                                    onMeasure={handleRowMeasure}
+                                />
+                            );
+                        })}
+                    </div>
                 ) : (
-	                    filteredTasks.map((task, index) => (
-	                        <TaskItem
-	                            key={task.id}
-	                            task={task}
-	                            project={task.projectId ? projectMap[task.projectId] : undefined}
-	                            isSelected={index === selectedIndex}
-	                            onSelect={() => {
-	                                if (!selectionMode) setSelectedIndex(index);
-	                            }}
-	                            selectionMode={selectionMode}
-	                            isMultiSelected={multiSelectedIds.has(task.id)}
-	                            onToggleSelect={() => toggleMultiSelect(task.id)}
-	                        />
-	                    ))
-	                )}
+                    <div className="space-y-3">
+                        {filteredTasks.map((task, index) => (
+                            <TaskItem
+                                key={task.id}
+                                task={task}
+                                project={task.projectId ? projectMap[task.projectId] : undefined}
+                                isSelected={index === selectedIndex}
+                                onSelect={() => {
+                                    if (!selectionMode) setSelectedIndex(index);
+                                }}
+                                selectionMode={selectionMode}
+                                isMultiSelected={multiSelectedIds.has(task.id)}
+                                onToggleSelect={() => toggleMultiSelect(task.id)}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
         <PromptModal
