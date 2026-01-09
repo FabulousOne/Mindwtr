@@ -71,6 +71,9 @@ export function TaskItemDisplay({
 }: TaskItemDisplayProps) {
     const checklistProgress = getChecklistProgress(task);
     const ageLabel = getTaskAgeLabel(task.createdAt);
+    const showCompactMeta = !isViewOpen
+        && ['inbox', 'next', 'someday', 'waiting'].includes(task.status)
+        && (project || (task.contexts?.length ?? 0) > 0);
 
     return (
         <div className="flex-1 min-w-0 flex items-start justify-between gap-3">
@@ -121,6 +124,24 @@ export function TaskItemDisplay({
                         <p className="text-sm text-muted-foreground mt-1">
                             {stripMarkdown(task.description)}
                         </p>
+                    )}
+                    {showCompactMeta && (
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            {project && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-foreground">
+                                    <span
+                                        className="inline-block h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: projectColor || '#94a3b8' }}
+                                    />
+                                    {project.title}
+                                </span>
+                            )}
+                            {(task.contexts ?? []).slice(0, 3).map((ctx) => (
+                                <span key={ctx} className="truncate">
+                                    {ctx}
+                                </span>
+                            ))}
+                        </div>
                     )}
                 </button>
 

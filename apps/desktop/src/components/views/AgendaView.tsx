@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils';
 import { Clock, Star, Calendar, AlertCircle, ArrowRight, Filter, type LucideIcon } from 'lucide-react';
 
 export function AgendaView() {
-    const { tasks, updateTask, settings } = useTaskStore();
+    const { tasks, projects, updateTask, settings } = useTaskStore();
     const { t, language } = useLanguage();
     const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
     const [selectedPriorities, setSelectedPriorities] = useState<TaskPriority[]>([]);
@@ -183,6 +183,9 @@ export function AgendaView() {
         const staleness = getTaskStaleness(task.createdAt);
         const focusTextClass = task.isFocusedToday ? "text-slate-100" : "text-foreground";
         const focusMutedClass = task.isFocusedToday ? "text-slate-300" : "text-muted-foreground";
+        const project = task.projectId
+            ? projects.find((proj) => proj.id === task.projectId)
+            : null;
 
         return (
             <div className={cn(
@@ -213,6 +216,16 @@ export function AgendaView() {
                                     task.status === 'done' && "bg-green-600"
                                 )}>
                                     {t(`status.${task.status}`)}
+                                </span>
+                            )}
+
+                            {project && (
+                                <span className={cn(
+                                    "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
+                                    focusMutedClass
+                                )}>
+                                    <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/60" />
+                                    {project.title}
                                 </span>
                             )}
 
