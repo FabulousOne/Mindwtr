@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
-import { Plus, Play, Filter } from 'lucide-react';
+import { Plus, Filter } from 'lucide-react';
 import { useTaskStore, TaskStatus, Task, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate, createAIProvider, type AIProviderId } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { TaskInput } from '../Task/TaskInput';
 import { cn } from '../../lib/utils';
 import { PromptModal } from '../PromptModal';
-import { InboxProcessingWizard, type ProcessingStep } from '../InboxProcessingWizard';
+import { InboxProcessor } from './InboxProcessor';
 import { useLanguage } from '../../contexts/language-context';
 import { useKeybindings } from '../../contexts/keybinding-context';
 import { buildCopilotConfig, loadAIKey } from '../../lib/ai-config';
@@ -91,7 +91,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const [selectedTimeEstimates, setSelectedTimeEstimates] = useState<TimeEstimate[]>([]);
     const [baseTasks, setBaseTasks] = useState<Task[]>([]);
     const [filtersOpen, setFiltersOpen] = useState(false);
-    const [customContext, setCustomContext] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [selectionMode, setSelectionMode] = useState(false);
     const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
@@ -126,18 +125,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         setMultiSelectedIds(new Set());
     }, []);
 
-    // Inbox processing state
     const [isProcessing, setIsProcessing] = useState(false);
-    const [processingTask, setProcessingTask] = useState<Task | null>(null);
-    const [processingStep, setProcessingStep] = useState<ProcessingStep>('actionable');
-    const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
-    const [waitingNote, setWaitingNote] = useState('');
-    const [projectSearch, setProjectSearch] = useState('');
-    const [processingTitle, setProcessingTitle] = useState('');
-    const [processingDescription, setProcessingDescription] = useState('');
-    const [convertToProject, setConvertToProject] = useState(false);
-    const [projectTitleDraft, setProjectTitleDraft] = useState('');
-    const [nextActionDraft, setNextActionDraft] = useState('');
 
     const allContexts = useMemo(() => {
         const taskContexts = tasks.flatMap(t => t.contexts || []);
@@ -150,7 +138,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const allTokens = useMemo(() => {
         return Array.from(new Set([...allContexts, ...allTags])).sort();
     }, [allContexts, allTags]);
-    const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
 
     useEffect(() => {
         setAiKey(loadAIKey(aiProvider));
@@ -205,18 +192,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             return acc;
         }, {} as Record<string, Project>);
     }, [projects]);
-
-    const filteredProjects = useMemo(() => {
-        if (!projectSearch.trim()) return projects;
-        const query = projectSearch.trim().toLowerCase();
-        return projects.filter((project) => project.title.toLowerCase().includes(query));
-    }, [projects, projectSearch]);
-
-    const hasExactProjectMatch = useMemo(() => {
-        if (!projectSearch.trim()) return false;
-        const query = projectSearch.trim().toLowerCase();
-        return projects.some((project) => project.title.toLowerCase() === query);
-    }, [projects, projectSearch]);
 
     const tasksById = useMemo(() => {
         return tasks.reduce((acc, task) => {
@@ -556,166 +531,8 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         }
     };
 
-    // Inbox processing handlers
-    const startProcessing = () => {
-        const inboxTasks = tasks.filter(t => t.status === 'inbox');
-        if (inboxTasks.length > 0) {
-            const nextTask = inboxTasks[0];
-            setProcessingTask(nextTask);
-            setProcessingStep('refine');
-            setSelectedContexts([]);
-            setCustomContext('');
-            setProjectSearch('');
-            setProcessingTitle(nextTask.title);
-            setProcessingDescription(nextTask.description || '');
-            setConvertToProject(false);
-            setProjectTitleDraft(nextTask.title);
-            setNextActionDraft('');
-            setIsProcessing(true);
-        }
-    };
-
-    const processNext = () => {
-        // Exclude the current task being processed (its status may not have updated in state yet)
-        const currentTaskId = processingTask?.id;
-        const inboxTasks = tasks.filter(t => t.status === 'inbox' && t.id !== currentTaskId);
-        if (inboxTasks.length > 0) {
-            const nextTask = inboxTasks[0];
-            setProcessingTask(nextTask);
-            setProcessingStep('refine');
-            setSelectedContexts([]);
-            setCustomContext('');
-            setProjectSearch('');
-            setProcessingTitle(nextTask.title);
-            setProcessingDescription(nextTask.description || '');
-            setConvertToProject(false);
-            setProjectTitleDraft(nextTask.title);
-            setNextActionDraft('');
-        } else {
-            setIsProcessing(false);
-            setProcessingTask(null);
-            setSelectedContexts([]);
-        }
-    };
-
-    const applyProcessingEdits = (updates: Partial<Task>) => {
-        if (!processingTask) return;
-        const trimmedTitle = processingTitle.trim();
-        const title = trimmedTitle.length > 0 ? trimmedTitle : processingTask.title;
-        const description = processingDescription.trim();
-        updateTask(processingTask.id, {
-            title,
-            description: description.length > 0 ? description : undefined,
-            ...updates,
-        });
-    };
-
-    const handleNotActionable = (action: 'trash' | 'someday') => {
-        if (!processingTask) return;
-        if (action === 'trash') {
-            deleteTask(processingTask.id);
-        } else {
-            applyProcessingEdits({ status: 'someday' });
-        }
-        processNext();
-    };
-
-    const handleActionable = () => setProcessingStep('twomin');
-
-    const handleTwoMinDone = () => {
-        if (processingTask) {
-            applyProcessingEdits({ status: 'done' });
-        }
-        processNext();
-    };
-
-    const handleTwoMinNo = () => setProcessingStep('decide');
-
-    const handleDelegate = () => {
-        setWaitingNote('');
-        setProcessingStep('waiting-note');
-    };
-
-    const handleConfirmWaiting = () => {
-        if (processingTask) {
-            const description = waitingNote.trim().length > 0 ? waitingNote : processingDescription;
-            applyProcessingEdits({
-                status: 'waiting',
-                description: description.trim().length > 0 ? description : undefined,
-            });
-        }
-        setWaitingNote('');
-        processNext();
-    };
-
-    const handleDefer = () => {
-        setSelectedContexts([]);
-        setProcessingStep('context');
-    };
-
-    const toggleContext = (ctx: string) => {
-        setSelectedContexts(prev =>
-            prev.includes(ctx) ? prev.filter(c => c !== ctx) : [...prev, ctx]
-        );
-    };
-
-    const addCustomContext = () => {
-        if (customContext.trim()) {
-            const ctx = `@${customContext.trim().replace(/^@/, '')}`;
-            if (!selectedContexts.includes(ctx)) {
-                setSelectedContexts(prev => [...prev, ctx]);
-            }
-            setCustomContext('');
-        }
-    };
-
-    const handleConfirmContexts = () => {
-        setProcessingStep('project');
-    };
-
-    const handleSetProject = (projectId: string | null) => {
-        if (processingTask) {
-            applyProcessingEdits({
-                status: 'next',
-                contexts: selectedContexts,
-                projectId: projectId || undefined
-            });
-        }
-        processNext();
-    };
-
-    const handleConvertToProject = async () => {
-        if (!processingTask) return;
-        const projectTitle = projectTitleDraft.trim() || processingTitle.trim();
-        const nextAction = nextActionDraft.trim();
-        if (!projectTitle) return;
-        if (!nextAction) {
-            alert(t('process.nextActionRequired'));
-            return;
-        }
-        const existing = projects.find((project) => project.title.toLowerCase() === projectTitle.toLowerCase());
-        const project = existing ?? await addProject(projectTitle, '#94a3b8');
-        applyProcessingEdits({
-            title: nextAction,
-            status: 'next',
-            contexts: selectedContexts,
-            projectId: project.id,
-        });
-        processNext();
-    };
-
     const showFilters = ['next', 'all'].includes(statusFilter);
     const isInbox = statusFilter === 'inbox';
-    const inboxCount = tasks.filter(t => {
-        if (t.status !== 'inbox' || t.deletedAt) return false;
-        const start = safeParseDate(t.startTime);
-        if (start && start > new Date()) return false;
-        return true;
-    }).length;
-    const remainingInboxCount = useMemo(
-        () => tasks.filter((t) => t.status === 'inbox').length,
-        [tasks]
-    );
     const nextCount = tasks.filter(t => t.status === 'next' && !t.deletedAt).length;
     const isNextView = statusFilter === 'next';
     const NEXT_WARNING_THRESHOLD = 15;
@@ -864,60 +681,18 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                 </div>
             )}
 
-            {/* Inbox Processing Bar */}
-            {isInbox && inboxCount > 0 && !isProcessing && (
-                <button
-                    onClick={startProcessing}
-                    className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-                >
-                    <Play className="w-4 h-4" />
-                    {t('process.btn')} ({inboxCount})
-                </button>
-            )}
-
-            <InboxProcessingWizard
+            <InboxProcessor
                 t={t}
-                isProcessing={isProcessing}
-                processingTask={processingTask}
-                processingStep={processingStep}
-                processingTitle={processingTitle}
-                processingDescription={processingDescription}
-                setProcessingTitle={setProcessingTitle}
-                setProcessingDescription={setProcessingDescription}
-                setIsProcessing={setIsProcessing}
-                handleRefineNext={() => setProcessingStep('actionable')}
-                handleNotActionable={handleNotActionable}
-                handleActionable={handleActionable}
-                handleTwoMinDone={handleTwoMinDone}
-                handleTwoMinNo={handleTwoMinNo}
-                handleDefer={handleDefer}
-                handleDelegate={handleDelegate}
-                waitingNote={waitingNote}
-                setWaitingNote={setWaitingNote}
-                handleConfirmWaiting={handleConfirmWaiting}
-                selectedContexts={selectedContexts}
-                allContexts={allContexts}
-                customContext={customContext}
-                setCustomContext={setCustomContext}
-                addCustomContext={addCustomContext}
-                toggleContext={toggleContext}
-                handleConfirmContexts={handleConfirmContexts}
-                convertToProject={convertToProject}
-                setConvertToProject={setConvertToProject}
-                setProjectTitleDraft={setProjectTitleDraft}
-                setNextActionDraft={setNextActionDraft}
-                projectTitleDraft={projectTitleDraft}
-                nextActionDraft={nextActionDraft}
-                handleConvertToProject={handleConvertToProject}
-                projectSearch={projectSearch}
-                setProjectSearch={setProjectSearch}
+                isInbox={isInbox}
+                tasks={tasks}
                 projects={projects}
-                filteredProjects={filteredProjects}
+                areas={areas}
                 addProject={addProject}
-                handleSetProject={handleSetProject}
-                hasExactProjectMatch={hasExactProjectMatch}
-                areaById={areaById}
-                remainingCount={remainingInboxCount}
+                updateTask={updateTask}
+                deleteTask={deleteTask}
+                allContexts={allContexts}
+                isProcessing={isProcessing}
+                setIsProcessing={setIsProcessing}
             />
 
             {/* Filters */}
