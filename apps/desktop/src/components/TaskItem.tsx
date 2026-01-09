@@ -368,46 +368,50 @@ export const TaskItem = memo(function TaskItem({
     const renderField = (fieldId: TaskEditorFieldId) => (
         <TaskItemFieldRenderer
             fieldId={fieldId}
-            t={t}
-            task={task}
-            showDescriptionPreview={showDescriptionPreview}
-            onToggleDescriptionPreview={() => setShowDescriptionPreview((prev) => !prev)}
-            editDescription={editDescription}
-            onEditDescription={(value) => {
-                setEditDescription(value);
-                resetCopilotDraft();
+            data={{
+                t,
+                task,
+                taskId: task.id,
+                showDescriptionPreview,
+                editDescription,
+                attachmentError,
+                visibleEditAttachments,
+                editStartTime,
+                editReviewAt,
+                editPriority,
+                editRecurrence,
+                editRecurrenceStrategy,
+                editRecurrenceRRule,
+                monthlyRecurrence,
+                editTimeEstimate,
+                editContexts,
+                editTags,
+                popularTagOptions,
             }}
-            attachmentError={attachmentError}
-            visibleEditAttachments={visibleEditAttachments}
-            onAddFileAttachment={addFileAttachment}
-            onAddLinkAttachment={addLinkAttachment}
-            onOpenAttachment={openAttachment}
-            onRemoveAttachment={removeAttachment}
-            editStartTime={editStartTime}
-            onEditStartTime={setEditStartTime}
-            editReviewAt={editReviewAt}
-            onEditReviewAt={setEditReviewAt}
-            onStatusChange={handleStatusChange}
-            editPriority={editPriority}
-            onEditPriority={setEditPriority}
-            editRecurrence={editRecurrence}
-            onEditRecurrence={setEditRecurrence}
-            editRecurrenceStrategy={editRecurrenceStrategy}
-            onEditRecurrenceStrategy={setEditRecurrenceStrategy}
-            editRecurrenceRRule={editRecurrenceRRule}
-            onEditRecurrenceRRule={setEditRecurrenceRRule}
-            onOpenCustomRecurrence={openCustomRecurrence}
-            monthlyRecurrence={monthlyRecurrence}
-            editTimeEstimate={editTimeEstimate}
-            onEditTimeEstimate={setEditTimeEstimate}
-            editContexts={editContexts}
-            onEditContexts={setEditContexts}
-            editTags={editTags}
-            onEditTags={setEditTags}
-            popularTagOptions={popularTagOptions}
-            taskId={task.id}
-            updateTask={updateTask}
-            resetTaskChecklist={resetTaskChecklist}
+            handlers={{
+                toggleDescriptionPreview: () => setShowDescriptionPreview((prev) => !prev),
+                setEditDescription: (value) => {
+                    setEditDescription(value);
+                    resetCopilotDraft();
+                },
+                addFileAttachment,
+                addLinkAttachment,
+                openAttachment,
+                removeAttachment,
+                setEditStartTime,
+                setEditReviewAt,
+                handleStatusChange,
+                setEditPriority,
+                setEditRecurrence,
+                setEditRecurrenceStrategy,
+                setEditRecurrenceRRule,
+                openCustomRecurrence,
+                setEditTimeEstimate,
+                setEditContexts,
+                setEditTags,
+                updateTask,
+                resetTaskChecklist,
+            }}
         />
     );
 
