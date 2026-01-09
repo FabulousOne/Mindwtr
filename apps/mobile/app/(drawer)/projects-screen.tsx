@@ -562,12 +562,38 @@ export default function ProjectsScreen() {
         }}
       >
                 <SafeAreaView style={{ flex: 1, backgroundColor: tc.bg }}>
-                  {selectedProject && (
+                  {selectedProject && taskReorderMode ? (
+                    <View style={styles.reorderContainer}>
+                      <View style={[styles.reorderHeader, { borderBottomColor: tc.border, backgroundColor: tc.cardBg }]}>
+                        <Text style={[styles.reorderTitle, { color: tc.text }]}>{selectedProject.title}</Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setTaskReorderMode(false);
+                            setIsReorderingTasks(false);
+                          }}
+                          style={[styles.reorderExitButton, { borderColor: tc.border }]}
+                          accessibilityLabel={t('projects.reorder') || 'Reorder'}
+                        >
+                          <Text style={[styles.reorderExitText, { color: tc.text }]}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <TaskList
+                        statusFilter="all"
+                        title={selectedProject.title}
+                        showHeader={false}
+                        projectId={selectedProject.id}
+                        enableReorder
+                        reorderMode
+                        allowAdd={false}
+                        scrollEnabled
+                        onReorderActiveChange={setIsReorderingTasks}
+                      />
+                    </View>
+                  ) : selectedProject ? (
                     <ScrollView
                       style={{ flex: 1 }}
                       contentContainerStyle={styles.projectDetailScroll}
                       keyboardShouldPersistTaps="handled"
-                      scrollEnabled={!isReorderingTasks && !taskReorderMode}
                     >
                 <View style={[styles.modalHeader, { borderBottomColor: tc.border, backgroundColor: tc.cardBg }]}>
                   <TextInput
@@ -605,18 +631,6 @@ export default function ProjectsScreen() {
                       {selectedProject.isSequential ? '📋 Seq' : '⏸ Par'}
                     </Text>
                   </TouchableOpacity>
-                  {taskReorderMode && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setTaskReorderMode(false);
-                        setIsReorderingTasks(false);
-                      }}
-                      style={[styles.reorderExitButton, { borderColor: tc.border }]}
-                      accessibilityLabel={t('projects.reorder') || 'Reorder'}
-                    >
-                      <Text style={[styles.reorderExitText, { color: tc.text }]}>✕</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
 
                 <View style={[styles.statusBlock, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
@@ -863,10 +877,8 @@ export default function ProjectsScreen() {
                   showHeader={false}
                   projectId={selectedProject.id}
                   enableReorder
-                  reorderMode={taskReorderMode}
                   onEnterReorderMode={() => setTaskReorderMode(true)}
                   allowAdd={true}
-                  scrollEnabled={taskReorderMode}
                   onReorderActiveChange={setIsReorderingTasks}
                 />
                     </ScrollView>
@@ -1365,6 +1377,22 @@ const styles = StyleSheet.create({
   reorderExitText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  reorderContainer: {
+    flex: 1,
+  },
+  reorderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  reorderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
   },
   statusBlock: {
     borderBottomWidth: 1,
