@@ -129,15 +129,12 @@ function SortableProjectRow({
 function SortableProjectTaskRow({
     task,
     project,
-    showHandle,
 }: {
     task: Task;
     project: Project;
-    showHandle: boolean;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: task.id,
-        disabled: !showHandle,
     });
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -147,17 +144,15 @@ function SortableProjectTaskRow({
 
     return (
         <div ref={setNodeRef} style={style} className="flex items-start gap-2">
-            {showHandle && (
-                <button
-                    type="button"
-                    {...attributes}
-                    {...listeners}
-                    className="mt-3 h-7 w-7 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center"
-                    title="Drag"
-                >
-                    <GripVertical className="w-3.5 h-3.5" />
-                </button>
-            )}
+            <button
+                type="button"
+                {...attributes}
+                {...listeners}
+                className="mt-3 h-7 w-7 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center"
+                title="Drag"
+            >
+                <GripVertical className="w-3.5 h-3.5" />
+            </button>
             <div className="flex-1 min-w-0">
                 <TaskItem task={task} project={project} />
             </div>
@@ -437,22 +432,20 @@ export function ProjectsView() {
     const orderedProjectTasks = useMemo(() => {
         if (!selectedProject) return projectTasks;
         const sorted = [...projectTasks];
-        const isSequential = selectedProject.isSequential;
-        if (isSequential) {
-            sorted.sort((a, b) => {
+        const hasOrder = sorted.some((task) => Number.isFinite(task.orderNum));
+        sorted.sort((a, b) => {
+            if (hasOrder) {
                 const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
                 const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
                 if (aOrder !== bOrder) return aOrder - bOrder;
-                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-            });
-        } else {
-            sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        }
+            }
+            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
         return sorted;
     }, [projectTasks, selectedProject]);
 
     const handleTaskDragEnd = (event: DragEndEvent) => {
-        if (!selectedProject?.isSequential) return;
+        if (!selectedProject) return;
         const { active, over } = event;
         if (!over || active.id === over.id) return;
         const oldIndex = orderedProjectTasks.findIndex((task) => task.id === active.id);
@@ -1192,35 +1185,26 @@ export function ProjectsView() {
 
                         <div className="flex-1 overflow-y-auto pr-2">
                             {orderedProjectTasks.length > 0 ? (
-                                selectedProject.isSequential ? (
-                                    <DndContext
-                                        sensors={taskSensors}
-                                        collisionDetection={closestCenter}
-                                        onDragEnd={handleTaskDragEnd}
+                                <DndContext
+                                    sensors={taskSensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleTaskDragEnd}
+                                >
+                                    <SortableContext
+                                        items={orderedProjectTasks.map((task) => task.id)}
+                                        strategy={verticalListSortingStrategy}
                                     >
-                                        <SortableContext
-                                            items={orderedProjectTasks.map((task) => task.id)}
-                                            strategy={verticalListSortingStrategy}
-                                        >
-                                            <div className="space-y-2">
-                                                {orderedProjectTasks.map((task) => (
-                                                    <SortableProjectTaskRow
-                                                        key={task.id}
-                                                        task={task}
-                                                        project={selectedProject}
-                                                        showHandle
-                                                    />
-                                                ))}
-                                            </div>
-                                        </SortableContext>
-                                    </DndContext>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {orderedProjectTasks.map((task) => (
-                                            <TaskItem key={task.id} task={task} project={selectedProject} />
-                                        ))}
-                                    </div>
-                                )
+                                        <div className="space-y-2">
+                                            {orderedProjectTasks.map((task) => (
+                                                <SortableProjectTaskRow
+                                                    key={task.id}
+                                                    task={task}
+                                                    project={selectedProject}
+                                                />
+                                            ))}
+                                        </div>
+                                    </SortableContext>
+                                </DndContext>
                             ) : (
                                 <div className="text-center text-muted-foreground py-12">
                                     {t('projects.noActiveTasks')}
