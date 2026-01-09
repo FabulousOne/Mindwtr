@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { parseInlineMarkdown } from '@mindwtr/core';
 import { cn } from '../lib/utils';
 
 function isSafeLink(href: string): boolean {
@@ -29,41 +30,28 @@ async function openLinkTarget(href: string) {
 }
 
 function renderInline(text: string): React.ReactNode[] {
-    const nodes: React.ReactNode[] = [];
-    const tokenRe = /(\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = tokenRe.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-            nodes.push(text.slice(lastIndex, match.index));
-        }
-
-        const boldA = match[2];
-        const boldB = match[3];
-        const italicA = match[4];
-        const italicB = match[5];
-        const code = match[6];
-        const linkText = match[7];
-        const linkHref = match[8];
-
-        if (code) {
-            nodes.push(
-                <code key={`code-${match.index}`} className="px-1 py-0.5 rounded bg-muted font-mono text-[0.9em]">
-                    {code}
+    return parseInlineMarkdown(text).map((token, index) => {
+        if (token.type === 'text') return token.text;
+        if (token.type === 'code') {
+            return (
+                <code key={`code-${index}`} className="px-1 py-0.5 rounded bg-muted font-mono text-[0.9em]">
+                    {token.text}
                 </code>
             );
-        } else if (boldA || boldB) {
-            nodes.push(<strong key={`bold-${match.index}`}>{boldA || boldB}</strong>);
-        } else if (italicA || italicB) {
-            nodes.push(<em key={`italic-${match.index}`}>{italicA || italicB}</em>);
-        } else if (linkText && linkHref) {
-            if (isSafeLink(linkHref) || isLocalLink(linkHref)) {
-                const local = isLocalLink(linkHref);
-                nodes.push(
+        }
+        if (token.type === 'bold') {
+            return <strong key={`bold-${index}`}>{token.text}</strong>;
+        }
+        if (token.type === 'italic') {
+            return <em key={`italic-${index}`}>{token.text}</em>;
+        }
+        if (token.type === 'link') {
+            if (isSafeLink(token.href) || isLocalLink(token.href)) {
+                const local = isLocalLink(token.href);
+                return (
                     <a
-                        key={`link-${match.index}`}
-                        href={linkHref}
+                        key={`link-${index}`}
+                        href={token.href}
                         target={local ? undefined : '_blank'}
                         rel={local ? undefined : 'noreferrer'}
                         className="text-primary underline underline-offset-2 hover:opacity-90"
@@ -71,26 +59,18 @@ function renderInline(text: string): React.ReactNode[] {
                             e.stopPropagation();
                             if (local) {
                                 e.preventDefault();
-                                void openLinkTarget(linkHref);
+                                void openLinkTarget(token.href);
                             }
                         }}
                     >
-                        {linkText}
+                        {token.text}
                     </a>
                 );
-            } else {
-                nodes.push(linkText);
             }
+            return token.text;
         }
-
-        lastIndex = tokenRe.lastIndex;
-    }
-
-    if (lastIndex < text.length) {
-        nodes.push(text.slice(lastIndex));
-    }
-
-    return nodes;
+        return null;
+    }).filter((node): node is React.ReactNode => node !== null);
 }
 
 export function Markdown({ markdown, className }: { markdown: string; className?: string }) {

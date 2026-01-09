@@ -8,6 +8,54 @@
 const CODE_BLOCK_RE = /```[\s\S]*?```/g;
 const INLINE_CODE_RE = /`([^`]+)`/g;
 const LINK_RE = /\[([^\]]+)\]\(([^)]+)\)/g;
+const INLINE_TOKEN_RE = /(\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g;
+
+export type InlineToken =
+    | { type: 'text'; text: string }
+    | { type: 'bold'; text: string }
+    | { type: 'italic'; text: string }
+    | { type: 'code'; text: string }
+    | { type: 'link'; text: string; href: string };
+
+export function parseInlineMarkdown(text: string): InlineToken[] {
+    const tokens: InlineToken[] = [];
+    if (!text) return tokens;
+
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = INLINE_TOKEN_RE.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            tokens.push({ type: 'text', text: text.slice(lastIndex, match.index) });
+        }
+
+        const boldA = match[2];
+        const boldB = match[3];
+        const italicA = match[4];
+        const italicB = match[5];
+        const code = match[6];
+        const linkText = match[7];
+        const linkHref = match[8];
+
+        if (code) {
+            tokens.push({ type: 'code', text: code });
+        } else if (boldA || boldB) {
+            tokens.push({ type: 'bold', text: boldA || boldB });
+        } else if (italicA || italicB) {
+            tokens.push({ type: 'italic', text: italicA || italicB });
+        } else if (linkText && linkHref) {
+            tokens.push({ type: 'link', text: linkText, href: linkHref });
+        }
+
+        lastIndex = INLINE_TOKEN_RE.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+        tokens.push({ type: 'text', text: text.slice(lastIndex) });
+    }
+
+    return tokens;
+}
 
 export function stripMarkdown(markdown: string): string {
     if (!markdown) return '';
@@ -41,4 +89,3 @@ export function stripMarkdown(markdown: string): string {
 
     return text.trim();
 }
-

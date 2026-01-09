@@ -3,72 +3,52 @@ import { View, Text, StyleSheet } from 'react-native';
 import * as Linking from 'expo-linking';
 
 import type { ThemeColors } from '@/hooks/use-theme-colors';
+import { parseInlineMarkdown } from '@mindwtr/core';
 
 function isSafeLink(href: string): boolean {
   return /^https?:\/\//i.test(href) || /^mailto:/i.test(href);
 }
 
 function renderInline(text: string, tc: ThemeColors, keyPrefix: string): React.ReactNode[] {
-  const nodes: React.ReactNode[] = [];
-  const tokenRe = /(\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = tokenRe.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
+  return parseInlineMarkdown(text).map((token, index) => {
+    if (token.type === 'text') return token.text;
+    if (token.type === 'code') {
+      return (
+        <Text key={`${keyPrefix}-code-${index}`} style={[styles.code, { backgroundColor: tc.filterBg, color: tc.text }]}>
+          {token.text}
+        </Text>
+      );
     }
-
-    const boldA = match[2];
-    const boldB = match[3];
-    const italicA = match[4];
-    const italicB = match[5];
-    const code = match[6];
-    const linkText = match[7];
-    const linkHref = match[8];
-
-    if (code) {
-      nodes.push(
-        <Text key={`${keyPrefix}-code-${match.index}`} style={[styles.code, { backgroundColor: tc.filterBg, color: tc.text }]}>
-          {code}
+    if (token.type === 'bold') {
+      return (
+        <Text key={`${keyPrefix}-bold-${index}`} style={styles.bold}>
+          {token.text}
         </Text>
       );
-    } else if (boldA || boldB) {
-      nodes.push(
-        <Text key={`${keyPrefix}-bold-${match.index}`} style={styles.bold}>
-          {boldA || boldB}
+    }
+    if (token.type === 'italic') {
+      return (
+        <Text key={`${keyPrefix}-italic-${index}`} style={styles.italic}>
+          {token.text}
         </Text>
       );
-    } else if (italicA || italicB) {
-      nodes.push(
-        <Text key={`${keyPrefix}-italic-${match.index}`} style={styles.italic}>
-          {italicA || italicB}
-        </Text>
-      );
-    } else if (linkText && linkHref) {
-      if (isSafeLink(linkHref)) {
-        nodes.push(
+    }
+    if (token.type === 'link') {
+      if (isSafeLink(token.href)) {
+        return (
           <Text
-            key={`${keyPrefix}-link-${match.index}`}
+            key={`${keyPrefix}-link-${index}`}
             style={[styles.link, { color: tc.tint }]}
-            onPress={() => Linking.openURL(linkHref)}
+            onPress={() => Linking.openURL(token.href)}
           >
-            {linkText}
+            {token.text}
           </Text>
         );
-      } else {
-        nodes.push(linkText);
       }
+      return token.text;
     }
-
-    lastIndex = tokenRe.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
-  }
-
-  return nodes;
+    return null;
+  }).filter((node): node is React.ReactNode => node !== null);
 }
 
 export function MarkdownText({ markdown, tc }: { markdown: string; tc: ThemeColors }) {
@@ -175,4 +155,3 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
 });
-
