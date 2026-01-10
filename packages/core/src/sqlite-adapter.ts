@@ -285,6 +285,39 @@ export class SqliteAdapter {
         await this.ensureSchema();
         await this.client.run('BEGIN IMMEDIATE');
         try {
+            const chunkArray = <T>(items: T[], size: number): T[][] => {
+                const chunks: T[][] = [];
+                for (let i = 0; i < items.length; i += size) {
+                    chunks.push(items.slice(i, i + size));
+                }
+                return chunks;
+            };
+
+            const upsertBatch = async (
+                table: string,
+                columns: string[],
+                rows: unknown[][],
+                updateClause: string,
+                chunkSize = 50,
+            ) => {
+                if (rows.length === 0) return;
+                const columnList = columns.join(', ');
+                const placeholders = `(${columns.map(() => '?').join(', ')})`;
+                for (const batch of chunkArray(rows, chunkSize)) {
+                    const values: unknown[] = [];
+                    const valuePlaceholders = batch
+                        .map((row) => {
+                            values.push(...row);
+                            return placeholders;
+                        })
+                        .join(', ');
+                    await this.client.run(
+                        `INSERT INTO ${table} (${columnList}) VALUES ${valuePlaceholders} ON CONFLICT(id) DO UPDATE SET ${updateClause}`,
+                        values
+                    );
+                }
+            };
+
             const syncIds = async (table: 'tasks' | 'projects' | 'areas', ids: string[]) => {
                 const tempTable = `temp_${table}_ids`;
                 try {
@@ -307,134 +340,170 @@ export class SqliteAdapter {
             await syncIds('projects', data.projects.map((project) => project.id));
             await syncIds('areas', data.areas.map((area) => area.id));
 
-            for (const task of data.tasks) {
-                await this.client.run(
-                    `INSERT INTO tasks (
-                        id, title, status, priority, taskMode, startTime, dueDate, recurrence, pushCount,
-                        tags, contexts, checklist, description, attachments, location, projectId, orderNum,
-                        isFocusedToday, timeEstimate, reviewAt, completedAt, createdAt, updatedAt, deletedAt, purgedAt
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET
-                        title=excluded.title,
-                        status=excluded.status,
-                        priority=excluded.priority,
-                        taskMode=excluded.taskMode,
-                        startTime=excluded.startTime,
-                        dueDate=excluded.dueDate,
-                        recurrence=excluded.recurrence,
-                        pushCount=excluded.pushCount,
-                        tags=excluded.tags,
-                        contexts=excluded.contexts,
-                        checklist=excluded.checklist,
-                        description=excluded.description,
-                        attachments=excluded.attachments,
-                        location=excluded.location,
-                        projectId=excluded.projectId,
-                        orderNum=excluded.orderNum,
-                        isFocusedToday=excluded.isFocusedToday,
-                        timeEstimate=excluded.timeEstimate,
-                        reviewAt=excluded.reviewAt,
-                        completedAt=excluded.completedAt,
-                        createdAt=excluded.createdAt,
-                        updatedAt=excluded.updatedAt,
-                        deletedAt=excluded.deletedAt,
-                        purgedAt=excluded.purgedAt`,
-                    [
-                        task.id,
-                        task.title,
-                        task.status,
-                        task.priority ?? null,
-                        task.taskMode ?? null,
-                        task.startTime ?? null,
-                        task.dueDate ?? null,
-                        toJson(task.recurrence),
-                        task.pushCount ?? null,
-                        toJson(task.tags ?? []),
-                        toJson(task.contexts ?? []),
-                        toJson(task.checklist),
-                        task.description ?? null,
-                        toJson(task.attachments),
-                        task.location ?? null,
-                        task.projectId ?? null,
-                        task.orderNum ?? null,
-                        toBool(task.isFocusedToday),
-                        task.timeEstimate ?? null,
-                        task.reviewAt ?? null,
-                        task.completedAt ?? null,
-                        task.createdAt,
-                        task.updatedAt,
-                        task.deletedAt ?? null,
-                        task.purgedAt ?? null,
-                    ]
-                );
-            }
+            await upsertBatch(
+                'tasks',
+                [
+                    'id',
+                    'title',
+                    'status',
+                    'priority',
+                    'taskMode',
+                    'startTime',
+                    'dueDate',
+                    'recurrence',
+                    'pushCount',
+                    'tags',
+                    'contexts',
+                    'checklist',
+                    'description',
+                    'attachments',
+                    'location',
+                    'projectId',
+                    'orderNum',
+                    'isFocusedToday',
+                    'timeEstimate',
+                    'reviewAt',
+                    'completedAt',
+                    'createdAt',
+                    'updatedAt',
+                    'deletedAt',
+                    'purgedAt',
+                ],
+                data.tasks.map((task) => [
+                    task.id,
+                    task.title,
+                    task.status,
+                    task.priority ?? null,
+                    task.taskMode ?? null,
+                    task.startTime ?? null,
+                    task.dueDate ?? null,
+                    toJson(task.recurrence),
+                    task.pushCount ?? null,
+                    toJson(task.tags ?? []),
+                    toJson(task.contexts ?? []),
+                    toJson(task.checklist),
+                    task.description ?? null,
+                    toJson(task.attachments),
+                    task.location ?? null,
+                    task.projectId ?? null,
+                    task.orderNum ?? null,
+                    toBool(task.isFocusedToday),
+                    task.timeEstimate ?? null,
+                    task.reviewAt ?? null,
+                    task.completedAt ?? null,
+                    task.createdAt,
+                    task.updatedAt,
+                    task.deletedAt ?? null,
+                    task.purgedAt ?? null,
+                ]),
+                `title=excluded.title,
+                 status=excluded.status,
+                 priority=excluded.priority,
+                 taskMode=excluded.taskMode,
+                 startTime=excluded.startTime,
+                 dueDate=excluded.dueDate,
+                 recurrence=excluded.recurrence,
+                 pushCount=excluded.pushCount,
+                 tags=excluded.tags,
+                 contexts=excluded.contexts,
+                 checklist=excluded.checklist,
+                 description=excluded.description,
+                 attachments=excluded.attachments,
+                 location=excluded.location,
+                 projectId=excluded.projectId,
+                 orderNum=excluded.orderNum,
+                 isFocusedToday=excluded.isFocusedToday,
+                 timeEstimate=excluded.timeEstimate,
+                 reviewAt=excluded.reviewAt,
+                 completedAt=excluded.completedAt,
+                 createdAt=excluded.createdAt,
+                 updatedAt=excluded.updatedAt,
+                 deletedAt=excluded.deletedAt,
+                 purgedAt=excluded.purgedAt`,
+            );
 
-            for (const project of data.projects) {
-                await this.client.run(
-                    `INSERT INTO projects (
-                        id, title, status, color, orderNum, tagIds, isSequential, isFocused, supportNotes, attachments,
-                        reviewAt, areaId, areaTitle, createdAt, updatedAt, deletedAt
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET
-                        title=excluded.title,
-                        status=excluded.status,
-                        color=excluded.color,
-                        orderNum=excluded.orderNum,
-                        tagIds=excluded.tagIds,
-                        isSequential=excluded.isSequential,
-                        isFocused=excluded.isFocused,
-                        supportNotes=excluded.supportNotes,
-                        attachments=excluded.attachments,
-                        reviewAt=excluded.reviewAt,
-                        areaId=excluded.areaId,
-                        areaTitle=excluded.areaTitle,
-                        createdAt=excluded.createdAt,
-                        updatedAt=excluded.updatedAt,
-                        deletedAt=excluded.deletedAt`,
-                    [
-                        project.id,
-                        project.title,
-                        project.status,
-                        project.color,
-                        Number.isFinite(project.order) ? project.order : 0,
-                        toJson(project.tagIds ?? []),
-                        toBool(project.isSequential),
-                        toBool(project.isFocused),
-                        project.supportNotes ?? null,
-                        toJson(project.attachments),
-                        project.reviewAt ?? null,
-                        project.areaId ?? null,
-                        project.areaTitle ?? null,
-                        project.createdAt,
-                        project.updatedAt,
-                        project.deletedAt ?? null,
-                    ]
-                );
-            }
+            await upsertBatch(
+                'projects',
+                [
+                    'id',
+                    'title',
+                    'status',
+                    'color',
+                    'orderNum',
+                    'tagIds',
+                    'isSequential',
+                    'isFocused',
+                    'supportNotes',
+                    'attachments',
+                    'reviewAt',
+                    'areaId',
+                    'areaTitle',
+                    'createdAt',
+                    'updatedAt',
+                    'deletedAt',
+                ],
+                data.projects.map((project) => [
+                    project.id,
+                    project.title,
+                    project.status,
+                    project.color,
+                    Number.isFinite(project.order) ? project.order : 0,
+                    toJson(project.tagIds ?? []),
+                    toBool(project.isSequential),
+                    toBool(project.isFocused),
+                    project.supportNotes ?? null,
+                    toJson(project.attachments),
+                    project.reviewAt ?? null,
+                    project.areaId ?? null,
+                    project.areaTitle ?? null,
+                    project.createdAt,
+                    project.updatedAt,
+                    project.deletedAt ?? null,
+                ]),
+                `title=excluded.title,
+                 status=excluded.status,
+                 color=excluded.color,
+                 orderNum=excluded.orderNum,
+                 tagIds=excluded.tagIds,
+                 isSequential=excluded.isSequential,
+                 isFocused=excluded.isFocused,
+                 supportNotes=excluded.supportNotes,
+                 attachments=excluded.attachments,
+                 reviewAt=excluded.reviewAt,
+                 areaId=excluded.areaId,
+                 areaTitle=excluded.areaTitle,
+                 createdAt=excluded.createdAt,
+                 updatedAt=excluded.updatedAt,
+                 deletedAt=excluded.deletedAt`,
+            );
 
-            for (const area of data.areas) {
-                await this.client.run(
-                    `INSERT INTO areas (
-                        id, name, color, icon, orderNum, createdAt, updatedAt
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET
-                        name=excluded.name,
-                        color=excluded.color,
-                        icon=excluded.icon,
-                        orderNum=excluded.orderNum,
-                        createdAt=excluded.createdAt,
-                        updatedAt=excluded.updatedAt`,
-                    [
-                        area.id,
-                        area.name,
-                        area.color ?? null,
-                        area.icon ?? null,
-                        area.order,
-                        area.createdAt ?? null,
-                        area.updatedAt ?? null,
-                    ]
-                );
-            }
+            await upsertBatch(
+                'areas',
+                [
+                    'id',
+                    'name',
+                    'color',
+                    'icon',
+                    'orderNum',
+                    'createdAt',
+                    'updatedAt',
+                ],
+                data.areas.map((area) => [
+                    area.id,
+                    area.name,
+                    area.color ?? null,
+                    area.icon ?? null,
+                    area.order,
+                    area.createdAt ?? null,
+                    area.updatedAt ?? null,
+                ]),
+                `name=excluded.name,
+                 color=excluded.color,
+                 icon=excluded.icon,
+                 orderNum=excluded.orderNum,
+                 createdAt=excluded.createdAt,
+                 updatedAt=excluded.updatedAt`,
+            );
 
             await this.client.run(
                 'INSERT INTO settings (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data=excluded.data',
