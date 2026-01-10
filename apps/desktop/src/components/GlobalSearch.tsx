@@ -38,9 +38,9 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
     }, [isOpen]);
 
     useEffect(() => {
-        const handleOpen = () => setIsOpen(true);
-        window.addEventListener('mindwtr:open-search', handleOpen as EventListener);
-        return () => window.removeEventListener('mindwtr:open-search', handleOpen as EventListener);
+        const handleOpen: EventListener = () => setIsOpen(true);
+        window.addEventListener('mindwtr:open-search', handleOpen);
+        return () => window.removeEventListener('mindwtr:open-search', handleOpen);
     }, []);
 
     // Auto-focus input when opened

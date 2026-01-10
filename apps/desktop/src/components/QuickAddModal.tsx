@@ -50,14 +50,15 @@ export function QuickAddModal() {
     }, []);
 
     useEffect(() => {
-        const handler = (event: Event) => {
-            const detail = (event as CustomEvent).detail as { initialProps?: Partial<Task>; initialValue?: string } | undefined;
+        type QuickAddDetail = { initialProps?: Partial<Task>; initialValue?: string };
+        const handler: EventListener = (event) => {
+            const detail = (event as CustomEvent<QuickAddDetail>).detail;
             setInitialProps(detail?.initialProps ?? null);
             setValue(detail?.initialValue ?? '');
             setIsOpen(true);
         };
-        window.addEventListener('mindwtr:quick-add', handler as EventListener);
-        return () => window.removeEventListener('mindwtr:quick-add', handler as EventListener);
+        window.addEventListener('mindwtr:quick-add', handler);
+        return () => window.removeEventListener('mindwtr:quick-add', handler);
     }, []);
 
     useEffect(() => {
