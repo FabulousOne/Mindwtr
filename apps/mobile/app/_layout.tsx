@@ -48,6 +48,7 @@ function RootLayoutContent() {
   const syncInFlight = useRef<Promise<void> | null>(null);
   const syncRequestVersion = useRef(0);
   const syncCompletedVersion = useRef(0);
+  const backgroundSyncPending = useRef(false);
   const isActive = useRef(true);
   const loadAttempts = useRef(0);
   const lastSyncErrorShown = useRef<string | null>(null);
@@ -55,6 +56,10 @@ function RootLayoutContent() {
 
   const runSync = useCallback((minIntervalMs = 5_000) => {
     if (!isActive.current) return;
+    if (syncInFlight.current && appState.current !== 'active') {
+      backgroundSyncPending.current = true;
+      return;
+    }
     if (syncInFlight.current) {
       return;
     }
@@ -78,6 +83,10 @@ function RootLayoutContent() {
     })().finally(() => {
       syncInFlight.current = null;
       syncCompletedVersion.current = targetVersion;
+      if (appState.current !== 'active' && backgroundSyncPending.current) {
+        backgroundSyncPending.current = false;
+        return;
+      }
       if (syncRequestVersion.current > syncCompletedVersion.current && isActive.current) {
         runSync(0);
       }
@@ -158,6 +167,12 @@ function RootLayoutContent() {
           syncDebounceTimer.current = null;
         }
         requestSync(0);
+      }
+      if (appState.current?.match(/inactive|background/) && nextAppState === 'active') {
+        if (backgroundSyncPending.current) {
+          backgroundSyncPending.current = false;
+          requestSync(0);
+        }
       }
       appState.current = nextAppState;
     };
