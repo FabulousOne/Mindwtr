@@ -282,45 +282,37 @@ export function SwipeableTaskItem({
         if (onToggleSelect) onToggleSelect();
     };
 
-    return (
-        <>
-            <Swipeable
-                ref={swipeableRef}
-                renderLeftActions={renderLeftActions}
-                renderRightActions={renderRightActions}
-                overshootLeft={false}
-                overshootRight={false}
-                enabled={!selectionMode && !disableSwipe}
-            >
-                <Pressable
+    const content = (
+        <Pressable
+            style={[
+                styles.taskItem,
+                { backgroundColor: tc.taskItemBg },
+                showFocusToggle && task.isFocusedToday && !selectionMode && { borderWidth: 2, borderColor: tc.tint },
+                isHighlighted && !selectionMode && { borderWidth: 2, borderColor: tc.tint },
+                selectionMode && { borderWidth: 2, borderColor: isMultiSelected ? tc.tint : tc.border }
+            ]}
+            onPress={handlePress}
+            onLongPress={handleLongPress}
+            delayLongPress={120}
+            accessibilityLabel={accessibilityLabel}
+            accessibilityHint="Double tap to edit task details. Swipe left to change status, right to delete."
+            accessibilityRole="button"
+        >
+            {selectionMode && (
+                <View
                     style={[
-                        styles.taskItem,
-                        { backgroundColor: tc.taskItemBg },
-                        showFocusToggle && task.isFocusedToday && !selectionMode && { borderWidth: 2, borderColor: tc.tint },
-                        isHighlighted && !selectionMode && { borderWidth: 2, borderColor: tc.tint },
-                        selectionMode && { borderWidth: 2, borderColor: isMultiSelected ? tc.tint : tc.border }
+                        styles.selectionIndicator,
+                        {
+                            borderColor: tc.tint,
+                            backgroundColor: isMultiSelected ? tc.tint : 'transparent'
+                        }
                     ]}
-                    onPress={handlePress}
-                    onLongPress={handleLongPress}
-                    accessibilityLabel={accessibilityLabel}
-                    accessibilityHint="Double tap to edit task details. Swipe left to change status, right to delete."
-                    accessibilityRole="button"
+                    pointerEvents="none"
                 >
-                    {selectionMode && (
-                        <View
-                            style={[
-                                styles.selectionIndicator,
-                                {
-                                    borderColor: tc.tint,
-                                    backgroundColor: isMultiSelected ? tc.tint : 'transparent'
-                                }
-                            ]}
-                            pointerEvents="none"
-                        >
-                            {isMultiSelected && <Text style={styles.selectionIndicatorText}>✓</Text>}
-                        </View>
-                    )}
-                    <View style={styles.taskContent}>
+                    {isMultiSelected && <Text style={styles.selectionIndicatorText}>✓</Text>}
+                </View>
+            )}
+            <View style={styles.taskContent}>
                         <View style={styles.titleRow}>
                             <Text
                                 style={[styles.taskTitle, { color: tc.text }, showFocusToggle && styles.taskTitleFlex]}
@@ -471,8 +463,25 @@ export function SwipeableTaskItem({
                             </Text>
                         </Pressable>
                     )}
-                </Pressable>
-            </Swipeable>
+        </Pressable>
+    );
+
+    return (
+        <>
+            {disableSwipe ? (
+                content
+            ) : (
+                <Swipeable
+                    ref={swipeableRef}
+                    renderLeftActions={renderLeftActions}
+                    renderRightActions={renderRightActions}
+                    overshootLeft={false}
+                    overshootRight={false}
+                    enabled={!selectionMode && !disableSwipe}
+                >
+                    {content}
+                </Swipeable>
+            )}
 
             <Modal
                 visible={showStatusMenu}
