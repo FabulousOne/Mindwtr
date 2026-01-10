@@ -173,7 +173,7 @@ interface TaskStore {
 
 // Save queue helper - coalesces writes while ensuring the latest snapshot is persisted quickly.
 let pendingData: AppData | null = null;
-let pendingOnError: ((msg: string) => void) | null = null;
+let pendingOnError: Array<(msg: string) => void> = [];
 let pendingVersion = 0;
 let pendingDataVersion = 0;
 let savedVersion = 0;
@@ -214,12 +214,39 @@ const stripSensitiveSettings = (settings: AppData['settings']): AppData['setting
     };
 };
 
+const cloneSettings = (settings: AppData['settings']): AppData['settings'] => {
+    try {
+        if (typeof structuredClone === 'function') {
+            return structuredClone(settings);
+        }
+    } catch {
+        // Fallback below
+    }
+    return JSON.parse(JSON.stringify(settings)) as AppData['settings'];
+};
+
+const cloneTask = (task: Task): Task => ({
+    ...task,
+    tags: task.tags ? [...task.tags] : [],
+    contexts: task.contexts ? [...task.contexts] : [],
+    checklist: task.checklist ? task.checklist.map((item) => ({ ...item })) : [],
+    attachments: task.attachments ? task.attachments.map((item) => ({ ...item })) : [],
+});
+
+const cloneProject = (project: Project): Project => ({
+    ...project,
+    tagIds: project.tagIds ? [...project.tagIds] : [],
+    attachments: project.attachments ? project.attachments.map((item) => ({ ...item })) : [],
+});
+
+const cloneArea = (area: Area): Area => ({ ...area });
+
 const sanitizeAppDataForStorage = (data: AppData): AppData => ({
     ...data,
-    settings: stripSensitiveSettings(data.settings),
-    tasks: [...data.tasks],
-    projects: [...data.projects],
-    areas: [...(data.areas || [])],
+    settings: stripSensitiveSettings(cloneSettings(data.settings)),
+    tasks: data.tasks.map(cloneTask),
+    projects: data.projects.map(cloneProject),
+    areas: (data.areas || []).map(cloneArea),
 });
 
 const getNextProjectOrder = (projectId: string | undefined, tasks: Task[]): number | undefined => {
@@ -242,12 +269,13 @@ const getNextProjectOrder = (projectId: string | undefined, tasks: Task[]): numb
  * @param onError Callback for save failures
  */
 const debouncedSave = (data: AppData, onError?: (msg: string) => void) => {
-    const nextVersion = pendingVersion + 1;
+    pendingVersion += 1;
     pendingData = sanitizeAppDataForStorage(data);
-    pendingVersion = nextVersion;
-    pendingDataVersion = nextVersion;
-    if (onError) pendingOnError = onError;
-    void flushPendingSave();
+    pendingDataVersion = pendingVersion;
+    if (onError) pendingOnError.push(onError);
+    void flushPendingSave().catch((error) => {
+        console.error('Failed to flush pending save:', error);
+    });
 };
 
 /**
@@ -264,18 +292,21 @@ export const flushPendingSave = async (): Promise<void> => {
         if (pendingDataVersion === savedVersion) return;
         const targetVersion = pendingDataVersion;
         const dataToSave = pendingData;
-        const onErrorCallback = pendingOnError;
+        const onErrorCallbacks = pendingOnError;
+        pendingOnError = [];
         saveInFlight = storage.saveData(dataToSave).then(() => {
             savedVersion = targetVersion;
         }).catch((e) => {
             console.error('Failed to flush pending save:', e);
-            if (onErrorCallback) {
-                onErrorCallback('Failed to save data');
+            if (onErrorCallbacks.length > 0) {
+                onErrorCallbacks.forEach((callback) => callback('Failed to save data'));
             }
         }).finally(() => {
             saveInFlight = null;
             if (pendingData) {
-                void flushPendingSave();
+                void flushPendingSave().catch((error) => {
+                    console.error('Failed to flush pending save:', error);
+                });
             }
         });
         await saveInFlight;
@@ -832,28 +863,39 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const now = new Date().toISOString();
         const updatesById = new Map(updatesList.map((u) => [u.id, u.updates]));
         const nextRecurringTasks: Task[] = [];
-        let newVisibleTasks = get().tasks;
+        let snapshot: AppData | null = null;
 
-        const newAllTasks = get()._allTasks.map((task) => {
-            const updates = updatesById.get(task.id);
-            if (!updates) return task;
-            const { updatedTask, nextRecurringTask } = applyTaskUpdates(task, updates, now);
-            if (nextRecurringTask) nextRecurringTasks.push(nextRecurringTask);
-            newVisibleTasks = updateVisibleTasks(newVisibleTasks, task, updatedTask);
-            return updatedTask;
+        set((state) => {
+            let newVisibleTasks = state.tasks;
+            const newAllTasks = state._allTasks.map((task) => {
+                const updates = updatesById.get(task.id);
+                if (!updates) return task;
+                const { updatedTask, nextRecurringTask } = applyTaskUpdates(task, updates, now);
+                if (nextRecurringTask) nextRecurringTasks.push(nextRecurringTask);
+                newVisibleTasks = updateVisibleTasks(newVisibleTasks, task, updatedTask);
+                return updatedTask;
+            });
+
+            if (nextRecurringTasks.length > 0) {
+                newAllTasks.push(...nextRecurringTasks);
+                nextRecurringTasks.forEach((task) => {
+                    newVisibleTasks = updateVisibleTasks(newVisibleTasks, null, task);
+                });
+            }
+
+            snapshot = {
+                tasks: newAllTasks,
+                projects: state._allProjects,
+                areas: state._allAreas,
+                settings: state.settings,
+            };
+
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
         });
 
-        if (nextRecurringTasks.length > 0) {
-            newAllTasks.push(...nextRecurringTasks);
-            nextRecurringTasks.forEach((task) => {
-                newVisibleTasks = updateVisibleTasks(newVisibleTasks, null, task);
-            });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
         }
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        debouncedSave(
-            { tasks: newAllTasks, projects: get()._allProjects, areas: get()._allAreas, settings: get().settings },
-            (msg) => set({ error: msg })
-        );
     },
 
     batchMoveTasks: async (ids: string[], newStatus: TaskStatus) => {
