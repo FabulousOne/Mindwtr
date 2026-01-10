@@ -19,7 +19,7 @@ import { performMobileSync } from '../lib/sync-service';
 import { updateAndroidWidgetFromStore } from '../lib/widget-service';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { verifyPolyfills } from '../utils/verify-polyfills';
-import { setupGlobalErrorLogging } from '../lib/app-log';
+import { logError, setupGlobalErrorLogging } from '../lib/app-log';
 
 // Initialize storage for mobile
 let storageInitError: Error | null = null;
@@ -125,6 +125,9 @@ function RootLayoutContent() {
         pathname: '/capture',
         params: { text: encodeURIComponent(sharedText.trim()) },
       });
+    } else {
+      void logError(new Error('Share intent payload missing text'), { scope: 'share-intent' });
+      router.replace('/capture');
     }
     resetShareIntent();
   }, [hasShareIntent, resetShareIntent, router, shareIntent?.text, shareIntent?.webUrl]);
