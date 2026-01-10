@@ -200,22 +200,21 @@ Or edit `~/.claude.json` directly:
 
 Then restart the Claude Code session and run `/mcp` to verify it's connected.
 
-### OpenAI Codex CLI (settings.json style)
+### OpenAI Codex (config.toml)
 
-If your Codex client uses a `settings.json` file with `mcpServers`, add:
+Codex stores MCP config in `~/.codex/config.toml`. Add:
 
-```json
-{
-  "mcpServers": {
-    "mindwtr": {
-      "command": "bun",
-      "args": ["/absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts", "--db", "/path/to/mindwtr.db"]
-    }
-  }
-}
+```toml
+[mcp_servers.mindwtr]
+command = "bun"
+args = ["/absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts", "--db", "/path/to/mindwtr.db"]
+
+# Optional: pass env vars to the server
+[mcp_servers.mindwtr.env]
+MINDWTR_DB_PATH = "/path/to/mindwtr.db"
 ```
 
-Restart the Codex client after saving.
+Restart Codex after saving.
 
 ### Gemini / Other MCP clients
 
