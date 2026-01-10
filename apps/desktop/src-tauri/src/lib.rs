@@ -1863,7 +1863,7 @@ pub fn run() {
             // Global hotkey for Quick Add.
             handle
                 .global_shortcut()
-                .on_shortcut("Alt+Shift+A", move |app, _shortcut, _event| {
+                .on_shortcut("CommandOrControl+Shift+A", move |app, _shortcut, _event| {
                     show_main_and_emit(app);
                 })?;
             
