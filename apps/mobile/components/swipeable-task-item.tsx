@@ -247,11 +247,9 @@ export function SwipeableTaskItem({
 
     const accessibilityLabel = [
         task.title,
-        `Status: ${task.status}`,
+        `Status: ${t(`status.${task.status}`)}`,
         dueLabel ? `Due: ${dueLabel}` : null,
-        task.contexts?.length ? `Contexts: ${task.contexts.join(', ')}` : null,
-        timeEstimateLabel ? `Estimate: ${timeEstimateLabel}` : null,
-    ].filter(Boolean).join(', ');
+    ].filter(Boolean).join('. ');
 
     const handlePress = () => {
         if (Date.now() < ignorePressUntil.current) return;
