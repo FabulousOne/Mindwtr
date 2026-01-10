@@ -56,7 +56,7 @@ async function tauriInvoke<T>(command: string, args?: Record<string, unknown>): 
     return mod.invoke<T>(command as any, args as any);
 }
 
-type WebDavConfig = { url: string; username: string; password: string };
+type WebDavConfig = { url: string; username: string; password?: string; hasPassword?: boolean };
 type CloudConfig = { url: string; token: string };
 
 function normalizeSyncBackend(raw: string | null): SyncBackend {
@@ -99,13 +99,13 @@ export class SyncService {
             url: localStorage.getItem(WEBDAV_URL_KEY) || '',
             username: localStorage.getItem(WEBDAV_USERNAME_KEY) || '',
             password: '',
+            hasPassword: false,
         };
     }
 
     private static setWebDavConfigLocal(config: { url: string; username?: string; password?: string }) {
         localStorage.setItem(WEBDAV_URL_KEY, config.url);
         localStorage.setItem(WEBDAV_USERNAME_KEY, config.username || '');
-        sessionStorage.removeItem(WEBDAV_PASSWORD_KEY);
     }
 
     private static getCloudConfigLocal(): CloudConfig {
@@ -202,7 +202,7 @@ export class SyncService {
             return await tauriInvoke<WebDavConfig>('get_webdav_config');
         } catch (error) {
             console.error('Failed to get WebDAV config:', error);
-            return { url: '', username: '', password: '' };
+            return { url: '', username: '', hasPassword: false };
         }
     }
 
@@ -408,13 +408,21 @@ export class SyncService {
                 ),
                 readRemote: async () => {
                     if (backend === 'webdav') {
+                        if (isTauriRuntime()) {
+                            const { url } = await SyncService.getWebDavConfig();
+                            if (!url) {
+                                throw new Error('WebDAV URL not configured');
+                            }
+                            syncUrl = url;
+                            return await tauriInvoke<AppData>('webdav_get_json');
+                        }
                         const { url, username, password } = await SyncService.getWebDavConfig();
                         if (!url) {
                             throw new Error('WebDAV URL not configured');
                         }
                         syncUrl = url;
                         const fetcher = await getTauriFetch();
-                        return await webdavGetJson<AppData>(url, { username, password, fetcher });
+                        return await webdavGetJson<AppData>(url, { username, password: password || '', fetcher });
                     }
                     if (backend === 'cloud') {
                         const { url, token } = await SyncService.getCloudConfig();
@@ -439,9 +447,13 @@ export class SyncService {
                 },
                 writeRemote: async (data) => {
                     if (backend === 'webdav') {
+                        if (isTauriRuntime()) {
+                            await tauriInvoke('webdav_put_json', { data });
+                            return;
+                        }
                         const { url, username, password } = await SyncService.getWebDavConfig();
                         const fetcher = await getTauriFetch();
-                        await webdavPutJson(url, data, { username, password, fetcher });
+                        await webdavPutJson(url, data, { username, password: password || '', fetcher });
                         return;
                     }
                     if (backend === 'cloud') {
