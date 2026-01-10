@@ -237,14 +237,12 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
     };
 
     const tasksResult = mergeEntitiesWithStats(localNormalized.tasks, incomingNormalized.tasks, (localTask: Task, incomingTask: Task, winner: Task) => {
-        if (winner.deletedAt) return winner;
         const loser = winner === incomingTask ? localTask : incomingTask;
         const attachments = mergeAttachments(winner.attachments, loser.attachments);
         return attachments ? { ...winner, attachments } : winner;
     });
 
     const projectsResult = mergeEntitiesWithStats(localNormalized.projects, incomingNormalized.projects, (localProject: Project, incomingProject: Project, winner: Project) => {
-        if (winner.deletedAt) return winner;
         const loser = winner === incomingProject ? localProject : incomingProject;
         const attachments = mergeAttachments(winner.attachments, loser.attachments);
         return attachments ? { ...winner, attachments } : winner;
