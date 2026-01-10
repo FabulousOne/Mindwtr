@@ -126,7 +126,9 @@ export function TaskItemEditor({
     };
     const [schedulingOpen, setSchedulingOpen] = useState(sectionCounts.scheduling > 0);
     const [organizationOpen, setOrganizationOpen] = useState(sectionCounts.organization > 0);
-    const [detailsOpen, setDetailsOpen] = useState(sectionCounts.details > 0);
+    const [detailsOpen, setDetailsOpen] = useState(
+        sectionCounts.details > 0 || detailsFields.includes('description') || detailsFields.includes('checklist')
+    );
     return (
         <form
             onSubmit={onSubmit}
