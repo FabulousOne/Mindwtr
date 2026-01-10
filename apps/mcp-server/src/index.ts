@@ -1,11 +1,7 @@
 #!/usr/bin/env node
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
+import * as z from 'zod';
 
 import { openMindwtrDb, closeDb } from './db.js';
 import { addTask, completeTask, listTasks } from './queries.js';
@@ -35,17 +31,10 @@ const dbPath = typeof flags.db === 'string' ? flags.db : undefined;
 const readonly = Boolean(flags.readonly);
 const keepAlive = Boolean(flags.wait || flags.keepalive || process.env.MINDWTR_MCP_WAIT) || Boolean(process.stdin.isTTY);
 
-const server = new Server(
-  {
-    name: 'mindwtr-mcp-server',
-    version: '0.1.0',
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
-  },
-);
+const server = new McpServer({
+  name: 'mindwtr-mcp-server',
+  version: '0.1.0',
+});
 
 const listTasksSchema = z.object({
   status: z.string().optional(),
@@ -74,83 +63,58 @@ const completeTaskSchema = z.object({
   id: z.string(),
 });
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
-    {
-      name: 'mindwtr.list_tasks',
-      description: 'List tasks from the local Mindwtr SQLite database.',
-      inputSchema: listTasksSchema,
-    },
-    {
-      name: 'mindwtr.add_task',
-      description: 'Add a task to the local Mindwtr SQLite database.',
-      inputSchema: addTaskSchema,
-    },
-    {
-      name: 'mindwtr.complete_task',
-      description: 'Mark a task as done in the local Mindwtr SQLite database.',
-      inputSchema: completeTaskSchema,
-    },
-  ],
-}));
-
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
+const withDb = async <T>(fn: (db: ReturnType<typeof openMindwtrDb>['db']) => T): Promise<T> => {
   const { db } = openMindwtrDb({ dbPath, readonly });
-
   try {
-    if (name === 'mindwtr.list_tasks') {
-      const input = listTasksSchema.parse(args ?? {});
-      const tasks = listTasks(db, {
-        ...input,
-        status: input.status as any,
-      });
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ tasks }, null, 2),
-          },
-        ],
-      };
-    }
-
-    if (name === 'mindwtr.add_task') {
-      if (readonly) throw new Error('Database opened read-only.');
-      const input = addTaskSchema.parse(args ?? {});
-      const task = addTask(db, {
-        ...input,
-        status: input.status as any,
-      });
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ task }, null, 2),
-          },
-        ],
-      };
-    }
-
-    if (name === 'mindwtr.complete_task') {
-      if (readonly) throw new Error('Database opened read-only.');
-      const input = completeTaskSchema.parse(args ?? {});
-      const task = completeTask(db, { id: input.id });
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ task }, null, 2),
-          },
-        ],
-      };
-    }
-
-    throw new Error(`Unknown tool: ${name}`);
+    return fn(db);
   } finally {
     closeDb(db);
   }
-});
+};
+
+server.registerTool(
+  'mindwtr.list_tasks',
+  {
+    description: 'List tasks from the local Mindwtr SQLite database.',
+    inputSchema: listTasksSchema,
+  },
+  async (input) => {
+    const tasks = await withDb((db) => listTasks(db, { ...input, status: input.status as any }));
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ tasks }, null, 2) }],
+    };
+  },
+);
+
+server.registerTool(
+  'mindwtr.add_task',
+  {
+    description: 'Add a task to the local Mindwtr SQLite database.',
+    inputSchema: addTaskSchema,
+  },
+  async (input) => {
+    if (readonly) throw new Error('Database opened read-only.');
+    const task = await withDb((db) => addTask(db, { ...input, status: input.status as any }));
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ task }, null, 2) }],
+    };
+  },
+);
+
+server.registerTool(
+  'mindwtr.complete_task',
+  {
+    description: 'Mark a task as done in the local Mindwtr SQLite database.',
+    inputSchema: completeTaskSchema,
+  },
+  async (input) => {
+    if (readonly) throw new Error('Database opened read-only.');
+    const task = await withDb((db) => completeTask(db, { id: input.id }));
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ task }, null, 2) }],
+    };
+  },
+);
 
 async function main() {
   const transport = new StdioServerTransport();
