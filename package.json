@@ -20,6 +20,7 @@
     "mobile:ios": "bun run --filter mobile ios",
     "mindwtr:cli": "bun run scripts/mindwtr-cli.ts --",
     "mindwtr:api": "bun run scripts/mindwtr-api.ts --",
+    "mindwtr:mcp": "bun run --filter mindwtr-mcp-server dev --",
     "set-version": "bun run scripts/set-version.ts"
   },
   "devDependencies": {
