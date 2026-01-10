@@ -389,6 +389,7 @@ export function SwipeableTaskItem({
                                                     : undefined;
                                                 updateTask(taskId, { checklist: pending, ...(nextStatus ? { status: nextStatus } : {}) });
                                                 pendingChecklist.current = null;
+                                                checklistUpdateTimer.current = null;
                                             }, 200);
                                         }}
                                         style={styles.checklistItem}
