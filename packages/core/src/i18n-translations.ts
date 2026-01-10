@@ -86,6 +86,7 @@ const en: Record<string, string> = {
         'list.waiting': 'Waiting For',
         'list.done': 'Completed',
         'list.tasks': 'Task list',
+        'list.confirmBatchDelete': 'Delete selected tasks?',
         'list.noTasks': 'No tasks found',
 
         // Status Labels
@@ -877,6 +878,7 @@ const zh: Record<string, string> = {
         'list.waiting': '等待中',
         'list.done': '已完成',
         'list.tasks': '任务列表',
+        'list.confirmBatchDelete': '删除选中的任务？',
         'list.noTasks': '未找到任务',
 
         // Status Labels

@@ -530,6 +530,8 @@ export function ListView({ title, statusFilter }: ListViewProps) {
 
     const handleBatchDelete = useCallback(async () => {
         if (selectedIdsArray.length === 0) return;
+        const confirmMessage = t('list.confirmBatchDelete') || 'Delete selected tasks?';
+        if (!window.confirm(confirmMessage)) return;
         await batchDeleteTasks(selectedIdsArray);
         exitSelectionMode();
     }, [batchDeleteTasks, selectedIdsArray, exitSelectionMode]);
