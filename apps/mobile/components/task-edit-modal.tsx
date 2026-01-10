@@ -760,21 +760,6 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     ];
     const priorityOptions: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 
-    const savedOrder = useMemo(() => settings.gtd?.taskEditor?.order ?? [], [settings.gtd?.taskEditor?.order]);
-    const disabledFields = useMemo(() => {
-        const next = new Set<TaskEditorFieldId>();
-        if (!prioritiesEnabled) next.add('priority');
-        if (!timeEstimatesEnabled) next.add('timeEstimate');
-        return next;
-    }, [prioritiesEnabled, timeEstimatesEnabled]);
-
-    const taskEditorOrder = useMemo(() => {
-        const known = new Set(DEFAULT_TASK_EDITOR_ORDER);
-        const normalized = savedOrder.filter((id) => known.has(id));
-        const missing = DEFAULT_TASK_EDITOR_ORDER.filter((id) => !normalized.includes(id));
-        return [...normalized, ...missing].filter((id) => !disabledFields.has(id));
-    }, [savedOrder, disabledFields]);
-
     const mergedTask = useMemo(() => ({
         ...(task ?? {}),
         ...editedTask,
