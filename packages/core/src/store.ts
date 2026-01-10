@@ -801,14 +801,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const changeAt = Date.now();
         const now = new Date().toISOString();
         const idSet = new Set(ids);
-        const newAllTasks = get()._allTasks.map((task) =>
-            idSet.has(task.id) ? { ...task, deletedAt: now, updatedAt: now } : task
-        );
         let newVisibleTasks = get().tasks;
-        idSet.forEach((id) => {
-            const oldTask = get()._allTasks.find((task) => task.id === id);
-            const updatedTask = oldTask ? { ...oldTask, deletedAt: now, updatedAt: now } : null;
-            newVisibleTasks = updateVisibleTasks(newVisibleTasks, oldTask, updatedTask);
+        const newAllTasks = get()._allTasks.map((task) => {
+            if (!idSet.has(task.id)) return task;
+            const updatedTask = { ...task, deletedAt: now, updatedAt: now };
+            newVisibleTasks = updateVisibleTasks(newVisibleTasks, task, updatedTask);
+            return updatedTask;
         });
         set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
         debouncedSave(
