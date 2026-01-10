@@ -303,11 +303,6 @@ export const flushPendingSave = async (): Promise<void> => {
             }
         }).finally(() => {
             saveInFlight = null;
-            if (pendingData) {
-                void flushPendingSave().catch((error) => {
-                    console.error('Failed to flush pending save:', error);
-                });
-            }
         });
         await saveInFlight;
     }
