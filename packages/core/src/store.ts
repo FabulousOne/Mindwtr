@@ -187,6 +187,25 @@ const normalizeTagId = (value: string): string => {
     return withPrefix.toLowerCase();
 };
 
+const stripSensitiveSettings = (settings: AppData['settings']): AppData['settings'] => {
+    if (!settings?.ai || !settings.ai.apiKey) return settings;
+    return {
+        ...settings,
+        ai: {
+            ...settings.ai,
+            apiKey: undefined,
+        },
+    };
+};
+
+const sanitizeAppDataForStorage = (data: AppData): AppData => ({
+    ...data,
+    settings: stripSensitiveSettings(data.settings),
+    tasks: [...data.tasks],
+    projects: [...data.projects],
+    areas: [...(data.areas || [])],
+});
+
 const getNextProjectOrder = (projectId: string | undefined, tasks: Task[]): number | undefined => {
     if (!projectId) return undefined;
     const projectTasks = tasks.filter((task) => task.projectId === projectId && !task.deletedAt);
@@ -207,12 +226,7 @@ const getNextProjectOrder = (projectId: string | undefined, tasks: Task[]): numb
  * @param onError Callback for save failures
  */
 const debouncedSave = (data: AppData, onError?: (msg: string) => void) => {
-    pendingData = {
-        ...data,
-        tasks: [...data.tasks],
-        projects: [...data.projects],
-        areas: [...(data.areas || [])],
-    };
+    pendingData = sanitizeAppDataForStorage(data);
     if (onError) pendingOnError = onError;
     pendingVersion += 1;
     void flushPendingSave();
