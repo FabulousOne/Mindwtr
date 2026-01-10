@@ -566,14 +566,11 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         const currentMode = showDatePicker;
         if (!currentMode) return;
 
-        if (Platform.OS === 'android') {
-            // Android fires dismiss events; handle explicitly.
-            if (event.type === 'dismissed') {
-                if (currentMode === 'start-time') setPendingStartDate(null);
-                if (currentMode === 'due-time') setPendingDueDate(null);
-                setShowDatePicker(null);
-                return;
-            }
+        if (event.type === 'dismissed') {
+            if (currentMode === 'start-time') setPendingStartDate(null);
+            if (currentMode === 'due-time') setPendingDueDate(null);
+            setShowDatePicker(null);
+            return;
         }
 
         if (!selectedDate) return;

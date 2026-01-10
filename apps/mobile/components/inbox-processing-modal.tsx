@@ -645,13 +645,11 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
                 mode="date"
                 display="default"
                 onChange={(event, date) => {
-                  if (Platform.OS === 'android') {
-                    if (event.type === 'dismissed') {
-                      setShowStartDatePicker(false);
-                      return;
-                    }
+                  if (event.type === 'dismissed') {
+                    setShowStartDatePicker(false);
+                    return;
                   }
-                  setShowStartDatePicker(false);
+                  if (Platform.OS !== 'ios') setShowStartDatePicker(false);
                   if (!date) return;
                   const next = new Date(date);
                   next.setHours(9, 0, 0, 0);
@@ -666,13 +664,11 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
                 mode="date"
                 display="default"
                 onChange={(event, date) => {
-                  if (Platform.OS === 'android') {
-                    if (event.type === 'dismissed') {
-                      setShowDelegateDatePicker(false);
-                      return;
-                    }
+                  if (event.type === 'dismissed') {
+                    setShowDelegateDatePicker(false);
+                    return;
                   }
-                  setShowDelegateDatePicker(false);
+                  if (Platform.OS !== 'ios') setShowDelegateDatePicker(false);
                   if (!date) return;
                   const next = new Date(date);
                   next.setHours(9, 0, 0, 0);

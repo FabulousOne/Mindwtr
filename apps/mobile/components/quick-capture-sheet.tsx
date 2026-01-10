@@ -210,11 +210,12 @@ export function QuickCaptureSheet({
           mode="date"
           display={Platform.OS === 'ios' ? 'inline' : 'default'}
           onChange={(event, selectedDate) => {
+            if (event.type === 'dismissed') {
+              setShowDatePicker(false);
+              return;
+            }
             if (Platform.OS !== 'ios') {
               setShowDatePicker(false);
-              if (event.type !== 'set') {
-                return;
-              }
             }
             if (selectedDate) setDueDate(selectedDate);
           }}
@@ -227,11 +228,12 @@ export function QuickCaptureSheet({
           mode="datetime"
           display={Platform.OS === 'ios' ? 'inline' : 'default'}
           onChange={(event, selectedDate) => {
+            if (event.type === 'dismissed') {
+              setShowStartPicker(false);
+              return;
+            }
             if (Platform.OS !== 'ios') {
               setShowStartPicker(false);
-              if (event.type !== 'set') {
-                return;
-              }
             }
             if (selectedDate) setStartTime(selectedDate);
           }}
