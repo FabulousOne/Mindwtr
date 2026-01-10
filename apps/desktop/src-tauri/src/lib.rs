@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
 use tauri::menu::{Menu, MenuItem};
 use tauri::path::BaseDirectory;
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::image::Image;
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use rusqlite::{params, Connection, OptionalExtension, params_from_iter, ToSql};
@@ -1721,6 +1721,7 @@ pub fn run() {
             TrayIconBuilder::new()
                 .icon(tray_icon)
                 .menu(&tray_menu)
+                .show_menu_on_left_click(false)
                 .on_menu_event(move |app, event| {
                     match event.id().as_ref() {
                         "quick_add" => {
@@ -1736,8 +1737,10 @@ pub fn run() {
                     }
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { .. } = event {
-                        show_main(tray.app_handle());
+                    if let TrayIconEvent::Click { button, button_state, .. } = event {
+                        if button == MouseButton::Left && button_state == MouseButtonState::Up {
+                            show_main(tray.app_handle());
+                        }
                     }
                 })
                 .build(handle)?;
