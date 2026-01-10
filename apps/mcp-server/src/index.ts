@@ -29,7 +29,7 @@ const flags = parseArgs(args);
 
 const dbPath = typeof flags.db === 'string' ? flags.db : undefined;
 const readonly = Boolean(flags.readonly);
-const keepAlive = Boolean(flags.wait || flags.keepalive || process.env.MINDWTR_MCP_WAIT) || Boolean(process.stdin.isTTY);
+const keepAlive = !(flags.nowait || flags.noWait);
 
 const server = new McpServer({
   name: 'mindwtr-mcp-server',
