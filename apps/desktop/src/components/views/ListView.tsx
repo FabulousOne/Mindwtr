@@ -261,6 +261,8 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     useEffect(() => {
         let cancelled = false;
         const status = statusFilter === 'all' ? undefined : statusFilter;
+        // Seed with in-memory tasks so switching views doesn't flash empty state.
+        setBaseTasks(statusFilter === 'archived' ? [] : tasks);
         queryTasks({
             status,
             includeArchived: status === 'archived',
@@ -273,7 +275,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         return () => {
             cancelled = true;
         };
-    }, [statusFilter, queryTasks, lastDataChangeAt]);
+    }, [statusFilter, queryTasks, lastDataChangeAt, tasks]);
 
     const filteredTasks = useMemo(() => {
         const now = new Date();
