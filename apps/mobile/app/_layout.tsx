@@ -43,11 +43,11 @@ function RootLayoutContent() {
   const appState = useRef(AppState.currentState);
   const lastAutoSyncAt = useRef(0);
   const syncDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncThrottleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const widgetRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryLoadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncInFlight = useRef<Promise<void> | null>(null);
-  const syncRequestVersion = useRef(0);
-  const syncCompletedVersion = useRef(0);
+  const syncPending = useRef(false);
   const backgroundSyncPending = useRef(false);
   const isActive = useRef(true);
   const loadAttempts = useRef(0);
@@ -58,15 +58,25 @@ function RootLayoutContent() {
     if (!isActive.current) return;
     if (syncInFlight.current && appState.current !== 'active') {
       backgroundSyncPending.current = true;
+      syncPending.current = true;
       return;
     }
     if (syncInFlight.current) {
       return;
     }
     const now = Date.now();
-    if (now - lastAutoSyncAt.current < minIntervalMs) return;
+    if (now - lastAutoSyncAt.current < minIntervalMs) {
+      if (!syncThrottleTimer.current) {
+        const waitMs = Math.max(0, minIntervalMs - (now - lastAutoSyncAt.current));
+        syncThrottleTimer.current = setTimeout(() => {
+          syncThrottleTimer.current = null;
+          runSync(0);
+        }, waitMs);
+      }
+      return;
+    }
     lastAutoSyncAt.current = now;
-    const targetVersion = syncRequestVersion.current;
+    syncPending.current = false;
 
     syncInFlight.current = (async () => {
       await flushPendingSave().catch(console.error);
@@ -82,19 +92,19 @@ function RootLayoutContent() {
       }
     })().finally(() => {
       syncInFlight.current = null;
-      syncCompletedVersion.current = targetVersion;
       if (appState.current !== 'active' && backgroundSyncPending.current) {
         backgroundSyncPending.current = false;
+        syncPending.current = true;
         return;
       }
-      if (syncRequestVersion.current > syncCompletedVersion.current && isActive.current) {
+      if (syncPending.current && isActive.current) {
         runSync(0);
       }
     });
   }, []);
 
   const requestSync = useCallback((minIntervalMs = 5_000) => {
-    syncRequestVersion.current += 1;
+    syncPending.current = true;
     runSync(minIntervalMs);
   }, [runSync]);
 
@@ -117,6 +127,9 @@ function RootLayoutContent() {
       unsubscribe();
       if (syncDebounceTimer.current) {
         clearTimeout(syncDebounceTimer.current);
+      }
+      if (syncThrottleTimer.current) {
+        clearTimeout(syncThrottleTimer.current);
       }
     };
   }, [requestSync]);
