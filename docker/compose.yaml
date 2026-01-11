@@ -1,9 +1,9 @@
 services:
-  mindwtr_cloud:
-    # image: ghcr.io/dongdongbh/mindwtr_cloud:latest
-    image: mindwtr_cloud:latest
-    container_name: mindwtr_cloud
-    hostname: mindwtr_cloud
+  mindwtr-cloud:
+    # image: ghcr.io/dongdongbh/mindwtr-cloud:latest
+    image: mindwtr-cloud:latest
+    container_name: mindwtr-cloud
+    hostname: mindwtr-cloud
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8787/health || echo 'Health check failed'"]
@@ -18,11 +18,11 @@ services:
     volumes:
       - /path/data_dir:/app/cloud_data
 
-  mindwtr_app:
-    # image: ghcr.io/dongdongbh/mindwtr_app:latest
-    image: mindwtr_app:latest
-    container_name: mindwtr_app
-    hostname: mindwtr_app
+  mindwtr-app:
+    # image: ghcr.io/dongdongbh/mindwtr-app:latest
+    image: mindwtr-app:latest
+    container_name: mindwtr-app
+    hostname: mindwtr-app
     restart: always
     ports:
       - 5173:80
