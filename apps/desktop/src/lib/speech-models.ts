@@ -9,6 +9,14 @@ export const WHISPER_MODELS: Array<{ id: string; fileName: string; label: string
 
 export const DEFAULT_WHISPER_MODEL = WHISPER_MODELS[0]?.id ?? 'whisper-tiny';
 
-export const OPENAI_SPEECH_MODELS = ['gpt-4o-transcribe'];
+export const OPENAI_SPEECH_MODELS = [
+    'gpt-4o-mini-transcribe',
+    'gpt-4o-transcribe',
+    'whisper-1',
+];
 
-export const GEMINI_SPEECH_MODELS = ['gemini-2.5-flash'];
+export const GEMINI_SPEECH_MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+];
