@@ -135,6 +135,8 @@ interface TaskStore {
     batchDeleteTasks: (ids: string[]) => Promise<void>;
     /** Query tasks using storage adapter when available */
     queryTasks: (options: TaskQueryOptions) => Promise<Task[]>;
+    /** Set or clear global error state */
+    setError: (error: string | null) => void;
 
     // Project Actions
     /** Add a new project */
@@ -316,6 +318,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     _allTasks: [],
     _allProjects: [],
     _allAreas: [],
+    setError: (error: string | null) => set({ error }),
 
     /**
      * Fetch all data from the configured storage adapter.

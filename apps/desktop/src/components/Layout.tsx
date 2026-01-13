@@ -26,6 +26,8 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     }, []));
     const settings = useTaskStore((state) => state.settings);
     const updateSettings = useTaskStore((state) => state.updateSettings);
+    const error = useTaskStore((state) => state.error);
+    const setError = useTaskStore((state) => state.setError);
     const { t } = useLanguage();
     const isCollapsed = settings?.sidebarCollapsed ?? false;
     const isFocusMode = useUiStore((state) => state.isFocusMode);
@@ -205,6 +207,18 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                     "mx-auto p-8 h-full",
                     isFocusMode ? "max-w-[800px]" : ['board', 'calendar'].includes(currentView) ? "max-w-full" : "max-w-4xl"
                 )}>
+                    {error && (
+                        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                            <span>{error}</span>
+                            <button
+                                type="button"
+                                className="text-destructive/80 hover:text-destructive underline underline-offset-2"
+                                onClick={() => setError(null)}
+                            >
+                                {t('common.dismiss') || 'Dismiss'}
+                            </button>
+                        </div>
+                    )}
                     {children}
                 </div>
             </main>

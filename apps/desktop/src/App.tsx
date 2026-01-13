@@ -27,6 +27,7 @@ function App() {
     const [activeView, setActiveView] = useState('inbox');
     const [isNavigating, startTransition] = useTransition();
     const { fetchData } = useTaskStore();
+    const setError = useTaskStore((state) => state.setError);
     const { t } = useLanguage();
     const isActiveRef = useRef(true);
     const lastAutoSyncRef = useRef(0);
@@ -41,8 +42,14 @@ function App() {
         if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
         fetchData();
 
+        const reportError = (label: string, error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            setError(`${label}: ${message}`);
+            console.error(error);
+        };
+
         const handleUnload = () => {
-            flushPendingSave().catch(console.error);
+            flushPendingSave().catch((error) => reportError('Save failed', error));
         };
         window.addEventListener('beforeunload', handleUnload);
         let unlistenClose: (() => void) | null = null;
@@ -58,7 +65,7 @@ function App() {
                         isClosing = true;
                         event.preventDefault();
                         closingPromise = flushPendingSave()
-                            .catch(console.error)
+                            .catch((error) => reportError('Save failed', error))
                             .then(() => window.close())
                             .finally(() => {
                                 closingPromise = null;
@@ -72,12 +79,12 @@ function App() {
                         unlistenClose = unlisten;
                     }
                 })
-                .catch(console.error);
+                .catch((error) => reportError('Window listener failed', error));
         }
 
         if (isTauriRuntime()) {
-            startDesktopNotifications().catch(console.error);
-            SyncService.startFileWatcher().catch(console.error);
+            startDesktopNotifications().catch((error) => reportError('Notifications failed', error));
+            SyncService.startFileWatcher().catch((error) => reportError('File watcher failed', error));
         }
 
         isActiveRef.current = true;
@@ -102,7 +109,7 @@ function App() {
             if (!(await canSync())) return;
 
             lastAutoSyncRef.current = now;
-            await flushPendingSave().catch(console.error);
+            await flushPendingSave().catch((error) => reportError('Save failed', error));
             const result = await SyncService.performSync();
             if (!result.success && result.error) {
                 const nowMs = Date.now();
@@ -122,7 +129,7 @@ function App() {
                 return;
             }
             syncInFlightRef.current = performSync()
-                .catch(console.error)
+                .catch((error) => reportError('Sync failed', error))
                 .finally(() => {
                     syncInFlightRef.current = null;
                     if (syncQueuedRef.current && isActiveRef.current) {
@@ -137,14 +144,14 @@ function App() {
             // On focus, use 30s throttle to avoid excessive syncs
             const now = Date.now();
             if (now - lastAutoSyncRef.current > 30_000) {
-                queueSync().catch(console.error);
+                queueSync().catch((error) => reportError('Sync failed', error));
             }
         };
 
         const blurListener = () => {
             // Sync when window loses focus
-            flushPendingSave().catch(console.error);
-            queueSync().catch(console.error);
+            flushPendingSave().catch((error) => reportError('Save failed', error));
+            queueSync().catch((error) => reportError('Sync failed', error));
         };
 
         // Auto-sync on data changes with debounce
@@ -155,7 +162,7 @@ function App() {
             }
             syncDebounceTimerRef.current = setTimeout(() => {
                 if (!isActiveRef.current) return;
-                queueSync().catch(console.error);
+                queueSync().catch((error) => reportError('Sync failed', error));
             }, 5000);
         });
 
@@ -164,7 +171,7 @@ function App() {
         window.addEventListener('blur', blurListener);
         initialSyncTimerRef.current = setTimeout(() => {
             if (!isActiveRef.current) return;
-            queueSync().catch(console.error);
+            queueSync().catch((error) => reportError('Sync failed', error));
         }, 1500);
 
         return () => {
@@ -184,9 +191,9 @@ function App() {
                 clearTimeout(initialSyncTimerRef.current);
             }
             stopDesktopNotifications();
-            SyncService.stopFileWatcher().catch(console.error);
+            SyncService.stopFileWatcher().catch((error) => reportError('File watcher failed', error));
         };
-    }, [fetchData]);
+    }, [fetchData, setError]);
 
     const renderView = () => {
         if (activeView.startsWith('savedSearch:')) {
