@@ -228,8 +228,8 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         const sorted = [...projects]
             .filter((project) => !project.deletedAt)
             .sort((a, b) => {
-                const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
-                const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
+                const aOrder = Number.isFinite(a.order) ? (a.order as number) : Number.POSITIVE_INFINITY;
+                const bOrder = Number.isFinite(b.order) ? (b.order as number) : Number.POSITIVE_INFINITY;
                 if (aOrder !== bOrder) return aOrder - bOrder;
                 return a.title.localeCompare(b.title);
             });
