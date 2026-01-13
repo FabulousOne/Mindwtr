@@ -12,6 +12,8 @@ export type RecurrenceRule = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export type RecurrenceStrategy = 'strict' | 'fluid';
 
+export type TextDirection = 'auto' | 'ltr' | 'rtl';
+
 export type RecurrenceWeekday = 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU';
 
 export type RecurrenceByDay =
@@ -37,6 +39,7 @@ export type TaskEditorFieldId =
     | 'dueDate'
     | 'reviewAt'
     | 'description'
+    | 'textDirection'
     | 'attachments'
     | 'checklist';
 
@@ -81,6 +84,20 @@ export interface Attachment {
     createdAt: string;
     updatedAt: string;
     deletedAt?: string; // Soft-delete: if set, this attachment is considered deleted
+    /**
+     * Relative path on the sync server, e.g., "attachments/123-456.png".
+     * If undefined, the file has not been uploaded yet.
+     */
+    cloudKey?: string;
+    /** Optional hash (e.g., SHA-256) for integrity checks. */
+    fileHash?: string;
+    /**
+     * Local runtime status (not synced to remote).
+     * - available: File exists at `uri`
+     * - missing: Metadata exists, file not found at `uri`
+     * - uploading/downloading: Transfer in progress
+     */
+    localStatus?: 'available' | 'missing' | 'uploading' | 'downloading';
 }
 
 export interface ChecklistItem {
@@ -103,6 +120,7 @@ export interface Task {
     contexts: string[]; // e.g., '@home', '@work'
     checklist?: ChecklistItem[]; // Subtasks/Shopping list items
     description?: string;
+    textDirection?: TextDirection;
     attachments?: Attachment[];
     location?: string;
     projectId?: string;
@@ -142,6 +160,9 @@ export interface AppData {
             autoArchiveDays?: number;
             defaultCaptureMethod?: 'text' | 'audio';
             saveAudioAttachments?: boolean;
+        };
+        attachments?: {
+            lastCleanupAt?: string;
         };
         features?: {
             priorities?: boolean;

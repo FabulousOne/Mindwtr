@@ -116,6 +116,7 @@ export function BoardView() {
     const hasProjectFilters = boardFilters.selectedProjectIds.length > 0;
     const showFiltersPanel = boardFilters.open || hasProjectFilters;
     const areaById = React.useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
+    const projectMap = React.useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
     const sortedProjects = React.useMemo(
         () => projects.filter(p => !p.deletedAt).sort((a, b) => a.title.localeCompare(b.title)),
         [projects]
@@ -158,6 +159,50 @@ export function BoardView() {
             return boardFilters.selectedProjectIds.includes(projectKey);
         });
     }, [hasProjectFilters, sortedTasks, boardFilters.selectedProjectIds]);
+
+    const sequentialProjectFirstTasks = React.useMemo(() => {
+        const sequentialIds = new Set(projects.filter((p) => p.isSequential && !p.deletedAt).map((p) => p.id));
+        if (sequentialIds.size === 0) return new Set<string>();
+        const tasksByProject = new Map<string, Task[]>();
+        for (const task of filteredTasks) {
+            if (task.deletedAt || task.status !== 'next' || !task.projectId) continue;
+            if (!sequentialIds.has(task.projectId)) continue;
+            const list = tasksByProject.get(task.projectId) ?? [];
+            list.push(task);
+            tasksByProject.set(task.projectId, list);
+        }
+
+        const firstTaskIds: string[] = [];
+        tasksByProject.forEach((tasksForProject) => {
+            const hasOrder = tasksForProject.some((task) => Number.isFinite(task.orderNum));
+            let firstTaskId: string | null = null;
+            let bestKey = Number.POSITIVE_INFINITY;
+            tasksForProject.forEach((task) => {
+                const key = hasOrder
+                    ? (Number.isFinite(task.orderNum) ? (task.orderNum as number) : Number.POSITIVE_INFINITY)
+                    : new Date(task.createdAt).getTime();
+                if (!firstTaskId || key < bestKey) {
+                    firstTaskId = task.id;
+                    bestKey = key;
+                }
+            });
+            if (firstTaskId) firstTaskIds.push(firstTaskId);
+        });
+        return new Set(firstTaskIds);
+    }, [filteredTasks, projects]);
+
+    const getColumnTasks = React.useCallback((status: TaskStatus) => {
+        let list = filteredTasks.filter((task) => task.status === status);
+        if (status === 'next') {
+            list = list.filter((task) => {
+                if (!task.projectId) return true;
+                const project = projectMap.get(task.projectId);
+                if (!project?.isSequential) return true;
+                return sequentialProjectFirstTasks.has(task.id);
+            });
+        }
+        return list;
+    }, [filteredTasks, projectMap, sequentialProjectFirstTasks]);
 
     const resolveText = React.useCallback((key: string, fallback: string) => {
         const value = t(key);
@@ -299,7 +344,7 @@ export function BoardView() {
                             key={col.id}
                             id={col.id}
                             label={col.label}
-                            tasks={filteredTasks.filter(t => t.status === col.id)}
+                            tasks={getColumnTasks(col.id)}
                             emptyState={getEmptyState(col.id)}
                             onQuickAdd={openQuickAdd}
                         />

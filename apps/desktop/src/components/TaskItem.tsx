@@ -26,6 +26,7 @@ import {
     PRESET_TAGS,
     type ClarifyResponse,
     type AIProviderId,
+    validateAttachmentForUpload,
 } from '@mindwtr/core';
 import { cn } from '../lib/utils';
 import { PromptModal } from './PromptModal';
@@ -39,7 +40,7 @@ import { TaskItemFieldRenderer } from './Task/TaskItemFieldRenderer';
 import { TaskItemRecurrenceModal } from './Task/TaskItemRecurrenceModal';
 import { WEEKDAY_FULL_LABELS, WEEKDAY_ORDER } from './Task/recurrence-constants';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
-import { readFile, readTextFile, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { readFile, readTextFile, BaseDirectory, size } from '@tauri-apps/plugin-fs';
 import { dataDir } from '@tauri-apps/api/path';
 
 const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
@@ -48,6 +49,7 @@ const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'priority',
     'contexts',
     'description',
+    'textDirection',
     'tags',
     'timeEstimate',
     'recurrence',
@@ -135,6 +137,7 @@ export const TaskItem = memo(function TaskItem({
     const [editContexts, setEditContexts] = useState(task.contexts?.join(', ') || '');
     const [editTags, setEditTags] = useState(task.tags?.join(', ') || '');
     const [editDescription, setEditDescription] = useState(task.description || '');
+    const [editTextDirection, setEditTextDirection] = useState(task.textDirection ?? 'auto');
     const [showDescriptionPreview, setShowDescriptionPreview] = useState(false);
     const [editLocation, setEditLocation] = useState(task.location || '');
     const [editRecurrence, setEditRecurrence] = useState<RecurrenceRule | ''>(getRecurrenceRuleValue(task.recurrence));
@@ -235,6 +238,10 @@ export const TaskItem = memo(function TaskItem({
         }
         setShowCustomRecurrence(true);
     }, [editRecurrenceRRule, monthlyAnchorDate, monthlyWeekdayCode]);
+
+    const handleSetEditTextDirection = useCallback((value: Task['textDirection']) => {
+        setEditTextDirection(value ?? 'auto');
+    }, []);
 
     const applyCustomRecurrence = useCallback(() => {
         const intervalValue = Number(customInterval);
@@ -348,6 +355,8 @@ export const TaskItem = memo(function TaskItem({
                 return Boolean(editContexts.trim());
             case 'description':
                 return Boolean(editDescription.trim());
+            case 'textDirection':
+                return editTextDirection !== undefined && editTextDirection !== 'auto';
             case 'tags':
                 return Boolean(editTags.trim());
             case 'timeEstimate':
@@ -371,6 +380,7 @@ export const TaskItem = memo(function TaskItem({
     }, [
         editContexts,
         editDescription,
+        editTextDirection,
         editDueDate,
         editPriority,
         editRecurrence,
@@ -416,7 +426,7 @@ export const TaskItem = memo(function TaskItem({
         [filterVisibleFields, orderFields]
     );
     const detailsFields = useMemo(
-        () => filterVisibleFields(orderFields(['description', 'attachments', 'checklist'])),
+        () => filterVisibleFields(orderFields(['description', 'textDirection', 'attachments', 'checklist'])),
         [filterVisibleFields, orderFields]
     );
     const sectionCounts = useMemo(
@@ -450,6 +460,7 @@ export const TaskItem = memo(function TaskItem({
                 editTimeEstimate,
                 editContexts,
                 editTags,
+                editTextDirection,
                 popularTagOptions,
             }}
             handlers={{
@@ -473,6 +484,7 @@ export const TaskItem = memo(function TaskItem({
                 setEditTimeEstimate,
                 setEditContexts,
                 setEditTags,
+                setEditTextDirection: handleSetEditTextDirection,
                 updateTask,
                 resetTaskChecklist,
             }}
@@ -532,6 +544,12 @@ export const TaskItem = memo(function TaskItem({
         const raw = uri.replace(/^file:\/\//i, '');
         return convertFileSrc(raw);
     }, []);
+
+    const resolveValidationMessage = useCallback((error?: string) => {
+        if (error === 'file_too_large') return t('attachments.fileTooLarge');
+        if (error === 'mime_type_blocked' || error === 'mime_type_not_allowed') return t('attachments.invalidFileType');
+        return t('attachments.fileNotSupported');
+    }, [t]);
 
     const resolveAudioBlobSource = useCallback(async (attachment: Attachment) => {
         if (!isTauriRuntime()) return null;
@@ -692,6 +710,26 @@ export const TaskItem = memo(function TaskItem({
             title: t('attachments.addFile'),
         });
         if (!selected || typeof selected !== 'string') return;
+        try {
+            const fileSize = await size(selected);
+            const validation = await validateAttachmentForUpload(
+                {
+                    id: 'pending',
+                    kind: 'file',
+                    title: selected.split(/[/\\]/).pop() || selected,
+                    uri: selected,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                },
+                fileSize
+            );
+            if (!validation.valid) {
+                setAttachmentError(resolveValidationMessage(validation.error));
+                return;
+            }
+        } catch (error) {
+            console.warn('Failed to validate attachment size', error);
+        }
         const now = new Date().toISOString();
         const title = selected.split(/[/\\]/).pop() || selected;
         const attachment: Attachment = {
@@ -726,6 +764,7 @@ export const TaskItem = memo(function TaskItem({
         setEditContexts(task.contexts?.join(', ') || '');
         setEditTags(task.tags?.join(', ') || '');
         setEditDescription(task.description || '');
+        setEditTextDirection(task.textDirection ?? 'auto');
         setEditLocation(task.location || '');
         setEditRecurrence(getRecurrenceRuleValue(task.recurrence));
         setEditRecurrenceStrategy(getRecurrenceStrategyValue(task.recurrence));
@@ -976,6 +1015,7 @@ export const TaskItem = memo(function TaskItem({
                 }
                 recurrenceValue.rrule = editRecurrenceRRule;
             }
+            const nextTextDirection = editTextDirection === 'auto' ? undefined : editTextDirection;
             updateTask(task.id, {
                 title: editTitle,
                 status: editStatus,
@@ -985,6 +1025,7 @@ export const TaskItem = memo(function TaskItem({
                 contexts: editContexts.split(',').map(c => c.trim()).filter(Boolean),
                 tags: editTags.split(',').map(c => c.trim()).filter(Boolean),
                 description: editDescription || undefined,
+                textDirection: nextTextDirection,
                 location: editLocation || undefined,
                 recurrence: recurrenceValue,
                 timeEstimate: editTimeEstimate || undefined,
@@ -1084,6 +1125,7 @@ export const TaskItem = memo(function TaskItem({
                                 renderField={renderField}
                                 editLocation={editLocation}
                                 setEditLocation={setEditLocation}
+                                editTextDirection={editTextDirection}
                                 inputContexts={allContexts}
                                 onDuplicateTask={() => duplicateTask(task.id, false)}
                                 onCancel={() => {

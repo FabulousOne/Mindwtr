@@ -180,7 +180,7 @@ let savedVersion = 0;
 let saveInFlight: Promise<void> | null = null;
 const MIGRATION_VERSION = 1;
 const AUTO_ARCHIVE_INTERVAL_MS = 12 * 60 * 60 * 1000;
-const TASK_EDITOR_DEFAULTS_VERSION = 2;
+const TASK_EDITOR_DEFAULTS_VERSION = 3;
 const TASK_EDITOR_ALWAYS_VISIBLE: TaskEditorFieldId[] = ['status', 'project', 'description', 'checklist', 'contexts'];
 const STORAGE_TIMEOUT_MS = 15_000;
 
@@ -376,6 +376,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             if (taskEditorDefaultsVersion < TASK_EDITOR_DEFAULTS_VERSION) {
                 const hidden = new Set(nextSettings.gtd?.taskEditor?.hidden ?? []);
                 TASK_EDITOR_ALWAYS_VISIBLE.forEach((fieldId) => hidden.delete(fieldId));
+                if (taskEditorDefaultsVersion < 3) {
+                    hidden.delete('textDirection');
+                }
                 nextSettings = {
                     ...nextSettings,
                     gtd: {
@@ -623,7 +626,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
             let adjustedUpdates = updates;
             if (Object.prototype.hasOwnProperty.call(updates, 'projectId')) {
-                const nextProjectId = updates.projectId ?? undefined;
+                const rawProjectId = updates.projectId;
+                const normalizedProjectId =
+                    typeof rawProjectId === 'string' && rawProjectId.trim().length > 0
+                        ? rawProjectId
+                        : undefined;
+                const nextProjectId = normalizedProjectId ?? undefined;
                 const projectChanged = (oldTask.projectId ?? undefined) !== nextProjectId;
                 if (projectChanged) {
                     const hasOrderNum = Object.prototype.hasOwnProperty.call(updates, 'orderNum');
@@ -637,9 +645,15 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                     } else {
                         adjustedUpdates = {
                             ...adjustedUpdates,
+                            projectId: undefined,
                             orderNum: undefined,
                         };
                     }
+                } else if (normalizedProjectId !== updates.projectId) {
+                    adjustedUpdates = {
+                        ...adjustedUpdates,
+                        projectId: normalizedProjectId,
+                    };
                 }
             }
 

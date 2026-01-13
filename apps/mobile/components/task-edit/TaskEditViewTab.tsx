@@ -10,6 +10,7 @@ import type {
 } from '@mindwtr/core';
 import type { ThemeColors } from '@/hooks/use-theme-colors';
 import { MarkdownText } from '../markdown-text';
+import { AttachmentProgressIndicator } from '../AttachmentProgressIndicator';
 
 type TaskEditViewTabProps = {
   t: (key: string) => string;
@@ -28,6 +29,8 @@ type TaskEditViewTabProps = {
   visibleAttachments: Attachment[];
   openAttachment: (attachment: Attachment) => void;
   isImageAttachment: (attachment: Attachment) => boolean;
+  textDirectionStyle: Record<string, any>;
+  resolvedDirection: 'ltr' | 'rtl';
   nestedScrollEnabled?: boolean;
 };
 
@@ -48,6 +51,8 @@ export function TaskEditViewTab({
   visibleAttachments,
   openAttachment,
   isImageAttachment,
+  textDirectionStyle,
+  resolvedDirection,
   nestedScrollEnabled,
 }: TaskEditViewTabProps) {
   const renderViewRow = (label: string, value?: string) => {
@@ -76,6 +81,13 @@ export function TaskEditViewTab({
   const project = projects.find((p) => p.id === mergedTask.projectId);
   const description = String(mergedTask.description || '').trim();
   const checklist = mergedTask.checklist || [];
+  const textDirectionValue = mergedTask.textDirection ?? 'auto';
+  const textDirectionLabel =
+    textDirectionValue === 'rtl'
+      ? t('taskEdit.textDirection.rtl')
+      : textDirectionValue === 'ltr'
+        ? t('taskEdit.textDirection.ltr')
+        : t('taskEdit.textDirection.auto');
 
   const statusLabel = mergedTask.status ? (t(`status.${mergedTask.status}`) || mergedTask.status) : undefined;
   const priorityLabel = mergedTask.priority ? (t(`priority.${mergedTask.priority}`) || mergedTask.priority) : undefined;
@@ -102,6 +114,7 @@ export function TaskEditViewTab({
       {renderViewRow(t('taskEdit.dueDateLabel'), mergedTask.dueDate ? formatDueDate(mergedTask.dueDate) : undefined)}
       {renderViewRow(t('taskEdit.reviewDateLabel'), mergedTask.reviewAt ? formatDate(mergedTask.reviewAt) : undefined)}
       {timeEstimatesEnabled ? renderViewRow(t('taskEdit.timeEstimateLabel'), timeEstimateLabel) : null}
+      {mergedTask.textDirection ? renderViewRow(t('taskEdit.textDirectionLabel'), textDirectionLabel) : null}
       {mergedTask.contexts?.length ? (
         <View style={styles.viewSection}>
           <Text style={[styles.viewLabel, { color: tc.secondaryText }]}>{t('taskEdit.contextsLabel')}</Text>
@@ -121,7 +134,7 @@ export function TaskEditViewTab({
           <Text style={[styles.viewLabel, { color: tc.secondaryText }]}>{t('taskEdit.descriptionLabel')}</Text>
           <View style={[styles.viewCard, { borderColor: tc.border, backgroundColor: tc.inputBg }]}
           >
-            <MarkdownText markdown={description} tc={tc} />
+            <MarkdownText markdown={description} tc={tc} direction={resolvedDirection} />
           </View>
         </View>
       ) : null}
@@ -143,7 +156,7 @@ export function TaskEditViewTab({
                 <Text style={[styles.viewChecklistMarker, { color: item.isCompleted ? tc.tint : tc.secondaryText }]}>
                   {item.isCompleted ? '✓' : '○'}
                 </Text>
-                <Text style={[styles.viewChecklistText, { color: tc.text }]}>{item.title}</Text>
+                <Text style={[styles.viewChecklistText, textDirectionStyle, { color: tc.text }]}>{item.title}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -158,14 +171,38 @@ export function TaskEditViewTab({
                 key={attachment.id}
                 style={[styles.viewAttachmentCard, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
                 onPress={() => openAttachment(attachment)}
+                disabled={attachment.localStatus === 'downloading'}
               >
-                {isImageAttachment(attachment) ? (
-                  <Image source={{ uri: attachment.uri }} style={styles.viewAttachmentImage} />
-                ) : (
-                  <Text style={[styles.viewAttachmentText, { color: tc.text }]} numberOfLines={2}>
-                    {attachment.title}
-                  </Text>
-                )}
+                {(() => {
+                  const isMissing = attachment.kind === 'file'
+                    && (!attachment.uri || attachment.localStatus === 'missing');
+                  const canDownload = isMissing && Boolean(attachment.cloudKey);
+                  const isDownloading = attachment.localStatus === 'downloading';
+                  if (isImageAttachment(attachment) && !isMissing) {
+                    return <Image source={{ uri: attachment.uri }} style={styles.viewAttachmentImage} />;
+                  }
+                  return (
+                    <View>
+                      <Text style={[styles.viewAttachmentText, { color: tc.text }]} numberOfLines={2}>
+                        {attachment.title}
+                      </Text>
+                      {isDownloading ? (
+                        <Text style={[styles.viewAttachmentSubtext, { color: tc.secondaryText }]}>
+                          {t('common.loading')}
+                        </Text>
+                      ) : canDownload ? (
+                        <Text style={[styles.viewAttachmentSubtext, { color: tc.secondaryText }]}>
+                          {t('attachments.download')}
+                        </Text>
+                      ) : isMissing ? (
+                        <Text style={[styles.viewAttachmentSubtext, { color: tc.secondaryText }]}>
+                          {t('attachments.missing')}
+                        </Text>
+                      ) : null}
+                      <AttachmentProgressIndicator attachmentId={attachment.id} />
+                    </View>
+                  );
+                })()}
               </TouchableOpacity>
             ))}
           </View>

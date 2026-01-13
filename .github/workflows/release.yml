@@ -73,11 +73,16 @@ jobs:
       - name: Ensure macOS SetFile is on PATH
         if: runner.os == 'macOS'
         run: |
-          TOOL_PATH="/Applications/Xcode.app/Contents/Developer/Tools"
-          if [ -d "$TOOL_PATH" ]; then
-            echo "$TOOL_PATH" >> "$GITHUB_PATH"
+          if [ -z "$DEVELOPER_DIR" ]; then
+            DEVELOPER_DIR="$(xcode-select -p)"
+            echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
           fi
-          which SetFile || xcrun --find SetFile || true
+          export DEVELOPER_DIR
+          SETFILE_PATH="$(xcrun --find SetFile || true)"
+          if [ -n "$SETFILE_PATH" ]; then
+            echo "$(dirname "$SETFILE_PATH")" >> "$GITHUB_PATH"
+          fi
+          which SetFile || true
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -105,6 +110,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MACOSX_DEPLOYMENT_TARGET: "10.15"
           CMAKE_OSX_DEPLOYMENT_TARGET: "10.15"
+          DEVELOPER_DIR: ${{ env.DEVELOPER_DIR }}
 
       - name: Build Tauri app (default)
         if: matrix.rust_target == '' || matrix.rust_target == null
@@ -116,6 +122,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MACOSX_DEPLOYMENT_TARGET: "10.15"
           CMAKE_OSX_DEPLOYMENT_TARGET: "10.15"
+          DEVELOPER_DIR: ${{ env.DEVELOPER_DIR }}
 
       - name: Sign macOS app (ad-hoc)
         if: runner.os == 'macOS'
@@ -358,8 +365,11 @@ jobs:
 
       - name: Update .SRCINFO
         run: |
-          cd aur
-          makepkg --printsrcinfo > .SRCINFO
+          docker run --rm \
+            -v "$PWD/aur:/aur" \
+            -w /aur \
+            archlinux:latest \
+            bash -lc "pacman -Sy --noconfirm --needed base-devel git && useradd -m builder && chown -R builder:builder /aur && su builder -c 'makepkg --printsrcinfo > .SRCINFO'"
         shell: bash
 
       - name: Publish to AUR
@@ -372,3 +382,110 @@ jobs:
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: Update to ${{ github.ref_name }}
           updpkgsums: true
+
+  update-packages:
+    needs: release
+    runs-on: ubuntu-latest
+    name: Update Homebrew/Scoop Packages
+    if: always() && needs.release.result == 'success'
+    steps:
+      - name: Checkout packages repo
+        uses: actions/checkout@v4
+        with:
+          repository: dongdongbh/homebrew-mindwtr
+          token: ${{ secrets.PACKAGES_REPO_TOKEN }}
+          path: packages-repo
+
+      - name: Resolve release version
+        id: version
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          TAG="${INPUT_TAG:-${GITHUB_REF#refs/tags/}}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download release assets and compute hashes
+        id: hashes
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          URL_DMG_ARM="https://github.com/${{ github.repository }}/releases/download/${TAG}/Mindwtr_${VERSION}_aarch64.dmg"
+          URL_DMG_INTEL="https://github.com/${{ github.repository }}/releases/download/${TAG}/Mindwtr_${VERSION}_x64.dmg"
+          URL_EXE="https://github.com/${{ github.repository }}/releases/download/${TAG}/Mindwtr_${VERSION}_x64-setup.exe"
+
+          curl -fL -o mindwtr-arm.dmg "$URL_DMG_ARM"
+          curl -fL -o mindwtr-intel.dmg "$URL_DMG_INTEL"
+          curl -fL -o mindwtr.exe "$URL_EXE"
+
+          SHA_ARM=$(sha256sum mindwtr-arm.dmg | awk '{print $1}')
+          SHA_INTEL=$(sha256sum mindwtr-intel.dmg | awk '{print $1}')
+          SHA_EXE=$(sha256sum mindwtr.exe | awk '{print $1}')
+
+          echo "sha_arm=$SHA_ARM" >> "$GITHUB_OUTPUT"
+          echo "sha_intel=$SHA_INTEL" >> "$GITHUB_OUTPUT"
+          echo "sha_exe=$SHA_EXE" >> "$GITHUB_OUTPUT"
+
+      - name: Update Homebrew cask
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA_ARM="${{ steps.hashes.outputs.sha_arm }}"
+          SHA_INTEL="${{ steps.hashes.outputs.sha_intel }}"
+
+          FILE="packages-repo/Casks/mindwtr.rb"
+          ruby -pi -e "sub(/^  version \".*\"/, \"  version \\\"$VERSION\\\"\")" "$FILE"
+          ruby -0777 -pi -e "sub(/sha256 arm:.*?intel: \\\"[^\\\"]+\\\"/m, \"sha256 arm:   \\\"$SHA_ARM\\\",\\n         intel: \\\"$SHA_INTEL\\\"\")" "$FILE"
+
+      - name: Update Scoop manifest
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA_EXE="${{ steps.hashes.outputs.sha_exe }}"
+          URL_EXE="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/Mindwtr_${VERSION}_x64-setup.exe#/dl.7z"
+
+          FILE="packages-repo/bucket/mindwtr.json"
+          jq --arg v "$VERSION" \
+             --arg url "$URL_EXE" \
+             --arg hash "$SHA_EXE" \
+             '.version = $v
+              | .architecture."64bit".url = $url
+              | .architecture."64bit".hash = $hash
+             | .autoupdate.architecture."64bit".url = "https://github.com/dongdongbh/Mindwtr/releases/download/v\($v)/Mindwtr_\($v)_x64-setup.exe#/dl.7z"' \
+             "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
+
+      - name: Check Winget package exists
+        id: winget_check
+        run: |
+          PKG_ID="dongdongbh.Mindwtr"
+          PKG_LOWER="${PKG_ID,,}"
+          FIRST="${PKG_LOWER:0:1}"
+          URL="https://github.com/microsoft/winget-pkgs/tree/master/manifests/${FIRST}/${PKG_ID//./\/}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+          if [ "$STATUS" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Winget package not found yet; skipping submission."
+          fi
+
+      - name: Submit to Winget
+        if: steps.winget_check.outputs.exists == 'true'
+        uses: vedantmgoyal2009/winget-releaser@v2
+        with:
+          identifier: dongdongbh.Mindwtr
+          installers-regex: '_x64-setup\.exe$'
+          token: ${{ secrets.PACKAGES_REPO_TOKEN }}
+
+      - name: Commit and push
+        run: |
+          cd packages-repo
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add Casks/mindwtr.rb bucket/mindwtr.json
+          if git diff --cached --quiet; then
+            echo "No package changes to commit."
+            exit 0
+          fi
+          git commit -m "update: Mindwtr ${{ steps.version.outputs.version }}"
+          git push

@@ -148,6 +148,7 @@ export function SettingsView() {
             ? GEMINI_SPEECH_MODELS
             : WHISPER_MODELS.map((model) => model.id);
     const loggingEnabled = settings?.diagnostics?.loggingEnabled === true;
+    const attachmentsLastCleanupAt = settings?.attachments?.lastCleanupAt;
     const didWriteLogRef = useRef(false);
 
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -173,6 +174,7 @@ export function SettingsView() {
     const [newCalendarName, setNewCalendarName] = useState('');
     const [newCalendarUrl, setNewCalendarUrl] = useState('');
     const [calendarError, setCalendarError] = useState<string | null>(null);
+    const [isCleaningAttachments, setIsCleaningAttachments] = useState(false);
 
     useEffect(() => {
         const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
@@ -653,6 +655,18 @@ export function SettingsView() {
         }
     };
 
+    const handleAttachmentsCleanup = useCallback(async () => {
+        if (!isTauri) return;
+        try {
+            setIsCleaningAttachments(true);
+            await SyncService.cleanupAttachmentsNow();
+        } catch (error) {
+            console.error('Attachment cleanup failed:', error);
+        } finally {
+            setIsCleaningAttachments(false);
+        }
+    }, [isTauri]);
+
     const toggleLogging = async () => {
         const nextEnabled = !loggingEnabled;
         await updateSettings({
@@ -789,6 +803,7 @@ export function SettingsView() {
             taskEditorFieldReviewAt: 'Review date',
             taskEditorFieldAttachments: 'Attachments',
             taskEditorFieldChecklist: 'Checklist',
+            taskEditorFieldTextDirection: 'Text direction',
             featurePriorities: 'Priorities',
             featurePrioritiesDesc: 'Show a priority flag on tasks.',
             featureTimeEstimates: 'Time estimates',
@@ -876,6 +891,12 @@ export function SettingsView() {
             syncBackendFile: 'File',
             syncBackendWebdav: 'WebDAV',
             syncBackendCloud: 'Self-Hosted',
+            attachmentsCleanup: 'Attachment cleanup',
+            attachmentsCleanupDesc: 'Remove deleted or orphaned attachment files from your device and sync storage.',
+            attachmentsCleanupLastRun: 'Last cleanup',
+            attachmentsCleanupNever: 'Never',
+            attachmentsCleanupRun: 'Run cleanup',
+            attachmentsCleanupRunning: 'Cleaning...',
             calendar: 'Calendar',
             calendarDesc: 'View external calendars via ICS subscription URLs.',
             externalCalendars: 'External calendars',
@@ -976,6 +997,7 @@ export function SettingsView() {
             taskEditorFieldReviewAt: '回顾日期',
             taskEditorFieldAttachments: '附件',
             taskEditorFieldChecklist: '清单',
+            taskEditorFieldTextDirection: '文本方向',
             featurePriorities: '优先级',
             featurePrioritiesDesc: '为任务显示优先级标记。',
             featureTimeEstimates: '时间估算',
@@ -1063,6 +1085,12 @@ export function SettingsView() {
             syncBackendFile: '文件',
             syncBackendWebdav: 'WebDAV',
             syncBackendCloud: '自托管',
+            attachmentsCleanup: '附件清理',
+            attachmentsCleanupDesc: '从设备和同步存储中删除已删除或孤立的附件文件。',
+            attachmentsCleanupLastRun: '上次清理',
+            attachmentsCleanupNever: '从未',
+            attachmentsCleanupRun: '立即清理',
+            attachmentsCleanupRunning: '清理中...',
             calendar: '日历',
             calendarDesc: '通过 ICS 订阅地址查看外部日历（只读）。',
             externalCalendars: '外部日历',
@@ -1145,6 +1173,7 @@ export function SettingsView() {
         taskEditorFieldReviewAt: 'taskEdit.reviewDateLabel',
         taskEditorFieldAttachments: 'attachments.title',
         taskEditorFieldChecklist: 'taskEdit.checklist',
+        taskEditorFieldTextDirection: 'taskEdit.textDirectionLabel',
     };
     const labelsFallback = language === 'zh' ? labelFallback.zh : labelFallback.en;
     const t = useMemo(() => {
@@ -1156,6 +1185,10 @@ export function SettingsView() {
         });
         return result;
     }, [labelsFallback, translate]);
+    const attachmentsLastCleanupDisplay = useMemo(() => {
+        if (!attachmentsLastCleanupAt) return '';
+        return safeFormatDate(attachmentsLastCleanupAt, 'MMM d, HH:mm');
+    }, [attachmentsLastCleanupAt]);
     const anthropicThinkingOptions = [
         { value: DEFAULT_ANTHROPIC_THINKING_BUDGET || 1024, label: t.aiThinkingLow },
         { value: 2048, label: t.aiThinkingMedium },
@@ -1431,6 +1464,9 @@ export function SettingsView() {
                     lastSyncStats={lastSyncStats}
                     conflictCount={conflictCount}
                     lastSyncError={settings?.lastSyncError}
+                    attachmentsLastCleanupDisplay={attachmentsLastCleanupDisplay}
+                    onRunAttachmentsCleanup={handleAttachmentsCleanup}
+                    isCleaningAttachments={isCleaningAttachments}
                 />
             );
         }

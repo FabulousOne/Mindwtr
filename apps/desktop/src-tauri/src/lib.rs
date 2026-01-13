@@ -583,6 +583,7 @@ fn open_sqlite(app: &tauri::AppHandle) -> Result<Connection, String> {
     conn.execute_batch(SQLITE_SCHEMA).map_err(|e| e.to_string())?;
     ensure_tasks_purged_at_column(&conn)?;
     ensure_tasks_order_column(&conn)?;
+    ensure_projects_order_column(&conn)?;
     ensure_fts_populated(&conn, false)?;
     Ok(conn)
 }
@@ -617,6 +618,23 @@ fn ensure_tasks_order_column(conn: &Connection) -> Result<(), String> {
         }
     }
     conn.execute("ALTER TABLE tasks ADD COLUMN orderNum INTEGER", [])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn ensure_projects_order_column(conn: &Connection) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(projects)")
+        .map_err(|e| e.to_string())?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?;
+    for col in columns {
+        if col.map_err(|e| e.to_string())? == "orderNum" {
+            return Ok(());
+        }
+    }
+    conn.execute("ALTER TABLE projects ADD COLUMN orderNum INTEGER", [])
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -815,6 +833,9 @@ fn row_to_project_value(row: &rusqlite::Row<'_>) -> Result<Value, rusqlite::Erro
     map.insert("title".to_string(), Value::String(row.get::<_, String>("title")?));
     map.insert("status".to_string(), Value::String(row.get::<_, String>("status")?));
     map.insert("color".to_string(), Value::String(row.get::<_, String>("color")?));
+    if let Ok(val) = row.get::<_, Option<i64>>("orderNum") {
+        if let Some(v) = val { map.insert("order".to_string(), Value::Number(v.into())); }
+    }
     let tag_ids_raw: Option<String> = row.get("tagIds")?;
     map.insert("tagIds".to_string(), parse_json_array(tag_ids_raw));
     if let Ok(val) = row.get::<_, i64>("isSequential") {
@@ -898,12 +919,13 @@ fn migrate_json_to_sqlite(conn: &mut Connection, data: &Value) -> Result<(), Str
         let tag_ids_json = json_str_or_default(project.get("tagIds"), "[]");
         let attachments_json = json_str(project.get("attachments"));
         tx.execute(
-            "INSERT INTO projects (id, title, status, color, tagIds, isSequential, isFocused, supportNotes, attachments, reviewAt, areaId, areaTitle, createdAt, updatedAt, deletedAt) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            "INSERT INTO projects (id, title, status, color, orderNum, tagIds, isSequential, isFocused, supportNotes, attachments, reviewAt, areaId, areaTitle, createdAt, updatedAt, deletedAt) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             params![
                 project.get("id").and_then(|v| v.as_str()).unwrap_or_default(),
                 project.get("title").and_then(|v| v.as_str()).unwrap_or_default(),
                 project.get("status").and_then(|v| v.as_str()).unwrap_or("active"),
                 project.get("color").and_then(|v| v.as_str()).unwrap_or("#6B7280"),
+                project.get("order").and_then(|v| v.as_i64()),
                 tag_ids_json,
                 project.get("isSequential").and_then(|v| v.as_bool()).unwrap_or(false) as i32,
                 project.get("isFocused").and_then(|v| v.as_bool()).unwrap_or(false) as i32,

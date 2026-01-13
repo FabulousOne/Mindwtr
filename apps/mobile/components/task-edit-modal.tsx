@@ -25,6 +25,8 @@ import {
     safeFormatDate,
     safeParseDate,
     safeParseDueDate,
+    resolveTextDirection,
+    validateAttachmentForUpload,
 } from '@mindwtr/core';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -35,6 +37,7 @@ import { useLanguage } from '../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { MarkdownText } from './markdown-text';
 import { buildAIConfig, buildCopilotConfig, loadAIKey } from '../lib/ai-config';
+import { ensureAttachmentAvailable } from '../lib/attachment-sync';
 import { AIResponseModal, type AIResponseAction } from './ai-response-modal';
 import { styles } from './task-edit/task-edit-modal.styles';
 import { TaskEditViewTab } from './task-edit/TaskEditViewTab';
@@ -81,6 +84,7 @@ const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'priority',
     'contexts',
     'description',
+    'textDirection',
     'tags',
     'timeEstimate',
     'recurrence',
@@ -479,6 +483,12 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     const attachments = (editedTask.attachments || []) as Attachment[];
     const visibleAttachments = attachments.filter((a) => !a.deletedAt);
 
+    const resolveValidationMessage = (error?: string) => {
+        if (error === 'file_too_large') return t('attachments.fileTooLarge');
+        if (error === 'mime_type_blocked' || error === 'mime_type_not_allowed') return t('attachments.invalidFileType');
+        return t('attachments.fileNotSupported');
+    };
+
     const addFileAttachment = async () => {
         const result = await DocumentPicker.getDocumentAsync({
             copyToCacheDirectory: false,
@@ -486,6 +496,25 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         });
         if (result.canceled) return;
         const asset = result.assets[0];
+        const size = asset.size;
+        if (typeof size === 'number') {
+            const validation = await validateAttachmentForUpload(
+                {
+                    id: 'pending',
+                    kind: 'file',
+                    title: asset.name || 'file',
+                    uri: asset.uri,
+                    mimeType: asset.mimeType,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                },
+                size
+            );
+            if (!validation.valid) {
+                Alert.alert(t('attachments.title'), resolveValidationMessage(validation.error));
+                return;
+            }
+        }
         const now = new Date().toISOString();
         const attachment: Attachment = {
             id: generateUUID(),
@@ -496,6 +525,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             size: asset.size,
             createdAt: now,
             updatedAt: now,
+            localStatus: 'available',
         };
         setEditedTask((prev) => ({ ...prev, attachments: [...(prev.attachments || []), attachment] }));
     };
@@ -522,6 +552,25 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         });
         if (result.canceled || !result.assets?.length) return;
         const asset = result.assets[0];
+        const size = (asset as { fileSize?: number }).fileSize ?? (asset as { size?: number }).size;
+        if (typeof size === 'number') {
+            const validation = await validateAttachmentForUpload(
+                {
+                    id: 'pending',
+                    kind: 'file',
+                    title: asset.fileName || asset.uri.split('/').pop() || 'image',
+                    uri: asset.uri,
+                    mimeType: asset.mimeType,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                },
+                size
+            );
+            if (!validation.valid) {
+                Alert.alert(t('attachments.title'), resolveValidationMessage(validation.error));
+                return;
+            }
+        }
         const now = new Date().toISOString();
         const attachment: Attachment = {
             id: generateUUID(),
@@ -532,6 +581,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             size: (asset as { fileSize?: number }).fileSize,
             createdAt: now,
             updatedAt: now,
+            localStatus: 'available',
         };
         setEditedTask((prev) => ({ ...prev, attachments: [...(prev.attachments || []), attachment] }));
     };
@@ -626,13 +676,58 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         }
     }, [audioStatus]);
 
+    const updateAttachmentState = useCallback((nextAttachment: Attachment) => {
+        setEditedTask((prev) => {
+            const nextAttachments = (prev.attachments || []).map((item) =>
+                item.id === nextAttachment.id ? { ...item, ...nextAttachment } : item
+            );
+            return { ...prev, attachments: nextAttachments };
+        }, false);
+    }, [setEditedTask]);
+
+    const resolveAttachment = useCallback(async (attachment: Attachment): Promise<Attachment | null> => {
+        if (attachment.kind !== 'file') return attachment;
+        const shouldDownload =
+            attachment.cloudKey &&
+            (attachment.localStatus === 'missing' || !attachment.uri);
+        if (shouldDownload && attachment.localStatus !== 'downloading') {
+            updateAttachmentState({ ...attachment, localStatus: 'downloading' });
+        }
+        const resolved = await ensureAttachmentAvailable(attachment);
+        if (resolved) {
+            if (resolved.uri !== attachment.uri || resolved.localStatus !== attachment.localStatus) {
+                updateAttachmentState(resolved);
+            }
+            return resolved;
+        }
+        if (shouldDownload) {
+            updateAttachmentState({ ...attachment, localStatus: 'missing' });
+        }
+        return null;
+    }, [updateAttachmentState]);
+
+    const downloadAttachment = useCallback(async (attachment: Attachment) => {
+        const resolved = await resolveAttachment(attachment);
+        if (!resolved) {
+            const message = attachment.kind === 'file' ? t('attachments.missing') : t('attachments.fileNotSupported');
+            Alert.alert(t('attachments.title'), message);
+        }
+    }, [resolveAttachment, t]);
+
     const openAttachment = async (attachment: Attachment) => {
-        if (attachment.kind === 'link') {
-            Linking.openURL(attachment.uri).catch(console.error);
+        const resolved = await resolveAttachment(attachment);
+        if (!resolved) {
+            const message = attachment.kind === 'file' ? t('attachments.missing') : t('attachments.fileNotSupported');
+            Alert.alert(t('attachments.title'), message);
             return;
         }
-        if (isAudioAttachment(attachment)) {
-            openAudioAttachment(attachment).catch(console.error);
+
+        if (resolved.kind === 'link') {
+            Linking.openURL(resolved.uri).catch(console.error);
+            return;
+        }
+        if (isAudioAttachment(resolved)) {
+            openAudioAttachment(resolved).catch(console.error);
             return;
         }
         const available = await Sharing.isAvailableAsync().catch((error) => {
@@ -640,9 +735,9 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             return false;
         });
         if (available) {
-            Sharing.shareAsync(attachment.uri).catch(console.error);
+            Sharing.shareAsync(resolved.uri).catch(console.error);
         } else {
-            Linking.openURL(attachment.uri).catch(console.error);
+            Linking.openURL(resolved.uri).catch(console.error);
         }
     };
 
@@ -863,7 +958,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         [orderFields]
     );
     const detailsFields = useMemo(
-        () => orderFields(['description', 'checklist', 'attachments']),
+        () => orderFields(['description', 'textDirection', 'checklist', 'attachments']),
         [orderFields]
     );
 
@@ -1179,6 +1274,13 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     };
 
     const inputStyle = { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text };
+    const textDirectionValue = (editedTask.textDirection ?? 'auto') as Task['textDirection'] | 'auto';
+    const combinedText = `${editedTask.title ?? ''}\n${editedTask.description ?? ''}`.trim();
+    const resolvedDirection = resolveTextDirection(combinedText, textDirectionValue);
+    const textDirectionStyle = {
+        writingDirection: resolvedDirection,
+        textAlign: resolvedDirection === 'rtl' ? 'right' : 'left',
+    } as const;
     const getStatusChipStyle = (active: boolean) => ([
         styles.statusChip,
         { backgroundColor: active ? tc.tint : tc.filterBg, borderColor: active ? tc.tint : tc.border },
@@ -1611,6 +1713,35 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                         </View>
                     </View>
                 );
+            case 'textDirection':
+                return (
+                    <View style={styles.formGroup}>
+                        <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.textDirectionLabel')}</Text>
+                        <View style={styles.statusContainer}>
+                            {([
+                                { value: 'auto', label: t('taskEdit.textDirection.auto') },
+                                { value: 'ltr', label: t('taskEdit.textDirection.ltr') },
+                                { value: 'rtl', label: t('taskEdit.textDirection.rtl') },
+                            ] as const).map((option) => {
+                                const isActive = (editedTask.textDirection ?? 'auto') === option.value;
+                                return (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        style={getStatusChipStyle(isActive)}
+                                        onPress={() => {
+                                            setEditedTask((prev) => ({
+                                                ...prev,
+                                                textDirection: option.value === 'auto' ? undefined : option.value,
+                                            }));
+                                        }}
+                                    >
+                                        <Text style={getStatusTextStyle(isActive)}>{option.label}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </View>
+                );
             case 'description':
                 return (
                     <View style={styles.formGroup}>
@@ -1624,11 +1755,11 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                         </View>
                         {showDescriptionPreview ? (
                             <View style={[styles.markdownPreview, { backgroundColor: tc.filterBg, borderColor: tc.border }]}>
-                                <MarkdownText markdown={editedTask.description || ''} tc={tc} />
+                                <MarkdownText markdown={editedTask.description || ''} tc={tc} direction={resolvedDirection} />
                             </View>
                         ) : (
                             <TextInput
-                                style={[styles.input, styles.textArea, inputStyle]}
+                                style={[styles.input, styles.textArea, inputStyle, textDirectionStyle]}
                                 value={editedTask.description || ''}
                                 onChangeText={(text) => {
                                     setEditedTask(prev => ({ ...prev, description: text }));
@@ -1671,23 +1802,45 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                             <Text style={[styles.helperText, { color: tc.secondaryText }]}>{t('common.none')}</Text>
                         ) : (
                             <View style={[styles.attachmentsList, { borderColor: tc.border, backgroundColor: tc.cardBg }]}>
-                                {visibleAttachments.map((attachment) => (
-                                    <View key={attachment.id} style={[styles.attachmentRow, { borderBottomColor: tc.border }]}>
-                                        <TouchableOpacity
-                                            style={styles.attachmentTitleWrap}
-                                            onPress={() => openAttachment(attachment)}
-                                        >
-                                            <Text style={[styles.attachmentTitle, { color: tc.tint }]} numberOfLines={1}>
-                                                {attachment.title}
-                                            </Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => removeAttachment(attachment.id)}>
-                                            <Text style={[styles.attachmentRemove, { color: tc.secondaryText }]}>
-                                                {t('attachments.remove')}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                ))}
+                                {visibleAttachments.map((attachment) => {
+                                    const isMissing = attachment.kind === 'file'
+                                        && (!attachment.uri || attachment.localStatus === 'missing');
+                                    const canDownload = isMissing && Boolean(attachment.cloudKey);
+                                    const isDownloading = attachment.localStatus === 'downloading';
+                                    return (
+                                        <View key={attachment.id} style={[styles.attachmentRow, { borderBottomColor: tc.border }]}>
+                                            <TouchableOpacity
+                                                style={styles.attachmentTitleWrap}
+                                                onPress={() => openAttachment(attachment)}
+                                                disabled={isDownloading}
+                                            >
+                                                <Text style={[styles.attachmentTitle, { color: tc.tint }]} numberOfLines={1}>
+                                                    {attachment.title}
+                                                </Text>
+                                            </TouchableOpacity>
+                                            {isDownloading ? (
+                                                <Text style={[styles.attachmentStatus, { color: tc.secondaryText }]}>
+                                                    {t('common.loading')}
+                                                </Text>
+                                            ) : canDownload ? (
+                                                <TouchableOpacity onPress={() => downloadAttachment(attachment)}>
+                                                    <Text style={[styles.attachmentDownload, { color: tc.tint }]}>
+                                                        {t('attachments.download')}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ) : isMissing ? (
+                                                <Text style={[styles.attachmentStatus, { color: tc.secondaryText }]}>
+                                                    {t('attachments.missing')}
+                                                </Text>
+                                            ) : null}
+                                            <TouchableOpacity onPress={() => removeAttachment(attachment.id)}>
+                                                <Text style={[styles.attachmentRemove, { color: tc.secondaryText }]}>
+                                                    {t('attachments.remove')}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    );
+                                })}
                             </View>
                         )}
                     </View>
@@ -1715,6 +1868,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                     <TextInput
                                         style={[
                                             styles.checklistInput,
+                                            textDirectionStyle,
                                             { color: item.isCompleted ? tc.secondaryText : tc.text },
                                             item.isCompleted && styles.completedText,
                                         ]}
@@ -1874,6 +2028,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                             onDateChange={onDateChange}
                             onCloseDatePicker={() => setShowDatePicker(null)}
                             containerWidth={containerWidth}
+                            textDirectionStyle={textDirectionStyle}
                         />
                         <View style={[styles.tabPage, { width: containerWidth || '100%' }]}>
                             <TaskEditViewTab
@@ -1893,6 +2048,8 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                 visibleAttachments={visibleAttachments}
                                 openAttachment={openAttachment}
                                 isImageAttachment={isImageAttachment}
+                                textDirectionStyle={textDirectionStyle}
+                                resolvedDirection={resolvedDirection}
                                 nestedScrollEnabled
                             />
                         </View>

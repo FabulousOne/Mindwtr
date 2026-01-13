@@ -51,8 +51,8 @@ import { pickAndParseSyncFile, exportData } from '../../lib/storage-file';
 import { fetchExternalCalendarEvents, getExternalCalendars, saveExternalCalendars } from '../../lib/external-calendar';
 import { loadAIKey, saveAIKey } from '../../lib/ai-config';
 import { clearLog, getLogPath, logInfo } from '../../lib/app-log';
+import { performMobileSync } from '../../lib/sync-service';
 import {
-    performMobileSync,
     SYNC_PATH_KEY,
     SYNC_BACKEND_KEY,
     WEBDAV_URL_KEY,
@@ -60,7 +60,7 @@ import {
     WEBDAV_PASSWORD_KEY,
     CLOUD_URL_KEY,
     CLOUD_TOKEN_KEY,
-} from '../../lib/sync-service';
+} from '../../lib/sync-constants';
 
 type SettingsScreen =
     | 'main'
@@ -1951,6 +1951,7 @@ export default function SettingsPage() {
             'priority',
             'contexts',
             'description',
+            'textDirection',
             'tags',
             'timeEstimate',
             'recurrence',
@@ -1965,6 +1966,7 @@ export default function SettingsPage() {
             'status',
             'project',
             'description',
+            'textDirection',
             'checklist',
             'contexts',
             'dueDate',
@@ -2009,6 +2011,8 @@ export default function SettingsPage() {
                     return t('attachments.title');
                 case 'checklist':
                     return t('taskEdit.checklist');
+                case 'textDirection':
+                    return t('taskEdit.textDirectionLabel');
                 default:
                     return fieldId;
             }
@@ -2061,7 +2065,7 @@ export default function SettingsPage() {
             { id: 'basic', title: t('taskEdit.basic') || 'Basic', fields: ['status', 'project', 'dueDate'] },
             { id: 'scheduling', title: t('taskEdit.scheduling'), fields: ['startTime', 'recurrence', 'reviewAt'] },
             { id: 'organization', title: t('taskEdit.organization'), fields: ['contexts', 'tags', 'priority', 'timeEstimate'] },
-            { id: 'details', title: t('taskEdit.details'), fields: ['description', 'attachments', 'checklist'] },
+            { id: 'details', title: t('taskEdit.details'), fields: ['description', 'textDirection', 'attachments', 'checklist'] },
         ];
 
         function TaskEditorRow({
