@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { useTaskStore, filterTasksBySearch, sortTasksBy, Project } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
@@ -41,7 +42,8 @@ export function SearchView({ savedSearchId, onDelete }: SearchViewProps) {
     }, [savedSearch, savedSearchId, settings?.savedSearches, updateSettings, onDelete, t]);
 
     return (
-        <div className="space-y-4">
+        <ErrorBoundary>
+            <div className="space-y-4">
             <header className="flex items-center justify-between">
                 <div className="space-y-1">
                     <h2 className="text-2xl font-bold tracking-tight">
@@ -79,6 +81,7 @@ export function SearchView({ savedSearchId, onDelete }: SearchViewProps) {
                     />
                 ))}
             </div>
-        </div>
+            </div>
+        </ErrorBoundary>
     );
 }
