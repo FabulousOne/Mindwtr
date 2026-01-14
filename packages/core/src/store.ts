@@ -271,6 +271,11 @@ const debouncedSave = (data: AppData, onError?: (msg: string) => void) => {
     if (onError) pendingOnError.push(onError);
     void flushPendingSave().catch((error) => {
         console.error('Failed to flush pending save:', error);
+        try {
+            useTaskStore.getState().setError('Failed to save data');
+        } catch {
+            // Ignore if store is not initialized yet
+        }
     });
 };
 
@@ -296,6 +301,11 @@ export const flushPendingSave = async (): Promise<void> => {
             console.error('Failed to flush pending save:', e);
             if (onErrorCallbacks.length > 0) {
                 onErrorCallbacks.forEach((callback) => callback('Failed to save data'));
+            }
+            try {
+                useTaskStore.getState().setError('Failed to save data');
+            } catch {
+                // Ignore if store is not initialized yet
             }
         }).finally(() => {
             saveInFlight = null;
