@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Plus, AlertTriangle, List, Mic } from 'lucide-react';
 import { useTaskStore, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate, createAIProvider, type AIProviderId } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
@@ -10,6 +10,7 @@ import { cn } from '../../lib/utils';
 import { PromptModal } from '../PromptModal';
 import { InboxProcessor } from './InboxProcessor';
 import { ListFiltersPanel } from './list/ListFiltersPanel';
+import { VirtualTaskRow } from './list/VirtualTaskRow';
 import { useLanguage } from '../../contexts/language-context';
 import { useKeybindings } from '../../contexts/keybinding-context';
 import { buildCopilotConfig, loadAIKey } from '../../lib/ai-config';
@@ -26,70 +27,6 @@ const EMPTY_ESTIMATES: TimeEstimate[] = [];
 const VIRTUALIZATION_THRESHOLD = 25;
 const VIRTUAL_ROW_ESTIMATE = 120;
 const VIRTUAL_OVERSCAN = 600;
-
-type VirtualTaskRowProps = {
-    task: Task;
-    project?: Project;
-    index: number;
-    top: number;
-    isSelected: boolean;
-    selectionMode: boolean;
-    isMultiSelected: boolean;
-    onSelectIndex: (index: number) => void;
-    onToggleSelectId: (id: string) => void;
-    onMeasure: (id: string, height: number) => void;
-    showQuickDone: boolean;
-    readOnly: boolean;
-    compactMetaEnabled?: boolean;
-};
-
-const VirtualTaskRow = React.memo(function VirtualTaskRow({
-    task,
-    project,
-    index,
-    top,
-    isSelected,
-    selectionMode,
-    isMultiSelected,
-    onSelectIndex,
-    onToggleSelectId,
-    onMeasure,
-    showQuickDone,
-    readOnly,
-    compactMetaEnabled = true,
-}: VirtualTaskRowProps) {
-    const rowRef = useRef<HTMLDivElement | null>(null);
-
-    useLayoutEffect(() => {
-        const node = rowRef.current;
-        if (!node) return undefined;
-        const measure = () => {
-            const nextHeight = Math.ceil(node.getBoundingClientRect().height);
-            onMeasure(task.id, nextHeight);
-        };
-        measure();
-    }, [task.id, task.updatedAt, onMeasure]);
-
-    return (
-        <div ref={rowRef} style={{ position: 'absolute', top, left: 0, right: 0 }}>
-            <div className="pb-3">
-                <TaskItem
-                    key={task.id}
-                    task={task}
-                    project={project}
-                    isSelected={isSelected}
-                    onSelect={() => onSelectIndex(index)}
-                    selectionMode={selectionMode}
-                    isMultiSelected={isMultiSelected}
-                    onToggleSelect={() => onToggleSelectId(task.id)}
-                    showQuickDone={showQuickDone}
-                    readOnly={readOnly}
-                    compactMetaEnabled={compactMetaEnabled}
-                />
-            </div>
-        </div>
-    );
-});
 
 export function ListView({ title, statusFilter }: ListViewProps) {
     const { tasks, projects, areas, settings, updateSettings, addTask, addProject, updateTask, deleteTask, moveTask, batchMoveTasks, batchDeleteTasks, batchUpdateTasks, queryTasks, lastDataChangeAt } = useTaskStore();
