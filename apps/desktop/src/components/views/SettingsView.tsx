@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { ErrorBoundary } from '../ErrorBoundary';
 import {
     Bell,
     CalendarDays,
@@ -1142,7 +1143,8 @@ export function SettingsView() {
     };
 
     return (
-        <div className="h-full overflow-y-auto">
+        <ErrorBoundary>
+            <div className="h-full overflow-y-auto">
             <div className="mx-auto max-w-6xl p-8">
                 <div className="grid grid-cols-12 gap-6">
                     <aside className="col-span-12 lg:col-span-4 xl:col-span-3 space-y-4">
@@ -1263,6 +1265,7 @@ export function SettingsView() {
                     </div>
                 </div>
             )}
-        </div>
+            </div>
+        </ErrorBoundary>
     );
 }
