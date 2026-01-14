@@ -60,6 +60,12 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
     }, [isOpen]);
 
     const trimmedQuery = query.trim();
+    const highlightQuery = trimmedQuery && !/\b\w+:/i.test(trimmedQuery) ? trimmedQuery : '';
+    const highlightRegex = useMemo(() => {
+        if (!highlightQuery) return null;
+        const escaped = highlightQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`(${escaped})`, 'ig');
+    }, [highlightQuery]);
     useEffect(() => {
         const timer = window.setTimeout(() => {
             setDebouncedQuery(trimmedQuery);
@@ -112,6 +118,16 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
         ...taskResults.map(t => ({ type: 'task' as const, item: t })),
     ].slice(0, 50); // Limit results
     const isTruncated = totalResults > results.length;
+
+    const renderHighlighted = (text: string) => {
+        if (!highlightRegex) return text;
+        const parts = text.split(highlightRegex);
+        return parts.map((part, index) => (
+            index % 2 === 1
+                ? <span key={`${part}-${index}`} className="text-primary font-semibold">{part}</span>
+                : <span key={`${part}-${index}`}>{part}</span>
+        ));
+    };
 
     // Keyboard navigation
     const handleListKeyDown = (e: React.KeyboardEvent) => {
@@ -249,7 +265,9 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
                             )}
 
                             <div className="flex-1 flex flex-col overflow-hidden">
-                                <span className="truncate font-medium">{result.item.title}</span>
+                                <span className="truncate font-medium">
+                                    {renderHighlighted(result.item.title)}
+                                </span>
                                 <span className="truncate text-xs text-muted-foreground">
                                     {result.type === 'project' ? t('search.resultProject') : t('search.resultTask')}
                                     {result.type === 'task' && (result.item as Task).projectId ? ` • ${t('search.inProjectSuffix')}` : ''}
