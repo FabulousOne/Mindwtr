@@ -13,6 +13,7 @@ import { ListFiltersPanel } from './list/ListFiltersPanel';
 import { ListHeader } from './list/ListHeader';
 import { ListBulkActions } from './list/ListBulkActions';
 import { VirtualTaskRow } from './list/VirtualTaskRow';
+import { useVirtualList } from './list/useVirtualList';
 import { useLanguage } from '../../contexts/language-context';
 import { useKeybindings } from '../../contexts/keybinding-context';
 import { buildCopilotConfig, loadAIKey } from '../../lib/ai-config';
@@ -329,62 +330,16 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         return () => observer.disconnect();
     }, [shouldVirtualize]);
 
-    useEffect(() => {
-        if (!shouldVirtualize) return;
-        const activeIds = new Set(filteredTasks.map((task) => task.id));
-        for (const id of rowHeightsRef.current.keys()) {
-            if (!activeIds.has(id)) {
-                rowHeightsRef.current.delete(id);
-            }
-        }
-    }, [filteredTasks, shouldVirtualize]);
-
-    const rowHeights = useMemo(() => {
-        if (!shouldVirtualize) return [];
-        const measuredHeights = Array.from(rowHeightsRef.current.values());
-        const fallbackHeight = measuredHeights.length
-            ? Math.round(measuredHeights.reduce((sum, value) => sum + value, 0) / measuredHeights.length)
-            : VIRTUAL_ROW_ESTIMATE;
-        return filteredTasks.map((task) => rowHeightsRef.current.get(task.id) ?? fallbackHeight);
-    }, [filteredTasks, measureVersion, shouldVirtualize]);
-
-    const { rowOffsets, totalHeight } = useMemo(() => {
-        if (!shouldVirtualize) return { rowOffsets: [] as number[], totalHeight: 0 };
-        let offset = 0;
-        const offsets = rowHeights.map((height) => {
-            const top = offset;
-            offset += height;
-            return top;
-        });
-        return { rowOffsets: offsets, totalHeight: offset };
-    }, [rowHeights, shouldVirtualize]);
-
-    const { startIndex, endIndex } = useMemo(() => {
-        if (!shouldVirtualize) return { startIndex: 0, endIndex: filteredTasks.length };
-        const count = rowOffsets.length;
-        if (count === 0) return { startIndex: 0, endIndex: 0 };
-        const targetStart = Math.max(0, listScrollTop - VIRTUAL_OVERSCAN);
-        let low = 0;
-        let high = count - 1;
-        while (low <= high) {
-            const mid = (low + high) >> 1;
-            const midBottom = rowOffsets[mid] + rowHeights[mid];
-            if (midBottom < targetStart) {
-                low = mid + 1;
-            } else {
-                high = mid - 1;
-            }
-        }
-        const start = Math.min(low, count - 1);
-        const targetEnd = listScrollTop + listHeight + VIRTUAL_OVERSCAN;
-        let end = start;
-        while (end < count && rowOffsets[end] < targetEnd) {
-            end += 1;
-        }
-        return { startIndex: start, endIndex: end };
-    }, [shouldVirtualize, rowOffsets, rowHeights, listScrollTop, listHeight, filteredTasks.length]);
-
-    const visibleTasks = shouldVirtualize ? filteredTasks.slice(startIndex, endIndex) : filteredTasks;
+    const { rowOffsets, totalHeight, visibleTasks, startIndex } = useVirtualList({
+        tasks: filteredTasks,
+        shouldVirtualize,
+        rowHeightsRef,
+        measureVersion,
+        listScrollTop,
+        listHeight,
+        rowEstimate: VIRTUAL_ROW_ESTIMATE,
+        overscan: VIRTUAL_OVERSCAN,
+    });
 
     useEffect(() => {
         setSelectedIndex(0);
