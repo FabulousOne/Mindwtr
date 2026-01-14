@@ -13,6 +13,7 @@ import {
     DEFAULT_ANTHROPIC_THINKING_BUDGET,
     safeFormatDate,
     useTaskStore,
+    type AppData,
 } from '@mindwtr/core';
 
 import { useKeybindings } from '../../contexts/keybinding-context';
@@ -78,7 +79,7 @@ export function SettingsView() {
     const [themeMode, setThemeMode] = useState<ThemeMode>('system');
     const { language, setLanguage, t: translate } = useLanguage();
     const { style: keybindingStyle, setStyle: setKeybindingStyle, openHelp } = useKeybindings();
-    const settings = useTaskStore((state) => state.settings);
+    const settings = useTaskStore((state) => state.settings) ?? ({} as AppData['settings']);
     const updateSettings = useTaskStore((state) => state.updateSettings);
     const isTauri = isTauriRuntime();
 
