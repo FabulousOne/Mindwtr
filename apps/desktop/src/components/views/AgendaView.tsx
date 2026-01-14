@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { useTaskStore, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, matchesHierarchicalToken, getTaskAgeLabel, getTaskStaleness, safeFormatDate, safeParseDate, safeParseDueDate, isDueForReview } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
@@ -436,7 +437,8 @@ export function AgendaView() {
     const nextActionsCount = sections.nextActions.length;
 
     return (
-        <div className="space-y-6 max-w-4xl">
+        <ErrorBoundary>
+            <div className="space-y-6 max-w-4xl">
             <header>
                 <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
                     <Calendar className="w-8 h-8" />
@@ -656,6 +658,7 @@ export function AgendaView() {
                     <p>{hasFilters ? t('filters.noMatch') : t('agenda.noTasks')}</p>
                 </div>
             )}
-        </div>
+            </div>
+        </ErrorBoundary>
     );
 }
