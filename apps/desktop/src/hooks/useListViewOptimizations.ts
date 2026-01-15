@@ -1,0 +1,120 @@
+import { useEffect, useMemo, useRef } from 'react';
+import { type Task, type TaskStatus, useTaskStore } from '@mindwtr/core';
+import { useConditionalMemo } from './useConditionalMemo';
+import { useProgressiveComputation } from './useProgressiveComputation';
+
+export type ListViewPerf = {
+    trackUseMemo?: () => void;
+    measure?: <T>(label: string, fn: () => T) => T;
+};
+
+export function useListViewOptimizations(
+    tasks: Task[],
+    baseTasks: Task[],
+    statusFilter: TaskStatus | 'all',
+    perf?: ListViewPerf,
+) {
+    const perfRef = useRef<ListViewPerf | undefined>(perf);
+    useEffect(() => {
+        perfRef.current = perf;
+    }, [perf]);
+
+    const getDerivedState = useTaskStore((state) => state.getDerivedState);
+    const derived = getDerivedState();
+    const allContexts = derived.allContexts;
+    const allTags = derived.allTags;
+    const sequentialProjectIds = derived.sequentialProjectIds;
+
+    const sequentialProjectFirstTasks = useConditionalMemo(
+        statusFilter === 'next',
+        () => {
+            const perfApi = perfRef.current;
+            perfApi?.trackUseMemo?.();
+            const compute = () => {
+                if (sequentialProjectIds.size === 0) return new Set<string>();
+                const tasksByProject = new Map<string, Task[]>();
+
+                for (const task of baseTasks) {
+                    if (task.deletedAt || task.status !== 'next' || !task.projectId) continue;
+                    if (!sequentialProjectIds.has(task.projectId)) continue;
+                    const list = tasksByProject.get(task.projectId) ?? [];
+                    list.push(task);
+                    tasksByProject.set(task.projectId, list);
+                }
+
+                const firstTaskIds: string[] = [];
+                tasksByProject.forEach((tasksForProject: Task[]) => {
+                    const hasOrder = tasksForProject.some((task) => Number.isFinite(task.orderNum));
+                    let firstTaskId: string | null = null;
+                    let bestKey = Number.POSITIVE_INFINITY;
+                    tasksForProject.forEach((task) => {
+                        const key = hasOrder
+                            ? (Number.isFinite(task.orderNum) ? (task.orderNum as number) : Number.POSITIVE_INFINITY)
+                            : new Date(task.createdAt).getTime();
+                        if (!firstTaskId || key < bestKey) {
+                            firstTaskId = task.id;
+                            bestKey = key;
+                        }
+                    });
+                    if (firstTaskId) firstTaskIds.push(firstTaskId);
+                });
+
+                return new Set(firstTaskIds);
+            };
+
+            return perfApi?.measure ? perfApi.measure('sequentialProjectFirstTasks', compute) : compute();
+        },
+        [baseTasks, sequentialProjectIds],
+        new Set<string>(),
+    );
+
+    const tokenCounts = useProgressiveComputation(
+        () => {
+            const perfApi = perfRef.current;
+            perfApi?.trackUseMemo?.();
+            const compute = () => {
+                const counts: Record<string, number> = {};
+                tasks
+                    .filter((task) => !task.deletedAt && (statusFilter === 'all' || task.status === statusFilter))
+                    .forEach((task) => {
+                        const tokens = new Set([...(task.contexts || []), ...(task.tags || [])]);
+                        tokens.forEach((token) => {
+                            counts[token] = (counts[token] || 0) + 1;
+                        });
+                    });
+                return counts;
+            };
+            return perfApi?.measure ? perfApi.measure('tokenCounts', compute) : compute();
+        },
+        [tasks, statusFilter],
+        {},
+        'low',
+    );
+
+    const nextCount = useProgressiveComputation(
+        () => {
+            const perfApi = perfRef.current;
+            perfApi?.trackUseMemo?.();
+            const compute = () => {
+                let count = 0;
+                for (const task of tasks) {
+                    if (!task.deletedAt && task.status === 'next') count += 1;
+                }
+                return count;
+            };
+            return perfApi?.measure ? perfApi.measure('nextCount', compute) : compute();
+        },
+        [tasks],
+        0,
+        'low',
+    );
+
+    return {
+        allContexts,
+        allTags,
+        sequentialProjectIds,
+        sequentialProjectFirstTasks,
+        tokenCounts,
+        nextCount,
+    };
+}

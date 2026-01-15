@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { shallow, useTaskStore, sortTasksBy, safeFormatDate } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 
 import { Undo2, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../contexts/language-context';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 export function ArchiveView() {
+    const perf = usePerformanceMonitor('ArchiveView');
     const { _allTasks, updateTask, purgeTask, settings } = useTaskStore(
         (state) => ({
             _allTasks: state._allTasks,
@@ -19,6 +22,14 @@ export function ArchiveView() {
     const { t } = useLanguage();
     const [searchQuery, setSearchQuery] = useState('');
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
+
+    useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('ArchiveView', perf.metrics, 'simple');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
     const archivedTasks = useMemo(() => {
         const filtered = _allTasks.filter((t) => t.status === 'archived' && !t.deletedAt);

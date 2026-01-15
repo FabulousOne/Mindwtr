@@ -8,6 +8,8 @@ import type { TaskSortBy } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
 import { Filter } from 'lucide-react';
 import { useUiStore } from '../../store/ui-store';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 const getColumns = (t: (key: string) => string): { id: TaskStatus; label: string }[] => [
     { id: 'inbox', label: t('list.inbox') || 'Inbox' },
@@ -104,6 +106,7 @@ function DraggableTask({ task }: { task: Task }) {
 }
 
 export function BoardView() {
+    const perf = usePerformanceMonitor('BoardView');
     const { tasks, moveTask, settings, projects, areas } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
@@ -145,6 +148,14 @@ export function BoardView() {
         sorted.forEach((project, index) => map.set(project.id, index));
         return map;
     }, [projects]);
+
+    React.useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('BoardView', perf.metrics, 'complex');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
     React.useEffect(() => {
         const timer = window.setTimeout(() => setComputeSequential(true), 0);
@@ -197,34 +208,37 @@ export function BoardView() {
     }, [projects]);
 
     const sequentialProjectFirstTasks = React.useMemo(() => {
-        if (!computeSequential) return new Set<string>();
-        if (sequentialProjectIds.size === 0) return new Set<string>();
-        const tasksByProject = new Map<string, Task[]>();
-        for (const task of filteredTasks) {
-            if (task.deletedAt || task.status !== 'next' || !task.projectId) continue;
-            if (!sequentialProjectIds.has(task.projectId)) continue;
-            const list = tasksByProject.get(task.projectId) ?? [];
-            list.push(task);
-            tasksByProject.set(task.projectId, list);
-        }
+        perf.trackUseMemo();
+        return perf.measure('sequentialProjectFirstTasks', () => {
+            if (!computeSequential) return new Set<string>();
+            if (sequentialProjectIds.size === 0) return new Set<string>();
+            const tasksByProject = new Map<string, Task[]>();
+            for (const task of filteredTasks) {
+                if (task.deletedAt || task.status !== 'next' || !task.projectId) continue;
+                if (!sequentialProjectIds.has(task.projectId)) continue;
+                const list = tasksByProject.get(task.projectId) ?? [];
+                list.push(task);
+                tasksByProject.set(task.projectId, list);
+            }
 
-        const firstTaskIds: string[] = [];
-        tasksByProject.forEach((tasksForProject) => {
-            const hasOrder = tasksForProject.some((task) => Number.isFinite(task.orderNum));
-            let firstTaskId: string | null = null;
-            let bestKey = Number.POSITIVE_INFINITY;
-            tasksForProject.forEach((task) => {
-                const key = hasOrder
-                    ? (Number.isFinite(task.orderNum) ? (task.orderNum as number) : Number.POSITIVE_INFINITY)
-                    : new Date(task.createdAt).getTime();
-                if (!firstTaskId || key < bestKey) {
-                    firstTaskId = task.id;
-                    bestKey = key;
-                }
+            const firstTaskIds: string[] = [];
+            tasksByProject.forEach((tasksForProject) => {
+                const hasOrder = tasksForProject.some((task) => Number.isFinite(task.orderNum));
+                let firstTaskId: string | null = null;
+                let bestKey = Number.POSITIVE_INFINITY;
+                tasksForProject.forEach((task) => {
+                    const key = hasOrder
+                        ? (Number.isFinite(task.orderNum) ? (task.orderNum as number) : Number.POSITIVE_INFINITY)
+                        : new Date(task.createdAt).getTime();
+                    if (!firstTaskId || key < bestKey) {
+                        firstTaskId = task.id;
+                        bestKey = key;
+                    }
+                });
+                if (firstTaskId) firstTaskIds.push(firstTaskId);
             });
-            if (firstTaskId) firstTaskIds.push(firstTaskId);
+            return new Set(firstTaskIds);
         });
-        return new Set(firstTaskIds);
     }, [computeSequential, filteredTasks, sequentialProjectIds]);
 
     const sortByProjectOrder = React.useCallback((items: Task[]) => {

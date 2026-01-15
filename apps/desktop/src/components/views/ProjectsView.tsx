@@ -24,8 +24,11 @@ import {
     sortAreasByName as sortAreasByNameIds,
     toDateTimeLocalValue,
 } from './projects/projects-utils';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 export function ProjectsView() {
+    const perf = usePerformanceMonitor('ProjectsView');
     const {
         projects,
         tasks,
@@ -88,6 +91,14 @@ export function ProjectsView() {
     const NO_TAGS = '__none__';
     const [selectedArea, setSelectedArea] = useState(ALL_AREAS);
     const [selectedTag, setSelectedTag] = useState(ALL_TAGS);
+
+    useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('ProjectsView', perf.metrics, 'complex');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
     useEffect(() => {
         setAttachmentError(null);

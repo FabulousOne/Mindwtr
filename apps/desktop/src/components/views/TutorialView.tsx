@@ -1,5 +1,8 @@
+import { useEffect } from 'react';
 import { CheckCircle2, Inbox, Layers, ListTodo, Heart } from 'lucide-react';
 import { useLanguage } from '../../contexts/language-context';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 function BoldText({ text, className }: { text: string; className?: string }) {
     // Simple parser for <strong> tags in translations
@@ -14,7 +17,16 @@ function BoldText({ text, className }: { text: string; className?: string }) {
 }
 
 export function TutorialView() {
+    const perf = usePerformanceMonitor('TutorialView');
     const { t } = useLanguage();
+
+    useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('TutorialView', perf.metrics, 'simple');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
     return (
         <div className="h-full overflow-y-auto p-8 max-w-4xl mx-auto">
@@ -154,4 +166,3 @@ export function TutorialView() {
         </div>
     );
 }
-

@@ -7,10 +7,13 @@ import { isTauriRuntime } from '../../lib/runtime';
 import { ExternalCalendarService } from '../../lib/external-calendar-service';
 import { cn } from '../../lib/utils';
 import { reportError } from '../../lib/report-error';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 const dayKey = (date: Date) => format(date, 'yyyy-MM-dd');
 
 export function CalendarView() {
+    const perf = usePerformanceMonitor('CalendarView');
     const { tasks, updateTask, deleteTask, settings } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
@@ -34,6 +37,14 @@ export function CalendarView() {
     const [editingTimeTaskId, setEditingTimeTaskId] = useState<string | null>(null);
     const [editingTimeValue, setEditingTimeValue] = useState<string>('');
     const calendarBodyRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('CalendarView', perf.metrics, 'complex');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
     const calendarStart = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 });
     const calendarEnd = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 0 });

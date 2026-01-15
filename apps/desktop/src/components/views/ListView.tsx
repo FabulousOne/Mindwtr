@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { shallow, useTaskStore, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate } from '@mindwtr/core';
+import { shallow, useTaskStore, TaskPriority, TimeEstimate, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
@@ -17,6 +17,9 @@ import { useLanguage } from '../../contexts/language-context';
 import { useKeybindings } from '../../contexts/keybinding-context';
 import { useListCopilot } from './list/useListCopilot';
 import { useUiStore } from '../../store/ui-store';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
+import { useListViewOptimizations } from '../../hooks/useListViewOptimizations';
 
 
 interface ListViewProps {
@@ -31,6 +34,7 @@ const VIRTUAL_ROW_ESTIMATE = 120;
 const VIRTUAL_OVERSCAN = 600;
 
 export function ListView({ title, statusFilter }: ListViewProps) {
+    const perf = usePerformanceMonitor('ListView');
     const {
         tasks,
         projects,
@@ -78,7 +82,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const setListOptions = useUiStore((state) => state.setListOptions);
     const [baseTasks, setBaseTasks] = useState<Task[]>(() => (statusFilter === 'archived' ? [] : tasks));
     const queryCacheRef = useRef<Map<string, Task[]>>(new Map());
-    const [isFullyMounted, setIsFullyMounted] = useState(false);
     const selectedTokens = listFilters.tokens;
     const selectedPriorities = listFilters.priorities;
     const selectedTimeEstimates = listFilters.estimates;
@@ -104,9 +107,12 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     );
 
     useEffect(() => {
-        const timer = window.setTimeout(() => setIsFullyMounted(true), 0);
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('ListView', perf.metrics, 'complex');
+        }, 0);
         return () => window.clearTimeout(timer);
-    }, []);
+    }, [perf.enabled]);
 
     const exitSelectionMode = useCallback(() => {
         setSelectionMode(false);
@@ -114,19 +120,13 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     }, []);
 
     const [isProcessing, setIsProcessing] = useState(false);
-
-    const { allContexts, allTags } = useMemo(() => {
-        const contexts = new Set<string>(PRESET_CONTEXTS);
-        const tags = new Set<string>(PRESET_TAGS);
-        tasks.forEach((task) => {
-            task.contexts?.forEach((ctx) => contexts.add(ctx));
-            task.tags?.forEach((tag) => tags.add(tag));
-        });
-        return {
-            allContexts: Array.from(contexts).sort(),
-            allTags: Array.from(tags).sort(),
-        };
-    }, [tasks]);
+    const {
+        allContexts,
+        allTags,
+        sequentialProjectFirstTasks,
+        tokenCounts,
+        nextCount,
+    } = useListViewOptimizations(tasks, baseTasks, statusFilter, perf);
     const allTokens = useMemo(() => {
         return Array.from(new Set([...allContexts, ...allTags])).sort();
     }, [allContexts, allTags]);
@@ -188,45 +188,10 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         }, {} as Record<string, Task>);
     }, [tasks]);
 
-    const sequentialProjectIds = useMemo(() => {
-        return new Set(projects.filter((project) => project.isSequential).map((project) => project.id));
-    }, [projects]);
-
     // For sequential projects, get only the first task to show in Next view
-    const sequentialProjectFirstTasks = useMemo(() => {
-        if (statusFilter !== 'next') return new Set<string>();
-        if (sequentialProjectIds.size === 0) return new Set<string>();
-        const tasksByProject = new Map<string, Task[]>();
-
-        for (const task of baseTasks) {
-            if (task.deletedAt || task.status !== 'next' || !task.projectId) continue;
-            if (!sequentialProjectIds.has(task.projectId)) continue;
-            const list = tasksByProject.get(task.projectId) ?? [];
-            list.push(task);
-            tasksByProject.set(task.projectId, list);
-        }
-
-        const firstTaskIds: string[] = [];
-        tasksByProject.forEach((tasksForProject: Task[]) => {
-            const hasOrder = tasksForProject.some((task) => Number.isFinite(task.orderNum));
-            let firstTaskId: string | null = null;
-            let bestKey = Number.POSITIVE_INFINITY;
-            tasksForProject.forEach((task) => {
-                const key = hasOrder
-                    ? (Number.isFinite(task.orderNum) ? (task.orderNum as number) : Number.POSITIVE_INFINITY)
-                    : new Date(task.createdAt).getTime();
-                if (!firstTaskId || key < bestKey) {
-                    firstTaskId = task.id;
-                    bestKey = key;
-                }
-            });
-            if (firstTaskId) firstTaskIds.push(firstTaskId);
-        });
-
-        return new Set(firstTaskIds);
-    }, [baseTasks, sequentialProjectIds, statusFilter]);
 
     useEffect(() => {
+        perf.trackUseEffect();
         let cancelled = false;
         const status = statusFilter === 'all' ? undefined : statusFilter;
         const cacheKey = `${statusFilter}-${lastDataChangeAt}`;
@@ -256,50 +221,53 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     }, [statusFilter, queryTasks, lastDataChangeAt]);
 
     const filteredTasks = useMemo(() => {
-        const now = new Date();
-        const filtered = baseTasks.filter(t => {
-            // Always filter out soft-deleted tasks
-            if (t.deletedAt) return false;
+        perf.trackUseMemo();
+        return perf.measure('filteredTasks', () => {
+            const now = new Date();
+            const filtered = baseTasks.filter(t => {
+                // Always filter out soft-deleted tasks
+                if (t.deletedAt) return false;
 
-            if (statusFilter !== 'all' && t.status !== statusFilter) return false;
-            // Respect statusFilter (handled above).
+                if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+                // Respect statusFilter (handled above).
 
-            if (statusFilter === 'inbox') {
-                const start = safeParseDate(t.startTime);
-                if (start && start > now) return false;
-            }
-            if (statusFilter === 'next') {
-                const start = safeParseDate(t.startTime);
-                if (start && start > now) return false;
-            }
-
-            // Sequential project filter: for 'next' status, only show first task from sequential projects
-            if (statusFilter === 'next' && t.projectId) {
-                const project = projectMap[t.projectId];
-                if (project?.isSequential) {
-                    // Only include if this is the first task
-                    if (!sequentialProjectFirstTasks.has(t.id)) return false;
+                if (statusFilter === 'inbox') {
+                    const start = safeParseDate(t.startTime);
+                    if (start && start > now) return false;
                 }
-            }
+                if (statusFilter === 'next') {
+                    const start = safeParseDate(t.startTime);
+                    if (start && start > now) return false;
+                }
+
+                // Sequential project filter: for 'next' status, only show first task from sequential projects
+                if (statusFilter === 'next' && t.projectId) {
+                    const project = projectMap[t.projectId];
+                    if (project?.isSequential) {
+                        // Only include if this is the first task
+                        if (!sequentialProjectFirstTasks.has(t.id)) return false;
+                    }
+                }
 
 
-            const taskTokens = [...(t.contexts || []), ...(t.tags || [])];
-            if (selectedTokens.length > 0) {
-                const matchesAll = selectedTokens.every((token) =>
-                    taskTokens.some((taskToken) => matchesHierarchicalToken(token, taskToken))
-                );
-                if (!matchesAll) return false;
+                const taskTokens = [...(t.contexts || []), ...(t.tags || [])];
+                if (selectedTokens.length > 0) {
+                    const matchesAll = selectedTokens.every((token) =>
+                        taskTokens.some((taskToken) => matchesHierarchicalToken(token, taskToken))
+                    );
+                    if (!matchesAll) return false;
+                }
+                if (activePriorities.length > 0 && (!t.priority || !activePriorities.includes(t.priority))) return false;
+                if (activeTimeEstimates.length > 0 && (!t.timeEstimate || !activeTimeEstimates.includes(t.timeEstimate))) return false;
+                return true;
+            });
+
+            if (statusFilter === 'next' && sortBy === 'default') {
+                return sortByProjectOrder(filtered);
             }
-            if (activePriorities.length > 0 && (!t.priority || !activePriorities.includes(t.priority))) return false;
-            if (activeTimeEstimates.length > 0 && (!t.timeEstimate || !activeTimeEstimates.includes(t.timeEstimate))) return false;
-            return true;
+
+            return sortTasksBy(filtered, sortBy);
         });
-
-        if (statusFilter === 'next' && sortBy === 'default') {
-            return sortByProjectOrder(filtered);
-        }
-
-        return sortTasksBy(filtered, sortBy);
     }, [baseTasks, projects, statusFilter, selectedTokens, activePriorities, activeTimeEstimates, sequentialProjectFirstTasks, projectMap, sortBy, sortByProjectOrder]);
 
     const shouldVirtualize = filteredTasks.length > VIRTUALIZATION_THRESHOLD;
@@ -413,20 +381,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         deleteSelected,
     ]);
 
-    const tokenCounts = useMemo(() => {
-        if (!isFullyMounted) return {};
-        const counts: Record<string, number> = {};
-        tasks
-            .filter(t => !t.deletedAt && (statusFilter === 'all' || t.status === statusFilter))
-            .forEach(t => {
-                const tokens = new Set([...(t.contexts || []), ...(t.tags || [])]);
-                tokens.forEach((token) => {
-                    counts[token] = (counts[token] || 0) + 1;
-                });
-            });
-        return counts;
-    }, [tasks, statusFilter, isFullyMounted]);
-
     const toggleMultiSelect = useCallback((taskId: string) => {
         setMultiSelectedIds(prev => {
             const next = new Set(prev);
@@ -492,14 +446,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
 
     const showFilters = ['next', 'all'].includes(statusFilter);
     const isInbox = statusFilter === 'inbox';
-    const nextCount = useMemo(() => {
-        if (!isFullyMounted) return 0;
-        let count = 0;
-        for (const task of tasks) {
-            if (!task.deletedAt && task.status === 'next') count += 1;
-        }
-        return count;
-    }, [tasks, isFullyMounted]);
     const isNextView = statusFilter === 'next';
     const NEXT_WARNING_THRESHOLD = 15;
     const priorityOptions: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];

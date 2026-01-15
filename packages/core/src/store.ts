@@ -2,6 +2,7 @@ import { create } from 'zustand';
 export { shallow } from 'zustand/shallow';
 import { generateUUID as uuidv4 } from './uuid';
 import { Task, TaskStatus, AppData, Project, Area, TaskEditorFieldId } from './types';
+import { PRESET_CONTEXTS, PRESET_TAGS } from './contexts';
 import { StorageAdapter, TaskQueryOptions, noopStorage } from './storage';
 import { createNextRecurringTask } from './recurrence';
 import { safeParseDate } from './date';
@@ -172,7 +173,63 @@ interface TaskStore {
     updateSettings: (updates: Partial<AppData['settings']>) => Promise<void>;
     /** Highlight a task in UI lists (non-persistent) */
     setHighlightTask: (id: string | null) => void;
+
+    /** Derived state selector (cached by lastDataChangeAt) */
+    getDerivedState: () => DerivedState;
 }
+
+type DerivedState = {
+    projectMap: Map<string, Project>;
+    tasksById: Map<string, Task>;
+    activeTasksByStatus: Map<TaskStatus, Task[]>;
+    allContexts: string[];
+    allTags: string[];
+    sequentialProjectIds: Set<string>;
+};
+
+type DerivedCache = {
+    key: number;
+    tasksRef: Task[];
+    projectsRef: Project[];
+    value: DerivedState;
+};
+
+let derivedCache: DerivedCache | null = null;
+
+const computeDerivedState = (tasks: Task[], projects: Project[]): DerivedState => {
+    const projectMap = new Map<string, Project>();
+    const tasksById = new Map<string, Task>();
+    const activeTasksByStatus = new Map<TaskStatus, Task[]>();
+    const contextsSet = new Set<string>(PRESET_CONTEXTS);
+    const tagsSet = new Set<string>(PRESET_TAGS);
+    const sequentialProjectIds = new Set<string>();
+
+    projects.forEach((project) => {
+        projectMap.set(project.id, project);
+        if (project.isSequential && !project.deletedAt) {
+            sequentialProjectIds.add(project.id);
+        }
+    });
+
+    tasks.forEach((task) => {
+        tasksById.set(task.id, task);
+        if (task.deletedAt) return;
+        const list = activeTasksByStatus.get(task.status) ?? [];
+        list.push(task);
+        activeTasksByStatus.set(task.status, list);
+        task.contexts?.forEach((ctx) => contextsSet.add(ctx));
+        task.tags?.forEach((tag) => tagsSet.add(tag));
+    });
+
+    return {
+        projectMap,
+        tasksById,
+        activeTasksByStatus,
+        allContexts: Array.from(contextsSet).sort(),
+        allTags: Array.from(tagsSet).sort(),
+        sequentialProjectIds,
+    };
+};
 
 // Save queue helper - coalesces writes while ensuring the latest snapshot is persisted quickly.
 let pendingData: AppData | null = null;
@@ -1446,6 +1503,25 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             { tasks: get()._allTasks, projects: get()._allProjects, areas: get()._allAreas, settings: newSettings },
             (msg) => set({ error: msg })
         );
+    },
+    getDerivedState: () => {
+        const state = get();
+        if (
+            derivedCache
+            && derivedCache.key === state.lastDataChangeAt
+            && derivedCache.tasksRef === state.tasks
+            && derivedCache.projectsRef === state.projects
+        ) {
+            return derivedCache.value;
+        }
+        const derived = computeDerivedState(state.tasks, state.projects);
+        derivedCache = {
+            key: state.lastDataChangeAt,
+            tasksRef: state.tasks,
+            projectsRef: state.projects,
+            value: derived,
+        };
+        return derived;
     },
     setHighlightTask: (id: string | null) => {
         set({ highlightTaskId: id, highlightTaskAt: id ? Date.now() : null });

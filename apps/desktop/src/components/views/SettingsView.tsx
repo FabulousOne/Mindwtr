@@ -29,6 +29,8 @@ import { SettingsSidebar } from './settings/SettingsSidebar';
 import { useAiSettings } from './settings/useAiSettings';
 import { useCalendarSettings } from './settings/useCalendarSettings';
 import { useSyncSettings } from './settings/useSyncSettings';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 type ThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia';
 type SettingsPage = 'main' | 'gtd' | 'notifications' | 'sync' | 'calendar' | 'ai' | 'about';
@@ -76,6 +78,7 @@ const maskCalendarUrl = (url: string): string => {
 };
 
 export function SettingsView() {
+    const perf = usePerformanceMonitor('SettingsView');
     const [page, setPage] = useState<SettingsPage>('main');
     const [themeMode, setThemeMode] = useState<ThemeMode>('system');
     const { language, setLanguage, t: translate } = useLanguage();
@@ -136,6 +139,14 @@ export function SettingsView() {
         });
         return result;
     }, [language, translate]);
+
+    useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('SettingsView', perf.metrics, 'settings');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
     useEffect(() => {
         const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);

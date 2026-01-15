@@ -1,14 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTaskStore, matchesHierarchicalToken } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { Tag, Filter } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../contexts/language-context';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 export function ContextsView() {
+    const perf = usePerformanceMonitor('ContextsView');
     const tasks = useTaskStore((state) => state.tasks);
     const { t } = useLanguage();
     const [selectedContext, setSelectedContext] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('ContextsView', perf.metrics, 'simple');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
     // Filter out deleted tasks first
     const activeTasks = tasks.filter(t => !t.deletedAt);

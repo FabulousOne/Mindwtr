@@ -11,10 +11,13 @@ import { shallow, sortTasksBy, useTaskStore, type Project, type Task, type TaskS
 
 import { PromptModal } from '../PromptModal';
 import { useLanguage } from '../../contexts/language-context';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'done'];
 
 export function ReviewView() {
+    const perf = usePerformanceMonitor('ReviewView');
     const { tasks, projects, settings, batchMoveTasks, batchDeleteTasks, batchUpdateTasks } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
@@ -39,41 +42,51 @@ export function ReviewView() {
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
     const statusOptions = STATUS_OPTIONS;
 
-    const { projectMap, tasksById, activeTasks, statusCounts, filteredTasks } = useMemo(() => {
-        const nextProjectMap: Record<string, Project> = {};
-        const nextTasksById: Record<string, Task> = {};
-        const nextStatusCounts: Record<string, number> = { all: 0 };
-        statusOptions.forEach((status) => {
-            nextStatusCounts[status] = 0;
-        });
+    useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('ReviewView', perf.metrics, 'complex');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
-        const nextActiveTasks: Task[] = [];
-        tasks.forEach((task) => {
-            nextTasksById[task.id] = task;
-            if (!task.deletedAt) {
-                nextActiveTasks.push(task);
-                nextStatusCounts.all += 1;
-                if (nextStatusCounts[task.status] !== undefined) {
-                    nextStatusCounts[task.status] += 1;
+    const { projectMap, tasksById, statusCounts, filteredTasks } = useMemo(() => {
+        perf.trackUseMemo();
+        return perf.measure('reviewData', () => {
+            const nextProjectMap: Record<string, Project> = {};
+            const nextTasksById: Record<string, Task> = {};
+            const nextStatusCounts: Record<string, number> = { all: 0 };
+            statusOptions.forEach((status) => {
+                nextStatusCounts[status] = 0;
+            });
+
+            const nextActiveTasks: Task[] = [];
+            tasks.forEach((task) => {
+                nextTasksById[task.id] = task;
+                if (!task.deletedAt) {
+                    nextActiveTasks.push(task);
+                    nextStatusCounts.all += 1;
+                    if (nextStatusCounts[task.status] !== undefined) {
+                        nextStatusCounts[task.status] += 1;
+                    }
                 }
-            }
+            });
+
+            projects.forEach((project) => {
+                nextProjectMap[project.id] = project;
+            });
+
+            const list = filterStatus === 'all'
+                ? nextActiveTasks
+                : nextActiveTasks.filter((task) => task.status === filterStatus);
+
+            return {
+                projectMap: nextProjectMap,
+                tasksById: nextTasksById,
+                statusCounts: nextStatusCounts,
+                filteredTasks: sortTasksBy(list, sortBy),
+            };
         });
-
-        projects.forEach((project) => {
-            nextProjectMap[project.id] = project;
-        });
-
-        const list = filterStatus === 'all'
-            ? nextActiveTasks
-            : nextActiveTasks.filter((task) => task.status === filterStatus);
-
-        return {
-            projectMap: nextProjectMap,
-            tasksById: nextTasksById,
-            activeTasks: nextActiveTasks,
-            statusCounts: nextStatusCounts,
-            filteredTasks: sortTasksBy(list, sortBy),
-        };
     }, [filterStatus, projects, sortBy, tasks]);
 
     const selectedIdsArray = useMemo(() => Array.from(multiSelectedIds), [multiSelectedIds]);

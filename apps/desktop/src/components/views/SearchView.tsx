@@ -1,10 +1,12 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { shallow, useTaskStore, filterTasksBySearch, sortTasksBy, Project } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { useLanguage } from '../../contexts/language-context';
 import { Trash2 } from 'lucide-react';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 interface SearchViewProps {
     savedSearchId: string;
@@ -12,6 +14,7 @@ interface SearchViewProps {
 }
 
 export function SearchView({ savedSearchId, onDelete }: SearchViewProps) {
+    const perf = usePerformanceMonitor('SearchView');
     const { tasks, projects, settings, updateSettings } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
@@ -26,6 +29,14 @@ export function SearchView({ savedSearchId, onDelete }: SearchViewProps) {
 
     const savedSearch = settings?.savedSearches?.find(s => s.id === savedSearchId);
     const query = savedSearch?.query || '';
+
+    useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('SearchView', perf.metrics, 'simple');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
     const projectMap = useMemo(() => {
         return projects.reduce((acc, project) => {

@@ -5,8 +5,11 @@ import type { Task, TaskStatus } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
 import { cn } from '../../lib/utils';
 import { Clock, Star, Calendar, AlertCircle, ArrowRight, Filter, Check, type LucideIcon } from 'lucide-react';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { checkBudget } from '../../config/performanceBudgets';
 
 export function AgendaView() {
+    const perf = usePerformanceMonitor('AgendaView');
     const { tasks, projects, updateTask, settings } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
@@ -26,6 +29,14 @@ export function AgendaView() {
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
     const activePriorities = prioritiesEnabled ? selectedPriorities : [];
     const activeTimeEstimates = timeEstimatesEnabled ? selectedTimeEstimates : [];
+
+    useEffect(() => {
+        if (!perf.enabled) return;
+        const timer = window.setTimeout(() => {
+            checkBudget('AgendaView', perf.metrics, 'complex');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [perf.enabled]);
 
     // Filter active tasks
     const activeTasks = useMemo(() =>
