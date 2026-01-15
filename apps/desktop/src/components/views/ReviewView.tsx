@@ -12,6 +12,8 @@ import { shallow, sortTasksBy, useTaskStore, type Project, type Task, type TaskS
 import { PromptModal } from '../PromptModal';
 import { useLanguage } from '../../contexts/language-context';
 
+const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'done'];
+
 export function ReviewView() {
     const { tasks, projects, settings, batchMoveTasks, batchDeleteTasks, batchUpdateTasks } = useTaskStore(
         (state) => ({
@@ -35,44 +37,44 @@ export function ReviewView() {
     const [moveToStatus, setMoveToStatus] = useState<TaskStatus | ''>('');
 
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
+    const statusOptions = STATUS_OPTIONS;
 
-    const projectMap = useMemo(() => {
-        return projects.reduce((acc, project) => {
-            acc[project.id] = project;
-            return acc;
-        }, {} as Record<string, Project>);
-    }, [projects]);
+    const { projectMap, tasksById, activeTasks, statusCounts, filteredTasks } = useMemo(() => {
+        const nextProjectMap: Record<string, Project> = {};
+        const nextTasksById: Record<string, Task> = {};
+        const nextStatusCounts: Record<string, number> = { all: 0 };
+        statusOptions.forEach((status) => {
+            nextStatusCounts[status] = 0;
+        });
 
-    const tasksById = useMemo(() => {
-        return tasks.reduce((acc, task) => {
-            acc[task.id] = task;
-            return acc;
-        }, {} as Record<string, Task>);
-    }, [tasks]);
-
-    const activeTasks = useMemo(() => {
-        return tasks.filter((t) => !t.deletedAt);
-    }, [tasks]);
-
-    const statusOptions: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'done'];
-
-    const statusCounts = useMemo(() => {
-        const counts: Record<string, number> = { all: activeTasks.length };
-        for (const status of statusOptions) {
-            counts[status] = 0;
-        }
-        activeTasks.forEach((task) => {
-            if (counts[task.status] !== undefined) {
-                counts[task.status] += 1;
+        const nextActiveTasks: Task[] = [];
+        tasks.forEach((task) => {
+            nextTasksById[task.id] = task;
+            if (!task.deletedAt) {
+                nextActiveTasks.push(task);
+                nextStatusCounts.all += 1;
+                if (nextStatusCounts[task.status] !== undefined) {
+                    nextStatusCounts[task.status] += 1;
+                }
             }
         });
-        return counts;
-    }, [activeTasks, statusOptions]);
 
-    const filteredTasks = useMemo(() => {
-        const list = filterStatus === 'all' ? activeTasks : activeTasks.filter((t) => t.status === filterStatus);
-        return sortTasksBy(list, sortBy);
-    }, [activeTasks, filterStatus, sortBy]);
+        projects.forEach((project) => {
+            nextProjectMap[project.id] = project;
+        });
+
+        const list = filterStatus === 'all'
+            ? nextActiveTasks
+            : nextActiveTasks.filter((task) => task.status === filterStatus);
+
+        return {
+            projectMap: nextProjectMap,
+            tasksById: nextTasksById,
+            activeTasks: nextActiveTasks,
+            statusCounts: nextStatusCounts,
+            filteredTasks: sortTasksBy(list, sortBy),
+        };
+    }, [filterStatus, projects, sortBy, tasks]);
 
     const selectedIdsArray = useMemo(() => Array.from(multiSelectedIds), [multiSelectedIds]);
 

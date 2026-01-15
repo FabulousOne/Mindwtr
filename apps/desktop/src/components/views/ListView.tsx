@@ -78,6 +78,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const setListOptions = useUiStore((state) => state.setListOptions);
     const [baseTasks, setBaseTasks] = useState<Task[]>(() => (statusFilter === 'archived' ? [] : tasks));
     const queryCacheRef = useRef<Map<string, Task[]>>(new Map());
+    const [isFullyMounted, setIsFullyMounted] = useState(false);
     const selectedTokens = listFilters.tokens;
     const selectedPriorities = listFilters.priorities;
     const selectedTimeEstimates = listFilters.estimates;
@@ -101,6 +102,11 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         () => (timeEstimatesEnabled ? selectedTimeEstimates : EMPTY_ESTIMATES),
         [timeEstimatesEnabled, selectedTimeEstimates]
     );
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setIsFullyMounted(true), 0);
+        return () => window.clearTimeout(timer);
+    }, []);
 
     const exitSelectionMode = useCallback(() => {
         setSelectionMode(false);
@@ -188,6 +194,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
 
     // For sequential projects, get only the first task to show in Next view
     const sequentialProjectFirstTasks = useMemo(() => {
+        if (statusFilter !== 'next') return new Set<string>();
         if (sequentialProjectIds.size === 0) return new Set<string>();
         const tasksByProject = new Map<string, Task[]>();
 
@@ -217,7 +224,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         });
 
         return new Set(firstTaskIds);
-    }, [baseTasks, sequentialProjectIds]);
+    }, [baseTasks, sequentialProjectIds, statusFilter]);
 
     useEffect(() => {
         let cancelled = false;
@@ -407,6 +414,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     ]);
 
     const tokenCounts = useMemo(() => {
+        if (!isFullyMounted) return {};
         const counts: Record<string, number> = {};
         tasks
             .filter(t => !t.deletedAt && (statusFilter === 'all' || t.status === statusFilter))
@@ -417,7 +425,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                 });
             });
         return counts;
-    }, [tasks, statusFilter]);
+    }, [tasks, statusFilter, isFullyMounted]);
 
     const toggleMultiSelect = useCallback((taskId: string) => {
         setMultiSelectedIds(prev => {
@@ -485,12 +493,13 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const showFilters = ['next', 'all'].includes(statusFilter);
     const isInbox = statusFilter === 'inbox';
     const nextCount = useMemo(() => {
+        if (!isFullyMounted) return 0;
         let count = 0;
         for (const task of tasks) {
             if (!task.deletedAt && task.status === 'next') count += 1;
         }
         return count;
-    }, [tasks]);
+    }, [tasks, isFullyMounted]);
     const isNextView = statusFilter === 'next';
     const NEXT_WARNING_THRESHOLD = 15;
     const priorityOptions: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
