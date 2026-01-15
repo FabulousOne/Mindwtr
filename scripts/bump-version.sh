@@ -27,11 +27,13 @@ bump_android_version_code() {
         return 0
     fi
 
-    node - <<'NODE'
+    APP_JSON_PATH="$app_json" node - <<'NODE'
 const fs = require('fs');
 const path = require('path');
 
-const appJsonPath = path.resolve(__dirname, '..', 'apps/mobile/app.json');
+const appJsonPath = process.env.APP_JSON_PATH
+  ? path.resolve(process.env.APP_JSON_PATH)
+  : path.resolve(process.cwd(), 'apps/mobile/app.json');
 const content = fs.readFileSync(appJsonPath, 'utf8');
 const json = JSON.parse(content);
 
