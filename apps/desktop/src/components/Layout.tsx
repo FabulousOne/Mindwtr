@@ -32,6 +32,8 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     const { t } = useLanguage();
     const isCollapsed = settings?.sidebarCollapsed ?? false;
     const isFocusMode = useUiStore((state) => state.isFocusMode);
+    const dismissLabel = t('common.dismiss');
+    const dismissText = dismissLabel && dismissLabel !== 'common.dismiss' ? dismissLabel : 'Dismiss';
 
     const navItems = useMemo(() => ([
         { id: 'inbox', labelKey: 'nav.inbox', icon: Inbox, count: inboxCount },
@@ -216,7 +218,7 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                                 className="text-destructive/80 hover:text-destructive underline underline-offset-2"
                                 onClick={() => setError(null)}
                             >
-                                {t('common.dismiss') || 'Dismiss'}
+                                {dismissText}
                             </button>
                         </div>
                     )}

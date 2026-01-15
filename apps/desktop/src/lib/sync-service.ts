@@ -888,13 +888,15 @@ export class SyncService {
         }
     }
 
-    static async getWebDavConfig(): Promise<WebDavConfig> {
+    static async getWebDavConfig(options?: { silent?: boolean }): Promise<WebDavConfig> {
         if (!isTauriRuntime()) return SyncService.getWebDavConfigLocal();
         await SyncService.maybeMigrateLegacyLocalStorageToConfig();
         try {
             return await tauriInvoke<WebDavConfig>('get_webdav_config');
         } catch (error) {
-            reportError('Failed to get WebDAV config', error);
+            if (!options?.silent) {
+                reportError('Failed to get WebDAV config', error);
+            }
             return { url: '', username: '', hasPassword: false };
         }
     }
@@ -915,13 +917,15 @@ export class SyncService {
         }
     }
 
-    static async getCloudConfig(): Promise<CloudConfig> {
+    static async getCloudConfig(options?: { silent?: boolean }): Promise<CloudConfig> {
         if (!isTauriRuntime()) return SyncService.getCloudConfigLocal();
         await SyncService.maybeMigrateLegacyLocalStorageToConfig();
         try {
             return await tauriInvoke<CloudConfig>('get_cloud_config');
         } catch (error) {
-            reportError('Failed to get Self-Hosted config', error);
+            if (!options?.silent) {
+                reportError('Failed to get Self-Hosted config', error);
+            }
             return { url: '', token: '' };
         }
     }

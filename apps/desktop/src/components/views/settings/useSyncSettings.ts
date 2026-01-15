@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SyncService } from '../../../lib/sync-service';
-import { reportError } from '../../../lib/report-error';
 
 export type SyncBackend = 'file' | 'webdav' | 'cloud';
 
@@ -23,22 +22,38 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
     const [cloudToken, setCloudToken] = useState('');
 
     useEffect(() => {
-        SyncService.getSyncPath().then(setSyncPath).catch((error) => reportError('Failed to load sync path', error));
-        SyncService.getSyncBackend().then(setSyncBackend).catch((error) => reportError('Failed to load sync backend', error));
-        SyncService.getWebDavConfig()
+        SyncService.getSyncPath()
+            .then(setSyncPath)
+            .catch((error) => {
+                setSyncError('Failed to load sync path.');
+                console.error(error);
+            });
+        SyncService.getSyncBackend()
+            .then(setSyncBackend)
+            .catch((error) => {
+                setSyncError('Failed to load sync backend.');
+                console.error(error);
+            });
+        SyncService.getWebDavConfig({ silent: true })
             .then((cfg) => {
                 setWebdavUrl(cfg.url);
                 setWebdavUsername(cfg.username);
                 setWebdavPassword(cfg.password ?? '');
                 setWebdavHasPassword(cfg.hasPassword === true);
             })
-            .catch((error) => reportError('Failed to update sync backend', error));
-        SyncService.getCloudConfig()
+            .catch((error) => {
+                setSyncError('Failed to load WebDAV config.');
+                console.error(error);
+            });
+        SyncService.getCloudConfig({ silent: true })
             .then((cfg) => {
                 setCloudUrl(cfg.url);
                 setCloudToken(cfg.token);
             })
-            .catch((error) => reportError('Failed to update sync path', error));
+            .catch((error) => {
+                setSyncError('Failed to load Cloud config.');
+                console.error(error);
+            });
     }, []);
 
     const handleSaveSyncPath = useCallback(async () => {
@@ -68,7 +83,8 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
                 }
             }
         } catch (error) {
-            reportError('Failed to change sync location', error);
+            setSyncError('Failed to change sync location.');
+            console.error(error);
         }
     }, [isTauri, selectSyncFolderTitle, showSaved]);
 
@@ -125,7 +141,7 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
 
             await SyncService.performSync();
         } catch (error) {
-            reportError('Sync failed', error);
+            console.error(error);
             setSyncError(String(error));
         } finally {
             setIsSyncing(false);
