@@ -1,4 +1,5 @@
 import { AppData, StorageAdapter } from '@mindwtr/core';
+import { reportError } from './report-error';
 
 const DATA_KEY = 'mindwtr-data';
 
@@ -16,7 +17,7 @@ export const webStorage: StorageAdapter = {
             data.areas = Array.isArray(data.areas) ? data.areas : [];
             return data;
         } catch (error) {
-            console.error('[WebStorage] Failed to load data:', error);
+            reportError('Failed to load local data', error);
             throw new Error('Data appears corrupted. Please restore from backup.');
         }
     },
@@ -25,7 +26,7 @@ export const webStorage: StorageAdapter = {
         try {
             localStorage.setItem(DATA_KEY, JSON.stringify(data));
         } catch (error) {
-            console.error('[WebStorage] Failed to save data:', error);
+            reportError('Failed to save local data', error);
             throw new Error('Failed to save data.');
         }
     },

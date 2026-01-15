@@ -1,5 +1,6 @@
 import { AppData, StorageAdapter, TaskQueryOptions } from '@mindwtr/core';
 import { invoke } from '@tauri-apps/api/core';
+import { reportError } from './report-error';
 
 const invokeWithError = async <T>(
     action: string,
@@ -9,7 +10,7 @@ const invokeWithError = async <T>(
     try {
         return await invoke<T>(command as any, args as any);
     } catch (error) {
-        console.error(`[TauriStorage] Failed to ${action}`, error);
+        reportError(`Failed to ${action}`, error);
         throw new Error(`Failed to ${action}.`);
     }
 };
