@@ -2170,6 +2170,16 @@ fn is_niri_session() -> bool {
     false
 }
 
+fn diagnostics_enabled() -> bool {
+    match env::var("MINDWTR_DIAGNOSTICS") {
+        Ok(value) => matches!(
+            value.to_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        ),
+        Err(_) => false,
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -2189,9 +2199,14 @@ pub fn run() {
         .setup(|app| {
             // Ensure data file exists on startup
             ensure_data_file(&app.handle()).ok();
+            let diagnostics_enabled = diagnostics_enabled();
             if let Some(window) = app.get_webview_window("main") {
                 if cfg!(target_os = "linux") && is_niri_session() {
                     let _ = window.set_decorations(false);
+                }
+                if diagnostics_enabled {
+                    let _ = window.eval("window.__MINDWTR_DIAGNOSTICS__ = true;");
+                    let _ = window.open_devtools();
                 }
             }
 
@@ -2239,7 +2254,7 @@ pub fn run() {
                     show_main_and_emit(app);
                 })?;
             
-            if cfg!(debug_assertions) {
+            if cfg!(debug_assertions) || diagnostics_enabled {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
                         .level(log::LevelFilter::Info)

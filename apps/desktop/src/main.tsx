@@ -36,6 +36,12 @@ const applyTheme = (mode: ThemeMode | null) => {
 
 applyTheme(savedTheme);
 
+const diagnosticsEnabled = typeof window !== 'undefined'
+    && (window as any).__MINDWTR_DIAGNOSTICS__ === true;
+if (diagnosticsEnabled) {
+    setupGlobalErrorLogging();
+}
+
 const nativeTheme = savedTheme === 'dark' || savedTheme === 'nord'
     ? 'dark'
     : savedTheme === 'light' || savedTheme === 'eink' || savedTheme === 'sepia'

@@ -108,7 +108,13 @@ async function ensureLogDir(): Promise<void> {
 }
 
 function isLoggingEnabled(): boolean {
+    if (isDiagnosticsEnabled()) return true;
     return useTaskStore.getState().settings.diagnostics?.loggingEnabled === true;
+}
+
+function isDiagnosticsEnabled(): boolean {
+    if (typeof window === 'undefined') return false;
+    return (window as any).__MINDWTR_DIAGNOSTICS__ === true;
 }
 
 async function appendLogLine(entry: LogEntry, options?: AppendLogOptions): Promise<string | null> {
@@ -244,4 +250,8 @@ export function setupGlobalErrorLogging(): void {
     window.addEventListener('unhandledrejection', (event) => {
         void logError(event.reason, { scope: 'unhandledrejection' });
     });
+
+    if (isDiagnosticsEnabled()) {
+        void logDiagnosticsEnabled();
+    }
 }
