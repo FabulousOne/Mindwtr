@@ -44,7 +44,6 @@ export default defineConfig({
             return 'i18n';
           }
           if (id.includes('node_modules')) {
-            if (id.includes('react')) return 'react-vendor';
             if (id.includes('@radix-ui')) return 'radix-vendor';
             if (id.includes('lucide-react')) return 'icons-vendor';
             if (id.includes('@tauri-apps')) return 'tauri-vendor';
