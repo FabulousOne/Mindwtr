@@ -2141,7 +2141,7 @@ export default function SettingsPage() {
         };
 
         const fieldGroups: { id: string; title: string; fields: TaskEditorFieldId[] }[] = [
-            { id: 'basic', title: t('taskEdit.basic') || 'Basic', fields: ['status', 'project', 'dueDate'] },
+            { id: 'basic', title: t('taskEdit.basic') || 'Basic', fields: ['status', 'project', 'area', 'dueDate'] },
             { id: 'scheduling', title: t('taskEdit.scheduling'), fields: ['startTime', 'recurrence', 'reviewAt'] },
             { id: 'organization', title: t('taskEdit.organization'), fields: ['contexts', 'tags', 'priority', 'timeEstimate'] },
             { id: 'details', title: t('taskEdit.details'), fields: ['description', 'textDirection', 'attachments', 'checklist'] },
