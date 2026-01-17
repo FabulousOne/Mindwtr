@@ -6,6 +6,8 @@ import { reportError } from '../../../lib/report-error';
 type Labels = {
     notificationsDesc: string;
     notificationsEnable: string;
+    reviewAtNotifications: string;
+    reviewAtNotificationsDesc: string;
     weeklyReview: string;
     weeklyReviewDesc: string;
     weeklyReviewDay: string;
@@ -21,6 +23,7 @@ type WeekdayOption = { value: number; label: string };
 type SettingsNotificationsPageProps = {
     t: Labels;
     notificationsEnabled: boolean;
+    reviewAtNotificationsEnabled: boolean;
     weeklyReviewEnabled: boolean;
     weeklyReviewDay: number;
     weeklyReviewTime: string;
@@ -36,6 +39,7 @@ type SettingsNotificationsPageProps = {
 export function SettingsNotificationsPage({
     t,
     notificationsEnabled,
+    reviewAtNotificationsEnabled,
     weeklyReviewEnabled,
     weeklyReviewDay,
     weeklyReviewTime,
@@ -75,6 +79,31 @@ export function SettingsNotificationsPage({
                         className={cn(
                             "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
                             notificationsEnabled ? "translate-x-4" : "translate-x-1"
+                        )}
+                    />
+                </button>
+            </div>
+
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <p className="text-sm font-medium">{t.reviewAtNotifications}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t.reviewAtNotificationsDesc}</p>
+                </div>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={reviewAtNotificationsEnabled}
+                    onClick={() => handleUpdate({ reviewAtNotificationsEnabled: !reviewAtNotificationsEnabled })}
+                    disabled={!notificationsEnabled}
+                    className={cn(
+                        "relative inline-flex h-5 w-9 items-center rounded-full border transition-colors disabled:opacity-50",
+                        reviewAtNotificationsEnabled ? "bg-primary border-primary" : "bg-muted/50 border-border"
+                    )}
+                >
+                    <span
+                        className={cn(
+                            "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                            reviewAtNotificationsEnabled ? "translate-x-4" : "translate-x-1"
                         )}
                     />
                 </button>

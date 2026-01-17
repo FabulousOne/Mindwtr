@@ -174,6 +174,7 @@ export interface AppData {
         dateFormat?: string;
         keybindingStyle?: 'vim' | 'emacs';
         notificationsEnabled?: boolean;
+        reviewAtNotificationsEnabled?: boolean;
         dailyDigestMorningEnabled?: boolean;
         dailyDigestMorningTime?: string; // HH:mm
         dailyDigestEveningEnabled?: boolean;

@@ -217,8 +217,9 @@ async function rescheduleAll(api: NotificationsApi) {
 
   const activeTaskIds = new Set<string>();
 
+  const includeReviewAt = settings.reviewAtNotificationsEnabled !== false;
   for (const task of tasks) {
-    const next = getNextScheduledAt(task, now);
+    const next = getNextScheduledAt(task, now, { includeReviewAt });
     if (!next || next.getTime() <= now.getTime()) {
       const existing = scheduledByTask.get(task.id);
       if (existing) {

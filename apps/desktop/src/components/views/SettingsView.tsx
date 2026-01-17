@@ -94,6 +94,7 @@ export function SettingsView() {
     const [configPath, setConfigPath] = useState('');
     const [logPath, setLogPath] = useState('');
     const notificationsEnabled = settings?.notificationsEnabled !== false;
+    const reviewAtNotificationsEnabled = settings?.reviewAtNotificationsEnabled !== false;
     const dailyDigestMorningEnabled = settings?.dailyDigestMorningEnabled === true;
     const dailyDigestEveningEnabled = settings?.dailyDigestEveningEnabled === true;
     const dailyDigestMorningTime = settings?.dailyDigestMorningTime || '09:00';
@@ -742,6 +743,7 @@ export function SettingsView() {
                 <SettingsNotificationsPage
                     t={t}
                     notificationsEnabled={notificationsEnabled}
+                    reviewAtNotificationsEnabled={reviewAtNotificationsEnabled}
                     weeklyReviewEnabled={weeklyReviewEnabled}
                     weeklyReviewDay={weeklyReviewDay}
                     weeklyReviewTime={weeklyReviewTime}
