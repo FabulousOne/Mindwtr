@@ -36,20 +36,21 @@ If applicable, add screenshots or paste relevant logs.
 <details>
 <summary><strong>📋 How to collect logs (Click to expand)</strong></summary>
 
-Logging is off by default. Enable it only when you want to report a bug.
+For detailed instructions, please see the [Diagnostics and Logs Wiki](https://github.com/dongdongbh/Mindwtr/wiki/Diagnostics-and-Logs).
 
 **Desktop:**
-1. Go to **Settings → Sync → Diagnostics**.
-2. Enable **Debug logging**.
+1. Go to **Settings → Sync**.
+2. Toggle **Debug logging** to ON.
 3. Reproduce the issue.
-4. Copy the **Log file path** and attach the file here.
-   * *Linux default:* `~/.local/share/mindwtr/logs/mindwtr.log`
+4. Go to **Settings → Sync → Diagnostics** to find the **Log file path**.
+5. Attach the log file here.
+   * *Note: You can also clear old logs from this screen.*
 
 **Mobile:**
-1. Go to **Settings → Data & Sync → Diagnostics**.
-2. Enable **Debug logging**.
+1. Go to **Settings → Diagnostics**.
+2. Toggle **Debug logging** to ON.
 3. Reproduce the issue.
-4. Tap **Share log** and attach it here.
+4. Tap **Share log** to export the file and attach it here.
 
 *Note: Logs are local-only and redact common credentials.*
 </details>
