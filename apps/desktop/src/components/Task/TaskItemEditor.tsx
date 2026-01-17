@@ -435,9 +435,15 @@ export function TaskItemEditor({
                     </button>
                     {organizationOpen && (
                         <div className="mt-3 space-y-3">
-                            {organizationFields.map((fieldId) => (
-                                <div key={fieldId}>{renderField(fieldId)}</div>
-                            ))}
+                            {organizationFields.length === 0 ? (
+                                <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                                    {t('taskEdit.organizationEmpty')}
+                                </div>
+                            ) : (
+                                organizationFields.map((fieldId) => (
+                                    <div key={fieldId}>{renderField(fieldId)}</div>
+                                ))
+                            )}
                         </div>
                     )}
                 </div>
@@ -460,9 +466,15 @@ export function TaskItemEditor({
                     </button>
                     {detailsOpen && (
                         <div className="mt-3 space-y-3">
-                            {detailsFields.map((fieldId) => (
-                                <div key={fieldId}>{renderField(fieldId)}</div>
-                            ))}
+                            {detailsFields.length === 0 ? (
+                                <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                                    {t('taskEdit.detailsEmpty')}
+                                </div>
+                            ) : (
+                                detailsFields.map((fieldId) => (
+                                    <div key={fieldId}>{renderField(fieldId)}</div>
+                                ))
+                            )}
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.locationLabel')}</label>
                                 <input
