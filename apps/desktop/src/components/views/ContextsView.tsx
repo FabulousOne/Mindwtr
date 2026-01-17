@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useTaskStore, matchesHierarchicalToken, isTaskInActiveProject, shallow } from '@mindwtr/core';
+import { useTaskStore, matchesHierarchicalToken, isTaskInActiveProject, shallow, TaskStatus } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { Tag, Filter } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -15,6 +15,7 @@ export function ContextsView() {
     );
     const { t } = useLanguage();
     const [selectedContext, setSelectedContext] = useState<string | null>(null);
+    const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('next');
 
     useEffect(() => {
         if (!perf.enabled) return;
@@ -27,10 +28,14 @@ export function ContextsView() {
     // Filter out deleted tasks first
     const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
     const activeTasks = tasks.filter(t => !t.deletedAt && isTaskInActiveProject(t, projectMap));
+    const baseTasks = activeTasks.filter(t => t.status !== 'done' && t.status !== 'archived');
+    const scopedTasks = statusFilter === 'all'
+        ? baseTasks
+        : baseTasks.filter(t => t.status === statusFilter);
 
     // Extract all unique contexts from active tasks
     const allContexts = Array.from(new Set(
-        activeTasks.flatMap(t => [...(t.contexts || []), ...(t.tags || [])])
+        scopedTasks.flatMap(t => [...(t.contexts || []), ...(t.tags || [])])
     )).sort();
 
     const matchesSelected = (task: typeof activeTasks[number], context: string) => {
@@ -39,8 +44,15 @@ export function ContextsView() {
     };
 
     const filteredTasks = selectedContext
-        ? activeTasks.filter(t => matchesSelected(t, selectedContext) && t.status !== 'done')
-        : activeTasks.filter(t => ((t.contexts?.length || 0) > 0 || (t.tags?.length || 0) > 0) && t.status !== 'done');
+        ? scopedTasks.filter(t => matchesSelected(t, selectedContext))
+        : scopedTasks.filter(t => ((t.contexts?.length || 0) > 0 || (t.tags?.length || 0) > 0));
+
+    const statusOptions: Array<{ value: TaskStatus | 'all'; label: string }> = [
+        { value: 'next', label: t('status.next') },
+        { value: 'waiting', label: t('status.waiting') },
+        { value: 'someday', label: t('status.someday') },
+        { value: 'all', label: t('common.all') || 'All' },
+    ];
 
     return (
         <div className="flex h-full gap-6">
@@ -62,7 +74,7 @@ export function ContextsView() {
                         <Tag className="w-4 h-4" />
                         <span className="flex-1">{t('contexts.all')}</span>
                         <span className="text-xs text-muted-foreground">
-                            {activeTasks.filter(t => ((t.contexts?.length || 0) > 0 || (t.tags?.length || 0) > 0) && t.status !== 'done').length}
+                            {scopedTasks.filter(t => ((t.contexts?.length || 0) > 0 || (t.tags?.length || 0) > 0)).length}
                         </span>
                     </div>
 
@@ -78,7 +90,7 @@ export function ContextsView() {
                             <span className="text-muted-foreground">@</span>
                             <span className="flex-1 truncate">{context.replace(/^@/, '')}</span>
                             <span className="text-xs text-muted-foreground">
-                                {activeTasks.filter(t => matchesSelected(t, context) && t.status !== 'done').length}
+                                {scopedTasks.filter(t => matchesSelected(t, context)).length}
                             </span>
                         </div>
                     ))}
@@ -104,6 +116,19 @@ export function ContextsView() {
                         <p className="text-muted-foreground text-sm">
                             {filteredTasks.length} {t('common.tasks')}
                         </p>
+                    </div>
+                    <div className="ml-auto">
+                        <select
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value as TaskStatus | 'all')}
+                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+                        >
+                            {statusOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </header>
 
