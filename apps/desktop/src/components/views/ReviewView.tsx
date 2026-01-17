@@ -7,7 +7,7 @@ import { ReviewTaskList } from './review/ReviewTaskList';
 import { DailyReviewGuideModal } from './review/DailyReviewModal';
 import { WeeklyReviewGuideModal } from './review/WeeklyReviewModal';
 
-import { shallow, sortTasksBy, useTaskStore, type Project, type Task, type TaskStatus, type TaskSortBy } from '@mindwtr/core';
+import { shallow, sortTasksBy, useTaskStore, type Project, type Task, type TaskStatus, type TaskSortBy, isTaskInActiveProject } from '@mindwtr/core';
 
 import { PromptModal } from '../PromptModal';
 import { useLanguage } from '../../contexts/language-context';
@@ -60,20 +60,20 @@ export function ReviewView() {
                 nextStatusCounts[status] = 0;
             });
 
+            projects.forEach((project) => {
+                nextProjectMap[project.id] = project;
+            });
+
             const nextActiveTasks: Task[] = [];
             tasks.forEach((task) => {
                 nextTasksById[task.id] = task;
-                if (!task.deletedAt) {
-                    nextActiveTasks.push(task);
-                    nextStatusCounts.all += 1;
-                    if (nextStatusCounts[task.status] !== undefined) {
-                        nextStatusCounts[task.status] += 1;
-                    }
+                if (task.deletedAt) return;
+                if (!isTaskInActiveProject(task, nextProjectMap)) return;
+                nextActiveTasks.push(task);
+                nextStatusCounts.all += 1;
+                if (nextStatusCounts[task.status] !== undefined) {
+                    nextStatusCounts[task.status] += 1;
                 }
-            });
-
-            projects.forEach((project) => {
-                nextProjectMap[project.id] = project;
             });
 
             const list = filterStatus === 'all'

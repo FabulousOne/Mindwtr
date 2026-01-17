@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { shallow, useTaskStore, TaskPriority, TimeEstimate, sortTasksBy, parseQuickAdd, matchesHierarchicalToken, safeParseDate } from '@mindwtr/core';
+import { shallow, useTaskStore, TaskPriority, TimeEstimate, sortTasksBy, parseQuickAdd, matchesHierarchicalToken, safeParseDate, isTaskInActiveProject } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
@@ -212,12 +212,14 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         perf.trackUseMemo();
         return perf.measure('filteredTasks', () => {
             const now = new Date();
+            const allowDeferredProjectTasks = statusFilter === 'someday' || statusFilter === 'done' || statusFilter === 'archived';
             const filtered = baseTasks.filter(t => {
                 // Always filter out soft-deleted tasks
                 if (t.deletedAt) return false;
 
                 if (statusFilter !== 'all' && t.status !== statusFilter) return false;
                 // Respect statusFilter (handled above).
+                if (!allowDeferredProjectTasks && !isTaskInActiveProject(t, projectMap)) return false;
 
                 if (statusFilter === 'inbox') {
                     const start = safeParseDate(t.startTime);

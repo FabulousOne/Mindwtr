@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { shallow, useTaskStore, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, matchesHierarchicalToken, getTaskAgeLabel, getTaskStaleness, safeFormatDate, safeParseDate, safeParseDueDate, isDueForReview } from '@mindwtr/core';
+import { shallow, useTaskStore, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, matchesHierarchicalToken, getTaskAgeLabel, getTaskStaleness, safeFormatDate, safeParseDate, safeParseDueDate, isDueForReview, isTaskInActiveProject } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
 import { cn } from '../../lib/utils';
@@ -39,9 +39,10 @@ export function AgendaView() {
     }, [perf.enabled]);
 
     // Filter active tasks
-    const activeTasks = useMemo(() =>
-        tasks.filter(t => !t.deletedAt && t.status !== 'done'),
-        [tasks]
+    const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+    const activeTasks = useMemo(
+        () => tasks.filter(t => !t.deletedAt && t.status !== 'done' && isTaskInActiveProject(t, projectMap)),
+        [tasks, projectMap]
     );
     const allTokens = useMemo(() => {
         const taskTokens = activeTasks.flatMap(t => [...(t.contexts || []), ...(t.tags || [])]);

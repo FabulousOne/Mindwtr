@@ -1,5 +1,19 @@
 import type { Project, Task } from './types';
 
+export function isTaskInActiveProject(
+    task: Task,
+    projectLookup: Map<string, Project> | Record<string, Project>
+): boolean {
+    if (!task.projectId) return true;
+    const project =
+        projectLookup instanceof Map
+            ? projectLookup.get(task.projectId)
+            : projectLookup[task.projectId];
+    if (!project) return true;
+    if (project.deletedAt) return false;
+    return project.status === 'active' || project.isFocused === true;
+}
+
 export function projectHasNextAction(project: Project, tasks: Task[]): boolean {
     return tasks.some(t =>
         t.projectId === project.id &&

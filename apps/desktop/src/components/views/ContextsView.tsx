@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useTaskStore, matchesHierarchicalToken } from '@mindwtr/core';
+import { useState, useEffect, useMemo } from 'react';
+import { useTaskStore, matchesHierarchicalToken, isTaskInActiveProject, shallow } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { Tag, Filter } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -9,7 +9,10 @@ import { checkBudget } from '../../config/performanceBudgets';
 
 export function ContextsView() {
     const perf = usePerformanceMonitor('ContextsView');
-    const tasks = useTaskStore((state) => state.tasks);
+    const { tasks, projects } = useTaskStore(
+        (state) => ({ tasks: state.tasks, projects: state.projects }),
+        shallow
+    );
     const { t } = useLanguage();
     const [selectedContext, setSelectedContext] = useState<string | null>(null);
 
@@ -22,7 +25,8 @@ export function ContextsView() {
     }, [perf.enabled]);
 
     // Filter out deleted tasks first
-    const activeTasks = tasks.filter(t => !t.deletedAt);
+    const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+    const activeTasks = tasks.filter(t => !t.deletedAt && isTaskInActiveProject(t, projectMap));
 
     // Extract all unique contexts from active tasks
     const allContexts = Array.from(new Set(

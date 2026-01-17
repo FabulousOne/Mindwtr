@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Calendar, Check, CheckSquare, RefreshCw, Star, X, type LucideIcon } from 'lucide-react';
-import { PRESET_CONTEXTS, isDueForReview, safeParseDate, safeParseDueDate, sortTasksBy, type Task, type TaskSortBy, shallow, useTaskStore } from '@mindwtr/core';
+import { PRESET_CONTEXTS, isDueForReview, safeParseDate, safeParseDueDate, sortTasksBy, type Task, type TaskSortBy, shallow, useTaskStore, isTaskInActiveProject } from '@mindwtr/core';
 import { cn } from '../../../lib/utils';
 import { useLanguage } from '../../../contexts/language-context';
 import { InboxProcessor } from '../InboxProcessor';
@@ -39,7 +39,7 @@ export function DailyReviewGuideModal({ onClose }: DailyReviewGuideModalProps) {
 
     const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
 
-    const activeTasks = tasks.filter((task) => !task.deletedAt);
+    const activeTasks = tasks.filter((task) => !task.deletedAt && isTaskInActiveProject(task, projectMap));
     const inboxTasks = useMemo(() => {
         const now = new Date();
         return activeTasks.filter((task) => {
@@ -72,9 +72,9 @@ export function DailyReviewGuideModal({ onClose }: DailyReviewGuideModalProps) {
     });
 
     const allContexts = useMemo(() => {
-        const taskContexts = tasks.flatMap((task) => task.contexts || []);
+        const taskContexts = activeTasks.flatMap((task) => task.contexts || []);
         return Array.from(new Set([...PRESET_CONTEXTS, ...taskContexts])).sort();
-    }, [tasks]);
+    }, [activeTasks]);
 
     const sequentialProjectIds = useMemo(
         () => new Set(projects.filter((project) => project.isSequential && !project.deletedAt).map((project) => project.id)),

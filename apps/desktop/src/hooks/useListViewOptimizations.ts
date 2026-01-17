@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { type Task, type TaskStatus, useTaskStore } from '@mindwtr/core';
+import { type Task, type TaskStatus, useTaskStore, isTaskInActiveProject } from '@mindwtr/core';
 import { useConditionalMemo } from './useConditionalMemo';
 import { useProgressiveComputation } from './useProgressiveComputation';
 
@@ -75,9 +75,15 @@ export function useListViewOptimizations(
             const perfApi = perfRef.current;
             perfApi?.trackUseMemo?.();
             const compute = () => {
+                const allowDeferredProjectTasks = statusFilter === 'someday' || statusFilter === 'done' || statusFilter === 'archived';
                 const counts: Record<string, number> = {};
                 tasks
-                    .filter((task) => !task.deletedAt && (statusFilter === 'all' || task.status === statusFilter))
+                    .filter((task) => {
+                        if (task.deletedAt) return false;
+                        if (statusFilter !== 'all' && task.status !== statusFilter) return false;
+                        if (!allowDeferredProjectTasks && !isTaskInActiveProject(task, projectMap)) return false;
+                        return true;
+                    })
                     .forEach((task) => {
                         const tokens = new Set([...(task.contexts || []), ...(task.tags || [])]);
                         tokens.forEach((token) => {
@@ -100,7 +106,10 @@ export function useListViewOptimizations(
             const compute = () => {
                 let count = 0;
                 for (const task of tasks) {
-                    if (!task.deletedAt && task.status === 'next') count += 1;
+                    if (task.deletedAt) continue;
+                    if (task.status !== 'next') continue;
+                    if (!isTaskInActiveProject(task, projectMap)) continue;
+                    count += 1;
                 }
                 return count;
             };

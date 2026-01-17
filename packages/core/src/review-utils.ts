@@ -1,5 +1,6 @@
 import type { ReviewSnapshotItem } from './ai/types';
 import type { Project, Task } from './types';
+import { isTaskInActiveProject } from './project-utils';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -10,10 +11,12 @@ export function getStaleItems(
     now: Date = new Date(),
 ): ReviewSnapshotItem[] {
     const items: ReviewSnapshotItem[] = [];
+    const projectMap = new Map(projects.map((project) => [project.id, project]));
 
     tasks.forEach((task) => {
         if (task.deletedAt) return;
         if (task.status !== 'next' && task.status !== 'waiting') return;
+        if (!isTaskInActiveProject(task, projectMap)) return;
         const updated = new Date(task.updatedAt || task.createdAt);
         if (Number.isNaN(updated.getTime())) return;
         const daysStale = Math.ceil((now.getTime() - updated.getTime()) / DAY_MS);
