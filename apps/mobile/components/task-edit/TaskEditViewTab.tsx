@@ -44,6 +44,7 @@ export function TaskEditViewTab({
   styles,
   mergedTask,
   projects,
+  sections,
   areas,
   prioritiesEnabled,
   timeEstimatesEnabled,

@@ -1,5 +1,5 @@
 
-import type { AppData, Attachment, Project, Task, Area, Section } from './types';
+import type { AppData, Attachment, Project, Task, Area } from './types';
 import { normalizeTaskForLoad } from './task-status';
 
 export interface EntityMergeStats {

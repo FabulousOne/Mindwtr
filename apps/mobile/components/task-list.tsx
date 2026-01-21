@@ -60,6 +60,7 @@ function TaskListComponent({
   const { t } = useLanguage();
   const tasks = useTaskStore((state) => state.tasks);
   const projects = useTaskStore((state) => state.projects);
+  const sections = useTaskStore((state) => state.sections);
   const addTask = useTaskStore((state) => state.addTask);
   const addProject = useTaskStore((state) => state.addProject);
   const updateTask = useTaskStore((state) => state.updateTask);
@@ -149,6 +150,60 @@ function TaskListComponent({
   const orderedTasks = useMemo(() => {
     return sortTasksBy(filteredTasks, sortBy);
   }, [filteredTasks, sortBy]);
+
+  const projectSections = useMemo(() => {
+    if (!projectId) return [];
+    return sections
+      .filter((section) => section.projectId === projectId && !section.deletedAt)
+      .sort((a, b) => {
+        const aOrder = Number.isFinite(a.order) ? a.order : 0;
+        const bOrder = Number.isFinite(b.order) ? b.order : 0;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return a.title.localeCompare(b.title);
+      });
+  }, [projectId, sections]);
+
+  type ListItem =
+    | { type: 'section'; id: string; title: string; count: number; muted?: boolean }
+    | { type: 'task'; task: Task };
+
+  const listItems = useMemo<ListItem[]>(() => {
+    const shouldGroup = Boolean(projectId) && (projectSections.length > 0 || orderedTasks.some((task) => task.sectionId));
+    if (!shouldGroup) {
+      return orderedTasks.map((task) => ({ type: 'task', task }));
+    }
+    const sectionIds = new Set(projectSections.map((section) => section.id));
+    const tasksBySection = new Map<string, Task[]>();
+    const unsectioned: Task[] = [];
+    orderedTasks.forEach((task) => {
+      const sectionId = task.sectionId && sectionIds.has(task.sectionId) ? task.sectionId : null;
+      if (sectionId) {
+        const list = tasksBySection.get(sectionId) ?? [];
+        list.push(task);
+        tasksBySection.set(sectionId, list);
+      } else {
+        unsectioned.push(task);
+      }
+    });
+    const items: ListItem[] = [];
+    projectSections.forEach((section) => {
+      const tasksForSection = tasksBySection.get(section.id) ?? [];
+      if (tasksForSection.length === 0) return;
+      items.push({ type: 'section', id: section.id, title: section.title, count: tasksForSection.length });
+      tasksForSection.forEach((task) => items.push({ type: 'task', task }));
+    });
+    if (unsectioned.length > 0) {
+      items.push({
+        type: 'section',
+        id: 'no-section',
+        title: t('projects.noSection'),
+        count: unsectioned.length,
+        muted: true,
+      });
+      unsectioned.forEach((task) => items.push({ type: 'task', task }));
+    }
+    return items;
+  }, [orderedTasks, projectId, projectSections, t]);
 
   const contextOptions = useMemo(() => {
     const taskContexts = tasks.flatMap((task) => task.contexts || []);
@@ -461,6 +516,22 @@ function TaskListComponent({
     updateTask,
   ]);
 
+  const renderListItem = useCallback(({ item }: { item: ListItem }) => {
+    if (item.type === 'section') {
+      return (
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: item.muted ? themeColorsMemo.secondaryText : themeColorsMemo.text }]}>
+            {item.title}
+          </Text>
+          <Text style={[styles.sectionCount, { color: themeColorsMemo.secondaryText }]}>
+            {item.count}
+          </Text>
+        </View>
+      );
+    }
+    return renderTask({ item: item.task });
+  }, [renderTask, themeColorsMemo.secondaryText, themeColorsMemo.text]);
+
   return (
     <View style={[styles.container, { backgroundColor: themeColorsMemo.bg }]}>
       {showHeader ? (
@@ -647,25 +718,25 @@ function TaskListComponent({
 
       {staticList ? (
         <View style={styles.staticList}>
-          {orderedTasks.length === 0 ? (
+          {listItems.length === 0 ? (
             <View style={[styles.emptyContainer, { backgroundColor: themeColors.cardBg, borderColor: themeColors.border }]}>
               <Text style={[styles.emptyText, { color: themeColors.text }]}>
                 {emptyText || t('list.noTasks')}
               </Text>
             </View>
           ) : (
-            orderedTasks.map((item) => (
-              <View key={item.id} style={styles.staticItem}>
-                {renderTask({ item })}
+            listItems.map((item) => (
+              <View key={item.type === 'section' ? `section-${item.id}` : item.task.id} style={styles.staticItem}>
+                {renderListItem({ item })}
               </View>
             ))
           )}
         </View>
       ) : (
         <FlatList
-          data={orderedTasks}
-          renderItem={renderTask}
-          keyExtractor={(item) => item.id}
+          data={listItems}
+          renderItem={renderListItem}
+          keyExtractor={(item) => (item.type === 'section' ? `section-${item.id}` : item.task.id)}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           getItemLayout={undefined}
@@ -1009,6 +1080,24 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 12,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  sectionCount: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   taskItem: {
     flexDirection: 'row',
