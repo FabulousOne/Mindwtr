@@ -39,6 +39,32 @@ const DOW_MAP: Partial<Record<string, DayOfWeek>> = {
     saturday: 6,
 };
 
+const ESCAPE_SENTINEL = '__MW_ESC__';
+const QUICK_ADD_ESCAPE_CHARS = new Set(['@', '#', '+', '/']);
+
+function protectEscapes(input: string): string {
+    let result = '';
+    for (let i = 0; i < input.length; i += 1) {
+        const ch = input[i];
+        if (ch === '\\' && i + 1 < input.length) {
+            const next = input[i + 1];
+            if (QUICK_ADD_ESCAPE_CHARS.has(next)) {
+                result += `${ESCAPE_SENTINEL}${next.charCodeAt(0)}__`;
+                i += 1;
+                continue;
+            }
+        }
+        result += ch;
+    }
+    return result;
+}
+
+function restoreEscapes(input: string): string {
+    return input.replace(new RegExp(`${ESCAPE_SENTINEL}(\\d+)__`, 'g'), (_, code) =>
+        String.fromCharCode(Number(code)),
+    );
+}
+
 function parseTime(text: string): { hour: number; minute: number; rest: string } | null {
     const match = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/);
     if (!match) return null;
@@ -105,7 +131,7 @@ function stripToken(source: string, token: string): string {
 }
 
 export function parseQuickAdd(input: string, projects?: Project[], now: Date = new Date()): QuickAddResult {
-    let working = input.trim();
+    let working = protectEscapes(input.trim());
 
     const contexts = new Set<string>();
     const tags = new Set<string>();
@@ -122,7 +148,7 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
     let description: string | undefined;
     const noteMatch = working.match(/\/note:([^/]+?)(?=\s\/|$)/i);
     if (noteMatch) {
-        description = noteMatch[1].trim();
+        description = restoreEscapes(noteMatch[1].trim());
         working = stripToken(working, noteMatch[0]);
     }
 
@@ -158,7 +184,7 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
     } else {
         const plusMatch = working.match(/(?:^|\s)\+([^\s/]+(?:\s+(?![@#+/])[^/\s]+)*)/);
         if (plusMatch) {
-            const rawProject = (plusMatch[1] || '').replace(/\s+/g, ' ').trim();
+            const rawProject = restoreEscapes((plusMatch[1] || '').replace(/\s+/g, ' ').trim());
             if (!rawProject) {
                 working = stripToken(working, plusMatch[0]);
                 return { title: working, props: {} };
@@ -176,7 +202,7 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
         }
     }
 
-    const title = working.replace(/\s{2,}/g, ' ').trim();
+    const title = restoreEscapes(working.replace(/\s{2,}/g, ' ').trim());
 
     const props: Partial<Task> = {};
     if (status) props.status = status;

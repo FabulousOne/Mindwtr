@@ -423,7 +423,8 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         if (!resolvedProjectId) {
             resolvedProjectId = existingProjectId;
         }
-        const cleanedTitle = parsedTitle.trim() ? parsedTitle : rawTitle;
+        const fallbackTitle = editedTask.title ?? task.title ?? rawTitle;
+        const cleanedTitle = parsedTitle.trim() ? parsedTitle : fallbackTitle;
         const baseDescription = descriptionDraftRef.current;
         const resolvedDescription = parsedProps.description
             ? (baseDescription ? `${baseDescription}\n${parsedProps.description}` : parsedProps.description)

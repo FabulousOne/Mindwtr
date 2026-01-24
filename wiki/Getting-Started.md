@@ -65,6 +65,10 @@ Mindwtr supports natural language quick-add. Type directly in the task input:
 - `/due:friday`, `/due:next week`
 - `/due:in 3 days`, `/due:2025-01-15`
 
+**Escaping**
+- Use a backslash to keep symbols as plain text: `\\@`, `\\#`, `\\+`, `\\/`
+- Example: `Call \\@support /due:tomorrow` → title becomes `Call @support`
+
 > **Tip:** You can also use **Audio Capture** to speak your tasks. Enable it in **Settings → AI Assistant** to use voice-to-text with smart parsing.
 
 ---

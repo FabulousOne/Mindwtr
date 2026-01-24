@@ -602,66 +602,67 @@ export const TaskItem = memo(function TaskItem({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const { title: parsedTitle, props: parsedProps, projectTitle } = parseQuickAdd(editTitle, projects);
-        if (parsedTitle.trim()) {
-            const hasProjectCommand = Boolean(parsedProps.projectId || projectTitle);
-            let resolvedProjectId = parsedProps.projectId || undefined;
-            if (!resolvedProjectId && projectTitle) {
-                try {
-                    const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
-                    resolvedProjectId = created?.id;
-                } catch (error) {
-                    console.error('Failed to create project from quick add', error);
-                }
+        const cleanedTitle = parsedTitle.trim() ? parsedTitle : task.title;
+        if (!cleanedTitle.trim()) return;
+
+        const hasProjectCommand = Boolean(parsedProps.projectId || projectTitle);
+        let resolvedProjectId = parsedProps.projectId || undefined;
+        if (!resolvedProjectId && projectTitle) {
+            try {
+                const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
+                resolvedProjectId = created?.id;
+            } catch (error) {
+                console.error('Failed to create project from quick add', error);
             }
-            if (!resolvedProjectId) {
-                resolvedProjectId = editProjectId || undefined;
-            }
-            const recurrenceValue: Recurrence | undefined = editRecurrence
-                ? { rule: editRecurrence, strategy: editRecurrenceStrategy }
-                : undefined;
-            if (recurrenceValue && editRecurrenceRRule) {
-                const parsed = parseRRuleString(editRecurrenceRRule);
-                if (parsed.byDay && parsed.byDay.length > 0) {
-                    recurrenceValue.byDay = parsed.byDay;
-                }
-                recurrenceValue.rrule = editRecurrenceRRule;
-            }
-            const nextTextDirection = editTextDirection === 'auto' ? undefined : editTextDirection;
-            const currentContexts = editContexts.split(',').map(c => c.trim()).filter(Boolean);
-            const mergedContexts = Array.from(new Set([...currentContexts, ...(parsedProps.contexts || [])]));
-            const currentTags = editTags.split(',').map(c => c.trim()).filter(Boolean);
-            const mergedTags = Array.from(new Set([...currentTags, ...(parsedProps.tags || [])]));
-            const resolvedDescription = parsedProps.description
-                ? (editDescription ? `${editDescription}\n${parsedProps.description}` : parsedProps.description)
-                : (editDescription || undefined);
-            const projectChangedByCommand = hasProjectCommand && resolvedProjectId !== (editProjectId || undefined);
-            const resolvedSectionId = projectChangedByCommand
-                ? undefined
-                : (resolvedProjectId ? (editSectionId || undefined) : undefined);
-            const resolvedAreaId = projectChangedByCommand
-                ? undefined
-                : (resolvedProjectId ? undefined : (editAreaId || undefined));
-            updateTask(task.id, {
-                title: parsedTitle,
-                status: parsedProps.status || editStatus,
-                dueDate: parsedProps.dueDate || editDueDate || undefined,
-                startTime: editStartTime || undefined,
-                projectId: resolvedProjectId,
-                sectionId: resolvedSectionId,
-                areaId: resolvedAreaId,
-                contexts: mergedContexts,
-                tags: mergedTags,
-                description: resolvedDescription,
-                textDirection: nextTextDirection,
-                location: editLocation || undefined,
-                recurrence: recurrenceValue,
-                timeEstimate: editTimeEstimate || undefined,
-                priority: editPriority || undefined,
-                reviewAt: editReviewAt || undefined,
-                attachments: editAttachments.length > 0 ? editAttachments : undefined,
-            });
-            setIsEditing(false);
         }
+        if (!resolvedProjectId) {
+            resolvedProjectId = editProjectId || undefined;
+        }
+        const recurrenceValue: Recurrence | undefined = editRecurrence
+            ? { rule: editRecurrence, strategy: editRecurrenceStrategy }
+            : undefined;
+        if (recurrenceValue && editRecurrenceRRule) {
+            const parsed = parseRRuleString(editRecurrenceRRule);
+            if (parsed.byDay && parsed.byDay.length > 0) {
+                recurrenceValue.byDay = parsed.byDay;
+            }
+            recurrenceValue.rrule = editRecurrenceRRule;
+        }
+        const nextTextDirection = editTextDirection === 'auto' ? undefined : editTextDirection;
+        const currentContexts = editContexts.split(',').map(c => c.trim()).filter(Boolean);
+        const mergedContexts = Array.from(new Set([...currentContexts, ...(parsedProps.contexts || [])]));
+        const currentTags = editTags.split(',').map(c => c.trim()).filter(Boolean);
+        const mergedTags = Array.from(new Set([...currentTags, ...(parsedProps.tags || [])]));
+        const resolvedDescription = parsedProps.description
+            ? (editDescription ? `${editDescription}\n${parsedProps.description}` : parsedProps.description)
+            : (editDescription || undefined);
+        const projectChangedByCommand = hasProjectCommand && resolvedProjectId !== (editProjectId || undefined);
+        const resolvedSectionId = projectChangedByCommand
+            ? undefined
+            : (resolvedProjectId ? (editSectionId || undefined) : undefined);
+        const resolvedAreaId = projectChangedByCommand
+            ? undefined
+            : (resolvedProjectId ? undefined : (editAreaId || undefined));
+        await updateTask(task.id, {
+            title: cleanedTitle,
+            status: parsedProps.status || editStatus,
+            dueDate: parsedProps.dueDate || editDueDate || undefined,
+            startTime: editStartTime || undefined,
+            projectId: resolvedProjectId,
+            sectionId: resolvedSectionId,
+            areaId: resolvedAreaId,
+            contexts: mergedContexts,
+            tags: mergedTags,
+            description: resolvedDescription,
+            textDirection: nextTextDirection,
+            location: editLocation || undefined,
+            recurrence: recurrenceValue,
+            timeEstimate: editTimeEstimate || undefined,
+            priority: editPriority || undefined,
+            reviewAt: editReviewAt || undefined,
+            attachments: editAttachments.length > 0 ? editAttachments : undefined,
+        });
+        setIsEditing(false);
     };
 
     const project = propProject || (task.projectId ? projectById.get(task.projectId) : undefined);
