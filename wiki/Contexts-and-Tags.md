@@ -201,14 +201,18 @@ When someone calls/visits unexpectedly:
 
 ## Contexts vs. Tags
 
-In Mindwtr, both `@contexts` and `#tags` work similarly, but conceptually:
+In Mindwtr, both `@contexts` and `#tags` can filter tasks, but they answer different questions:
 
-| Symbol | Purpose                   | Examples                        |
-| ------ | ------------------------- | ------------------------------- |
-| `@`    | Location/tool contexts    | @home, @work, @phone            |
-| `#`    | Energy/mode/category tags | #focused, #lowenergy, #creative |
+| Symbol | What it answers               | Typical use                          | Examples                   |
+| ------ | ----------------------------- | ------------------------------------ | -------------------------- |
+| `@`    | Where/with what can I do it?  | Location, tool, or person constraint | @home, @work, @phone       |
+| `#`    | What is this about?           | Topic, energy, mode, or label        | #focused, #lowenergy       |
 
-Both are searchable and filterable.
+### Practical guidance
+
+- Use **`@` contexts** for *execution filters* (the places/tools/people you need).
+- Use **`#` tags** for *categorization* (energy level, topic, or grouping across projects).
+- Both support **hierarchies** (e.g., `@work/meetings`, `#health/fitness`).
 
 ---
 
