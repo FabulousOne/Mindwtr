@@ -129,6 +129,30 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
     }
   }, [currentTask, inboxTasks.length, visible]);
 
+  useEffect(() => {
+    if (!visible) return;
+    if (processingQueue.length === 0) {
+      handleClose();
+      return;
+    }
+    if (currentIndex < 0 || currentIndex >= processingQueue.length) {
+      const nextIndex = Math.max(0, processingQueue.length - 1);
+      const nextTask = processingQueue[nextIndex];
+      setCurrentIndex(nextIndex);
+      setProcessingStep('refine');
+      setPendingStartDate(null);
+      setShowStartDatePicker(false);
+      setDelegateWho('');
+      setDelegateFollowUpDate(null);
+      setShowDelegateDatePicker(false);
+      setSelectedContexts(nextTask?.contexts ?? []);
+      setNewContext('');
+      setProjectSearch('');
+      setProcessingTitle(nextTask?.title ?? '');
+      setProcessingDescription(nextTask?.description ?? '');
+    }
+  }, [visible, processingQueue, currentIndex]);
+
   const moveToNext = () => {
     if (currentIndex + 1 < processingQueue.length) {
       setCurrentIndex(currentIndex + 1);
