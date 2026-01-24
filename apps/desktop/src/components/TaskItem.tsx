@@ -179,6 +179,10 @@ export const TaskItem = memo(function TaskItem({
         setShowDescriptionPreview,
         resetEditState: resetLocalEditState,
     } = useTaskItemEditState({ task, resetAttachmentState });
+    const editTextDirectionRef = useRef<Task['textDirection']>(editTextDirection);
+    useEffect(() => {
+        editTextDirectionRef.current = editTextDirection;
+    }, [editTextDirection]);
     const [isViewOpen, setIsViewOpen] = useState(false);
     const prioritiesEnabled = settings?.features?.priorities === true;
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
@@ -213,8 +217,10 @@ export const TaskItem = memo(function TaskItem({
     });
 
     const handleSetEditTextDirection = useCallback((value: Task['textDirection']) => {
-        setEditTextDirection(value ?? 'auto');
-    }, []);
+        const nextValue = value ?? 'auto';
+        editTextDirectionRef.current = nextValue;
+        setEditTextDirection(nextValue);
+    }, [setEditTextDirection]);
 
     useEffect(() => {
         if (!isHighlighted) return;
@@ -628,7 +634,8 @@ export const TaskItem = memo(function TaskItem({
             }
             recurrenceValue.rrule = editRecurrenceRRule;
         }
-        const nextTextDirection = editTextDirection === 'auto' ? undefined : editTextDirection;
+        const resolvedTextDirection = editTextDirectionRef.current ?? 'auto';
+        const nextTextDirection = resolvedTextDirection === 'auto' ? undefined : resolvedTextDirection;
         const currentContexts = editContexts.split(',').map(c => c.trim()).filter(Boolean);
         const mergedContexts = Array.from(new Set([...currentContexts, ...(parsedProps.contexts || [])]));
         const currentTags = editTags.split(',').map(c => c.trim()).filter(Boolean);
