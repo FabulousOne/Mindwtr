@@ -38,6 +38,7 @@ export interface TaskListProps {
   headerAccessory?: React.ReactNode;
   enableCopilot?: boolean;
   defaultEditTab?: 'task' | 'view';
+  contentPaddingBottom?: number;
 }
 
 // ... inside TaskList component
@@ -55,6 +56,7 @@ function TaskListComponent({
   headerAccessory,
   enableCopilot = true,
   defaultEditTab,
+  contentPaddingBottom,
 }: TaskListProps) {
   const { isDark } = useTheme();
   const { t } = useLanguage();
@@ -116,6 +118,13 @@ function TaskListComponent({
       themeColors.filterBg,
     ],
   );
+
+  const listContentStyle = useMemo(() => {
+    if (!contentPaddingBottom || contentPaddingBottom <= 0) {
+      return styles.listContent;
+    }
+    return [styles.listContent, { paddingBottom: 12 + contentPaddingBottom }];
+  }, [contentPaddingBottom]);
 
   const tasksById = useMemo(() => {
     return tasks.reduce((acc, task) => {
@@ -738,7 +747,7 @@ function TaskListComponent({
           renderItem={renderListItem}
           keyExtractor={(item) => (item.type === 'section' ? `section-${item.id}` : item.task.id)}
           style={styles.list}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={listContentStyle}
           getItemLayout={undefined}
           initialNumToRender={12}
           maxToRenderPerBatch={12}

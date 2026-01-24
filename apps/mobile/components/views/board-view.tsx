@@ -1,10 +1,11 @@
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
 import { useTaskStore } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import { useMemo, useState, useCallback } from 'react';
 import { useTheme } from '../../contexts/theme-context';
 import { useLanguage } from '../../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureDetector, Gesture, Swipeable } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -241,6 +242,13 @@ export function BoardView() {
   const { t } = useLanguage();
   const timeEstimatesEnabled = useTaskStore((state) => state.settings?.features?.timeEstimates === true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const insets = useSafeAreaInsets();
+
+  const navBarInset = Platform.OS === 'android' && insets.bottom >= 24 ? insets.bottom : 0;
+  const boardContentStyle = useMemo(
+    () => (navBarInset ? [styles.boardContent, { paddingBottom: 16 + navBarInset }] : styles.boardContent),
+    [navBarInset],
+  );
 
   const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
   const projectById = useMemo(() => {
@@ -289,7 +297,7 @@ export function BoardView() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         style={styles.boardScroll}
-        contentContainerStyle={styles.boardContent}
+        contentContainerStyle={boardContentStyle}
       >
         {COLUMNS.map((col, index) => (
           <Column

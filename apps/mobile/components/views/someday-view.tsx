@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useTaskStore } from '@mindwtr/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task, TaskStatus } from '@mindwtr/core';
@@ -7,6 +7,7 @@ import { useLanguage } from '../../contexts/language-context';
 import { Folder } from 'lucide-react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { SwipeableTaskItem } from '../swipeable-task-item';
@@ -22,6 +23,12 @@ export function SomedayView() {
   const router = useRouter();
 
   const tc = useThemeColors();
+  const insets = useSafeAreaInsets();
+  const navBarInset = Platform.OS === 'android' && insets.bottom >= 24 ? insets.bottom : 0;
+  const taskListContentStyle = useMemo(
+    () => [styles.taskListContent, navBarInset ? { paddingBottom: 16 + navBarInset } : null],
+    [navBarInset],
+  );
 
   const somedayTasks = tasks
     .filter((t) => !t.deletedAt && t.status === 'someday')
@@ -85,7 +92,7 @@ export function SomedayView() {
         </View>
       </View>
 
-      <ScrollView style={styles.taskList} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.taskList} showsVerticalScrollIndicator={false} contentContainerStyle={taskListContentStyle}>
         {deferredProjects.length > 0 && (
           <View style={[styles.projectSection, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
             <Text style={[styles.sectionLabel, { color: tc.secondaryText }]}>
@@ -187,6 +194,8 @@ const styles = StyleSheet.create({
   },
   taskList: {
     flex: 1,
+  },
+  taskListContent: {
     padding: 16,
   },
   projectSection: {
