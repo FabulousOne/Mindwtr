@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme as useSystemColorScheme } from 'react-native';
+import { useTaskStore } from '@mindwtr/core';
 
 type ThemeMode = 'system' | 'light' | 'dark' | 'material3-light' | 'material3-dark' | 'eink' | 'nord' | 'sepia' | 'oled';
 type ThemePreset = 'default' | 'eink' | 'nord' | 'sepia' | 'oled';
@@ -28,6 +29,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
     const [themeStyle, setThemeStyleState] = useState<ThemeStyle>('default');
     const [isReady, setIsReady] = useState(false);
+    const syncedTheme = useTaskStore((state) => state.settings?.theme);
 
     const themePreset: ThemePreset =
         themeMode === 'eink' ? 'eink' :
@@ -54,6 +56,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         loadThemePreference();
     }, []);
+
+    useEffect(() => {
+        if (!syncedTheme) return;
+        if (syncedTheme === themeMode) return;
+        void setThemeMode(syncedTheme);
+    }, [syncedTheme, themeMode]);
 
     const loadThemePreference = async () => {
         try {
