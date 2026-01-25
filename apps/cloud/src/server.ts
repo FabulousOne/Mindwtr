@@ -116,6 +116,18 @@ async function main() {
     const maxBodyBytes = Number(process.env.MINDWTR_CLOUD_MAX_BODY_BYTES || 2_000_000);
     const maxAttachmentBytes = Number(process.env.MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES || 50_000_000);
     const encoder = new TextEncoder();
+    const rateLimitCleanupMs = Number(process.env.MINDWTR_CLOUD_RATE_CLEANUP_MS || 60_000);
+    const cleanupTimer = setInterval(() => {
+        const now = Date.now();
+        for (const [key, state] of rateLimits.entries()) {
+            if (now > state.resetAt) {
+                rateLimits.delete(key);
+            }
+        }
+    }, rateLimitCleanupMs);
+    if (typeof cleanupTimer.unref === 'function') {
+        cleanupTimer.unref();
+    }
 
     console.log(`[mindwtr-cloud] dataDir: ${dataDir}`);
     console.log(`[mindwtr-cloud] listening on http://${host}:${port}`);
