@@ -230,6 +230,16 @@ type DerivedCache = {
 
 let derivedCache: DerivedCache | null = null;
 
+type SaveBaseState = Pick<TaskStore, '_allTasks' | '_allProjects' | '_allSections' | '_allAreas' | 'settings'>;
+
+const buildSaveSnapshot = (state: SaveBaseState, overrides?: Partial<AppData>): AppData => ({
+    tasks: overrides?.tasks ?? state._allTasks,
+    projects: overrides?.projects ?? state._allProjects,
+    sections: overrides?.sections ?? state._allSections,
+    areas: overrides?.areas ?? state._allAreas,
+    settings: overrides?.settings ?? state.settings,
+});
+
 const computeDerivedState = (tasks: Task[], projects: Project[]): DerivedState => {
     const projectMap = new Map<string, Project>();
     const tasksById = new Map<string, Task>();
@@ -726,9 +736,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const resolvedProjectId = initialProps?.projectId;
         const resolvedSectionId = resolvedProjectId ? initialProps?.sectionId : undefined;
         const resolvedAreaId = resolvedProjectId ? undefined : initialProps?.areaId;
-        const resolvedOrderNum = !hasOrderNum && resolvedProjectId
-            ? getNextProjectOrder(resolvedProjectId, get()._allTasks)
-            : initialProps?.orderNum;
         const referenceClears = resolvedStatus === 'reference'
             ? {
                 startTime: undefined,
@@ -742,37 +749,40 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                 pushCount: 0,
             }
             : {};
-        const newTask: Task = {
-            id: uuidv4(),
-            title,
-            status: resolvedStatus,
-            taskMode: 'task',
-            tags: [],
-            contexts: [],
-            pushCount: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            ...initialProps,
-            ...referenceClears,
-            areaId: resolvedAreaId,
-            projectId: resolvedProjectId,
-            sectionId: resolvedSectionId,
-            orderNum: resolvedOrderNum,
-        };
+        const now = new Date().toISOString();
+        let snapshot: AppData | null = null;
 
-        const newAllTasks = [...get()._allTasks, newTask];
-        const newVisibleTasks = updateVisibleTasks(get().tasks, null, newTask);
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        set((state) => {
+            const resolvedOrderNum = !hasOrderNum && resolvedProjectId
+                ? getNextProjectOrder(resolvedProjectId, state._allTasks)
+                : initialProps?.orderNum;
+            const newTask: Task = {
+                id: uuidv4(),
+                title,
+                status: resolvedStatus,
+                taskMode: 'task',
+                tags: [],
+                contexts: [],
+                pushCount: 0,
+                createdAt: now,
+                updatedAt: now,
+                ...initialProps,
+                ...referenceClears,
+                areaId: resolvedAreaId,
+                projectId: resolvedProjectId,
+                sectionId: resolvedSectionId,
+                orderNum: resolvedOrderNum,
+            };
+
+            const newAllTasks = [...state._allTasks, newTask];
+            const newVisibleTasks = updateVisibleTasks(state.tasks, null, newTask);
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks });
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
+        });
+
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -783,8 +793,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     updateTask: async (id: string, updates: Partial<Task>) => {
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        let nextAllTasks: Task[] | null = null;
-        let nextVisibleTasks: Task[] | null = null;
+        let snapshot: AppData | null = null;
         set((state) => {
             const oldTask = state._allTasks.find((t) => t.id === id);
             if (!oldTask) return state;
@@ -848,24 +857,13 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             if (nextRecurringTask) {
                 updatedVisibleTasks = updateVisibleTasks(updatedVisibleTasks, null, nextRecurringTask);
             }
-            nextAllTasks = updatedAllTasks;
-            nextVisibleTasks = updatedVisibleTasks;
+            snapshot = buildSaveSnapshot(state, { tasks: updatedAllTasks });
             return { tasks: updatedVisibleTasks, _allTasks: updatedAllTasks, lastDataChangeAt: changeAt };
         });
 
-        if (!nextAllTasks || !nextVisibleTasks) {
-            return;
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
         }
-        debouncedSave(
-            {
-                tasks: nextAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
     },
 
     /**
@@ -875,26 +873,23 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     deleteTask: async (id: string) => {
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const oldTask = get()._allTasks.find((task) => task.id === id);
-        const updatedTask = oldTask ? { ...oldTask, deletedAt: now, updatedAt: now } : null;
-        // Update in full data (set tombstone)
-        const newAllTasks = get()._allTasks.map((task) =>
-            task.id === id ? (updatedTask ?? task) : task
-        );
-        // Filter for UI state (hide deleted)
-        const newVisibleTasks = updateVisibleTasks(get().tasks, oldTask, updatedTask);
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        // Save with all data including tombstones
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const oldTask = state._allTasks.find((task) => task.id === id);
+            if (!oldTask) return state;
+            const updatedTask = { ...oldTask, deletedAt: now, updatedAt: now };
+            // Update in full data (set tombstone)
+            const newAllTasks = state._allTasks.map((task) =>
+                task.id === id ? updatedTask : task
+            );
+            // Filter for UI state (hide deleted)
+            const newVisibleTasks = updateVisibleTasks(state.tasks, oldTask, updatedTask);
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks });
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -903,33 +898,27 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     restoreTask: async (id: string) => {
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const oldTask = get()._allTasks.find((task) => task.id === id);
-        const updatedTask = oldTask
-            ? {
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const oldTask = state._allTasks.find((task) => task.id === id);
+            if (!oldTask) return state;
+            const updatedTask = {
                 ...oldTask,
                 deletedAt: undefined,
                 purgedAt: undefined,
                 status: oldTask.status === 'archived' ? 'inbox' : oldTask.status,
                 updatedAt: now,
-            }
-            : null;
-        const newAllTasks = get()._allTasks.map((task) =>
-            task.id === id
-                ? (updatedTask ?? task)
-                : task
-        );
-        const newVisibleTasks = updateVisibleTasks(get().tasks, oldTask, updatedTask);
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+            };
+            const newAllTasks = state._allTasks.map((task) =>
+                task.id === id ? updatedTask : task
+            );
+            const newVisibleTasks = updateVisibleTasks(state.tasks, oldTask, updatedTask);
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks });
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -938,29 +927,26 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     purgeTask: async (id: string) => {
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const oldTask = get()._allTasks.find((task) => task.id === id);
-        if (!oldTask) return;
-        const updatedTask = {
-            ...oldTask,
-            deletedAt: oldTask.deletedAt ?? now,
-            purgedAt: now,
-            updatedAt: now,
-        };
-        const newAllTasks = get()._allTasks.map((task) =>
-            task.id === id ? updatedTask : task
-        );
-        const newVisibleTasks = updateVisibleTasks(get().tasks, oldTask, updatedTask);
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const oldTask = state._allTasks.find((task) => task.id === id);
+            if (!oldTask) return state;
+            const updatedTask = {
+                ...oldTask,
+                deletedAt: oldTask.deletedAt ?? now,
+                purgedAt: now,
+                updatedAt: now,
+            };
+            const newAllTasks = state._allTasks.map((task) =>
+                task.id === id ? updatedTask : task
+            );
+            const newVisibleTasks = updateVisibleTasks(state.tasks, oldTask, updatedTask);
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks });
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -969,23 +955,20 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     purgeDeletedTasks: async () => {
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const newAllTasks = get()._allTasks.map((task) =>
-            task.deletedAt
-                ? { ...task, purgedAt: now, updatedAt: now }
-                : task
-        );
-        const newVisibleTasks = get().tasks.filter((task) => !task.deletedAt && task.status !== 'archived');
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const newAllTasks = state._allTasks.map((task) =>
+                task.deletedAt
+                    ? { ...task, purgedAt: now, updatedAt: now }
+                    : task
+            );
+            const newVisibleTasks = newAllTasks.filter((task) => !task.deletedAt && task.status !== 'archived');
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks });
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -994,57 +977,54 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     duplicateTask: async (id: string, asNextAction?: boolean) => {
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const sourceTask = get()._allTasks.find((task) => task.id === id && !task.deletedAt);
-        if (!sourceTask) return;
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const sourceTask = state._allTasks.find((task) => task.id === id && !task.deletedAt);
+            if (!sourceTask) return state;
 
-        const duplicatedChecklist = (sourceTask.checklist || []).map((item) => ({
-            ...item,
-            id: uuidv4(),
-            isCompleted: false,
-        }));
-        const duplicatedAttachments = (sourceTask.attachments || []).map((attachment) => ({
-            ...attachment,
-            id: uuidv4(),
-            createdAt: now,
-            updatedAt: now,
-            deletedAt: undefined,
-        }));
+            const duplicatedChecklist = (sourceTask.checklist || []).map((item) => ({
+                ...item,
+                id: uuidv4(),
+                isCompleted: false,
+            }));
+            const duplicatedAttachments = (sourceTask.attachments || []).map((attachment) => ({
+                ...attachment,
+                id: uuidv4(),
+                createdAt: now,
+                updatedAt: now,
+                deletedAt: undefined,
+            }));
 
-        const newTask: Task = {
-            ...sourceTask,
-            id: uuidv4(),
-            title: `${sourceTask.title} (Copy)`,
-            status: asNextAction ? 'next' : 'inbox',
-            checklist: duplicatedChecklist.length > 0 ? duplicatedChecklist : undefined,
-            attachments: duplicatedAttachments.length > 0 ? duplicatedAttachments : undefined,
-            startTime: undefined,
-            dueDate: undefined,
-            recurrence: undefined,
-            reviewAt: undefined,
-            completedAt: undefined,
-            isFocusedToday: false,
-            pushCount: 0,
-            deletedAt: undefined,
-            createdAt: now,
-            updatedAt: now,
-            orderNum: sourceTask.projectId
-                ? getNextProjectOrder(sourceTask.projectId, get()._allTasks)
-                : undefined,
-        };
+            const newTask: Task = {
+                ...sourceTask,
+                id: uuidv4(),
+                title: `${sourceTask.title} (Copy)`,
+                status: asNextAction ? 'next' : 'inbox',
+                checklist: duplicatedChecklist.length > 0 ? duplicatedChecklist : undefined,
+                attachments: duplicatedAttachments.length > 0 ? duplicatedAttachments : undefined,
+                startTime: undefined,
+                dueDate: undefined,
+                recurrence: undefined,
+                reviewAt: undefined,
+                completedAt: undefined,
+                isFocusedToday: false,
+                pushCount: 0,
+                deletedAt: undefined,
+                createdAt: now,
+                updatedAt: now,
+                orderNum: sourceTask.projectId
+                    ? getNextProjectOrder(sourceTask.projectId, state._allTasks)
+                    : undefined,
+            };
 
-        const newAllTasks = [...get()._allTasks, newTask];
-        const newVisibleTasks = updateVisibleTasks(get().tasks, null, newTask);
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+            const newAllTasks = [...state._allTasks, newTask];
+            const newVisibleTasks = updateVisibleTasks(state.tasks, null, newTask);
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks });
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -1053,38 +1033,35 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     resetTaskChecklist: async (id: string) => {
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const sourceTask = get()._allTasks.find((task) => task.id === id && !task.deletedAt);
-        if (!sourceTask || !sourceTask.checklist || sourceTask.checklist.length === 0) return;
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const sourceTask = state._allTasks.find((task) => task.id === id && !task.deletedAt);
+            if (!sourceTask || !sourceTask.checklist || sourceTask.checklist.length === 0) return state;
 
-        const resetChecklist = sourceTask.checklist.map((item) => ({
-            ...item,
-            isCompleted: false,
-        }));
-        const wasDone = sourceTask.status === 'done';
-        const nextStatus: TaskStatus = wasDone ? 'next' : sourceTask.status;
+            const resetChecklist = sourceTask.checklist.map((item) => ({
+                ...item,
+                isCompleted: false,
+            }));
+            const wasDone = sourceTask.status === 'done';
+            const nextStatus: TaskStatus = wasDone ? 'next' : sourceTask.status;
 
-        const updatedTask: Task = {
-            ...sourceTask,
-            checklist: resetChecklist,
-            status: nextStatus,
-            completedAt: wasDone ? undefined : sourceTask.completedAt,
-            isFocusedToday: wasDone ? false : sourceTask.isFocusedToday,
-            updatedAt: now,
-        };
+            const updatedTask: Task = {
+                ...sourceTask,
+                checklist: resetChecklist,
+                status: nextStatus,
+                completedAt: wasDone ? undefined : sourceTask.completedAt,
+                isFocusedToday: wasDone ? false : sourceTask.isFocusedToday,
+                updatedAt: now,
+            };
 
-        const newAllTasks = get()._allTasks.map((task) => (task.id === id ? updatedTask : task));
-        const newVisibleTasks = updateVisibleTasks(get().tasks, sourceTask, updatedTask);
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+            const newAllTasks = state._allTasks.map((task) => (task.id === id ? updatedTask : task));
+            const newVisibleTasks = updateVisibleTasks(state.tasks, sourceTask, updatedTask);
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks });
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -1151,24 +1128,21 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const changeAt = Date.now();
         const now = new Date().toISOString();
         const idSet = new Set(ids);
-        let newVisibleTasks = get().tasks;
-        const newAllTasks = get()._allTasks.map((task) => {
-            if (!idSet.has(task.id)) return task;
-            const updatedTask = { ...task, deletedAt: now, updatedAt: now };
-            newVisibleTasks = updateVisibleTasks(newVisibleTasks, task, updatedTask);
-            return updatedTask;
+        let snapshot: AppData | null = null;
+        set((state) => {
+            let newVisibleTasks = state.tasks;
+            const newAllTasks = state._allTasks.map((task) => {
+                if (!idSet.has(task.id)) return task;
+                const updatedTask = { ...task, deletedAt: now, updatedAt: now };
+                newVisibleTasks = updateVisibleTasks(newVisibleTasks, task, updatedTask);
+                return updatedTask;
+            });
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks });
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
         });
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     queryTasks: async (options: TaskQueryOptions) => {
@@ -1197,36 +1171,36 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
      */
     addProject: async (title: string, color: string, initialProps?: Partial<Project>) => {
         const changeAt = Date.now();
-        const targetAreaId = initialProps?.areaId;
-        const maxOrder = get()._allProjects
-            .filter((project) => (project.areaId ?? undefined) === (targetAreaId ?? undefined))
-            .reduce((max, project) => Math.max(max, Number.isFinite(project.order) ? project.order : -1), -1);
-        const baseOrder = Number.isFinite(initialProps?.order) ? (initialProps?.order as number) : maxOrder + 1;
-        const newProject: Project = {
-            id: uuidv4(),
-            title,
-            color,
-            order: baseOrder,
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            ...initialProps,
-            tagIds: initialProps?.tagIds ?? [],
-        };
-        const newAllProjects = [...get()._allProjects, newProject];
-        const newVisibleProjects = [...get().projects, newProject];
-        set({ projects: newVisibleProjects, _allProjects: newAllProjects, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: get()._allTasks,
-                projects: newAllProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
-        return newProject;
+        let snapshot: AppData | null = null;
+        let createdProject: Project | null = null;
+        set((state) => {
+            const targetAreaId = initialProps?.areaId;
+            const maxOrder = state._allProjects
+                .filter((project) => (project.areaId ?? undefined) === (targetAreaId ?? undefined))
+                .reduce((max, project) => Math.max(max, Number.isFinite(project.order) ? project.order : -1), -1);
+            const baseOrder = Number.isFinite(initialProps?.order) ? (initialProps?.order as number) : maxOrder + 1;
+            const now = new Date().toISOString();
+            const newProject: Project = {
+                id: uuidv4(),
+                title,
+                color,
+                order: baseOrder,
+                status: 'active',
+                createdAt: now,
+                updatedAt: now,
+                ...initialProps,
+                tagIds: initialProps?.tagIds ?? [],
+            };
+            createdProject = newProject;
+            const newAllProjects = [...state._allProjects, newProject];
+            const newVisibleProjects = [...state.projects, newProject];
+            snapshot = buildSaveSnapshot(state, { projects: newAllProjects });
+            return { projects: newVisibleProjects, _allProjects: newAllProjects, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
+        return createdProject as Project;
     },
 
     /**
@@ -1237,36 +1211,38 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     updateProject: async (id: string, updates: Partial<Project>) => {
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const allProjects = get()._allProjects;
-        const oldProject = allProjects.find(p => p.id === id);
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const allProjects = state._allProjects;
+            const oldProject = allProjects.find(p => p.id === id);
+            if (!oldProject) return state;
 
-        const incomingStatus = updates.status ?? oldProject?.status;
-        const statusChanged = !!oldProject && !!incomingStatus && incomingStatus !== oldProject.status;
+            const incomingStatus = updates.status ?? oldProject.status;
+            const statusChanged = incomingStatus !== oldProject.status;
 
-        let newAllTasks = get()._allTasks;
+            let newAllTasks = state._allTasks;
 
-        if (statusChanged && incomingStatus === 'archived') {
-            const taskStatus: TaskStatus = 'archived';
-            newAllTasks = newAllTasks.map(task => {
-                if (
-                    task.projectId === id &&
-                    !task.deletedAt &&
-                    task.status !== taskStatus
-                ) {
-                    return {
-                        ...task,
-                        status: taskStatus,
-                        completedAt: task.completedAt || now,
-                        isFocusedToday: false,
-                        updatedAt: now,
-                    };
-                }
-                return task;
-            });
-        }
+            if (statusChanged && incomingStatus === 'archived') {
+                const taskStatus: TaskStatus = 'archived';
+                newAllTasks = newAllTasks.map(task => {
+                    if (
+                        task.projectId === id &&
+                        !task.deletedAt &&
+                        task.status !== taskStatus
+                    ) {
+                        return {
+                            ...task,
+                            status: taskStatus,
+                            completedAt: task.completedAt || now,
+                            isFocusedToday: false,
+                            updatedAt: now,
+                        };
+                    }
+                    return task;
+                });
+            }
 
-        let adjustedOrder = updates.order;
-        if (oldProject) {
+            let adjustedOrder = updates.order;
             const nextAreaId = updates.areaId ?? oldProject.areaId;
             const areaChanged = updates.areaId !== undefined && updates.areaId !== oldProject.areaId;
             if (areaChanged && !Number.isFinite(adjustedOrder)) {
@@ -1275,41 +1251,35 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                     .reduce((max, project) => Math.max(max, Number.isFinite(project.order) ? project.order : -1), -1);
                 adjustedOrder = maxOrder + 1;
             }
-        }
 
-        const finalProjectUpdates: Partial<Project> = {
-            ...updates,
-            ...(Number.isFinite(adjustedOrder) ? { order: adjustedOrder } : {}),
-            ...(statusChanged && incomingStatus && incomingStatus !== 'active'
-                ? { isFocused: false }
-                : {}),
-        };
+            const finalProjectUpdates: Partial<Project> = {
+                ...updates,
+                ...(Number.isFinite(adjustedOrder) ? { order: adjustedOrder } : {}),
+                ...(statusChanged && incomingStatus !== 'active'
+                    ? { isFocused: false }
+                    : {}),
+            };
 
-        const newAllProjects = allProjects.map(project =>
-            project.id === id ? { ...project, ...finalProjectUpdates, updatedAt: now } : project
-        );
+            const newAllProjects = allProjects.map(project =>
+                project.id === id ? { ...project, ...finalProjectUpdates, updatedAt: now } : project
+            );
 
-        const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
-        const newVisibleTasks = newAllTasks.filter(t => !t.deletedAt && t.status !== 'archived');
+            const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
+            const newVisibleTasks = newAllTasks.filter(t => !t.deletedAt && t.status !== 'archived');
 
-        set({
-            projects: newVisibleProjects,
-            _allProjects: newAllProjects,
-            tasks: newVisibleTasks,
-            _allTasks: newAllTasks,
-            lastDataChangeAt: changeAt,
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks, projects: newAllProjects });
+            return {
+                projects: newVisibleProjects,
+                _allProjects: newAllProjects,
+                tasks: newVisibleTasks,
+                _allTasks: newAllTasks,
+                lastDataChangeAt: changeAt,
+            };
         });
 
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: newAllProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -1319,45 +1289,45 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     deleteProject: async (id: string) => {
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        // Soft-delete project
-        const newAllProjects = get()._allProjects.map((project) =>
-            project.id === id ? { ...project, deletedAt: now, updatedAt: now } : project
-        );
-        const newAllSections = get()._allSections.map((section) =>
-            section.projectId === id && !section.deletedAt
-                ? { ...section, deletedAt: now, updatedAt: now }
-                : section
-        );
-        // Also soft-delete tasks that belonged to this project
-        const newAllTasks = get()._allTasks.map(task =>
-            task.projectId === id && !task.deletedAt
-                ? { ...task, deletedAt: now, updatedAt: now, sectionId: undefined }
-                : task
-        );
-        // Filter for UI state
-        const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
-        const newVisibleTasks = newAllTasks.filter(t => !t.deletedAt && t.status !== 'archived');
-        const newVisibleSections = newAllSections.filter((section) => !section.deletedAt);
-        set({
-            projects: newVisibleProjects,
-            tasks: newVisibleTasks,
-            sections: newVisibleSections,
-            _allProjects: newAllProjects,
-            _allTasks: newAllTasks,
-            _allSections: newAllSections,
-            lastDataChangeAt: changeAt,
-        });
-        // Save with all data including tombstones
-        debouncedSave(
-            {
+        let snapshot: AppData | null = null;
+        set((state) => {
+            // Soft-delete project
+            const newAllProjects = state._allProjects.map((project) =>
+                project.id === id ? { ...project, deletedAt: now, updatedAt: now } : project
+            );
+            const newAllSections = state._allSections.map((section) =>
+                section.projectId === id && !section.deletedAt
+                    ? { ...section, deletedAt: now, updatedAt: now }
+                    : section
+            );
+            // Also soft-delete tasks that belonged to this project
+            const newAllTasks = state._allTasks.map(task =>
+                task.projectId === id && !task.deletedAt
+                    ? { ...task, deletedAt: now, updatedAt: now, sectionId: undefined }
+                    : task
+            );
+            // Filter for UI state
+            const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
+            const newVisibleTasks = newAllTasks.filter(t => !t.deletedAt && t.status !== 'archived');
+            const newVisibleSections = newAllSections.filter((section) => !section.deletedAt);
+            snapshot = buildSaveSnapshot(state, {
                 tasks: newAllTasks,
                 projects: newAllProjects,
                 sections: newAllSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+            });
+            return {
+                projects: newVisibleProjects,
+                tasks: newVisibleTasks,
+                sections: newVisibleSections,
+                _allProjects: newAllProjects,
+                _allTasks: newAllTasks,
+                _allSections: newAllSections,
+                lastDataChangeAt: changeAt,
+            };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -1366,145 +1336,134 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
      * @param id Project ID
      */
     toggleProjectFocus: async (id: string) => {
-        const allProjects = get()._allProjects;
-        const project = allProjects.find(p => p.id === id);
-        if (!project) return;
-        if (project.status !== 'active' && !project.isFocused) return;
-
-        // If turning on focus, check if we already have 5 focused
-        const focusedCount = allProjects.filter(p => p.isFocused && !p.deletedAt).length;
-        const isCurrentlyFocused = project.isFocused;
-
-        // Don't allow more than 5 focused projects
-        if (!isCurrentlyFocused && focusedCount >= 5) {
-            return;
-        }
-
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const newAllProjects = allProjects.map(p =>
-            p.id === id ? { ...p, isFocused: !p.isFocused, updatedAt: now } : p
-        );
-        const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
-        set({ projects: newVisibleProjects, _allProjects: newAllProjects, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: get()._allTasks,
-                projects: newAllProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const allProjects = state._allProjects;
+            const project = allProjects.find(p => p.id === id);
+            if (!project) return state;
+            if (project.status !== 'active' && !project.isFocused) return state;
+
+            // If turning on focus, check if we already have 5 focused
+            const focusedCount = allProjects.filter(p => p.isFocused && !p.deletedAt).length;
+            const isCurrentlyFocused = project.isFocused;
+
+            // Don't allow more than 5 focused projects
+            if (!isCurrentlyFocused && focusedCount >= 5) {
+                return state;
+            }
+
+            const newAllProjects = allProjects.map(p =>
+                p.id === id ? { ...p, isFocused: !p.isFocused, updatedAt: now } : p
+            );
+            const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
+            snapshot = buildSaveSnapshot(state, { projects: newAllProjects });
+            return { projects: newVisibleProjects, _allProjects: newAllProjects, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     addSection: async (projectId: string, title: string, initialProps?: Partial<Section>) => {
         const trimmedTitle = typeof title === 'string' ? title.trim() : '';
         if (!projectId || !trimmedTitle) return null;
-        const projectExists = get()._allProjects.some((project) => project.id === projectId && !project.deletedAt);
-        if (!projectExists) return null;
-
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const allSections = get()._allSections;
-        const maxOrder = allSections
-            .filter((section) => section.projectId === projectId && !section.deletedAt)
-            .reduce((max, section) => Math.max(max, Number.isFinite(section.order) ? section.order : -1), -1);
-        const baseOrder = Number.isFinite(initialProps?.order) ? (initialProps?.order as number) : maxOrder + 1;
-        const newSection: Section = {
-            id: uuidv4(),
-            projectId,
-            title: trimmedTitle,
-            description: initialProps?.description,
-            order: baseOrder,
-            isCollapsed: initialProps?.isCollapsed ?? false,
-            createdAt: initialProps?.createdAt ?? now,
-            updatedAt: now,
-        };
-        const newAllSections = [...allSections, newSection];
-        const newVisibleSections = [...get().sections, newSection];
-        set({ sections: newVisibleSections, _allSections: newAllSections, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: get()._allTasks,
-                projects: get()._allProjects,
-                sections: newAllSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
-        return newSection;
+        let snapshot: AppData | null = null;
+        let createdSection: Section | null = null;
+        set((state) => {
+            const projectExists = state._allProjects.some((project) => project.id === projectId && !project.deletedAt);
+            if (!projectExists) return state;
+            const allSections = state._allSections;
+            const maxOrder = allSections
+                .filter((section) => section.projectId === projectId && !section.deletedAt)
+                .reduce((max, section) => Math.max(max, Number.isFinite(section.order) ? section.order : -1), -1);
+            const baseOrder = Number.isFinite(initialProps?.order) ? (initialProps?.order as number) : maxOrder + 1;
+            const newSection: Section = {
+                id: uuidv4(),
+                projectId,
+                title: trimmedTitle,
+                description: initialProps?.description,
+                order: baseOrder,
+                isCollapsed: initialProps?.isCollapsed ?? false,
+                createdAt: initialProps?.createdAt ?? now,
+                updatedAt: now,
+            };
+            createdSection = newSection;
+            const newAllSections = [...allSections, newSection];
+            const newVisibleSections = [...state.sections, newSection];
+            snapshot = buildSaveSnapshot(state, { sections: newAllSections });
+            return { sections: newVisibleSections, _allSections: newAllSections, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
+        return createdSection;
     },
 
     updateSection: async (id: string, updates: Partial<Section>) => {
-        const allSections = get()._allSections;
-        const section = allSections.find((item) => item.id === id);
-        if (!section) return;
-        const nextTitle = updates.title !== undefined ? updates.title.trim() : section.title;
-        if (!nextTitle) return;
-        const { projectId: _ignored, ...restUpdates } = updates;
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const newAllSections = allSections.map((item) =>
-            item.id === id
-                ? {
-                    ...item,
-                    ...restUpdates,
-                    title: nextTitle,
-                    updatedAt: now,
-                }
-                : item
-        );
-        const newVisibleSections = newAllSections.filter((item) => !item.deletedAt);
-        set({ sections: newVisibleSections, _allSections: newAllSections, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: get()._allTasks,
-                projects: get()._allProjects,
-                sections: newAllSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const allSections = state._allSections;
+            const section = allSections.find((item) => item.id === id);
+            if (!section) return state;
+            const nextTitle = updates.title !== undefined ? updates.title.trim() : section.title;
+            if (!nextTitle) return state;
+            const { projectId: _ignored, ...restUpdates } = updates;
+            const newAllSections = allSections.map((item) =>
+                item.id === id
+                    ? {
+                        ...item,
+                        ...restUpdates,
+                        title: nextTitle,
+                        updatedAt: now,
+                    }
+                    : item
+            );
+            const newVisibleSections = newAllSections.filter((item) => !item.deletedAt);
+            snapshot = buildSaveSnapshot(state, { sections: newAllSections });
+            return { sections: newVisibleSections, _allSections: newAllSections, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     deleteSection: async (id: string) => {
-        const allSections = get()._allSections;
-        const section = allSections.find((item) => item.id === id);
-        if (!section) return;
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const newAllSections = allSections.map((item) =>
-            item.id === id
-                ? { ...item, deletedAt: now, updatedAt: now }
-                : item
-        );
-        const newAllTasks = get()._allTasks.map((task) => {
-            if (task.sectionId !== id) return task;
-            return { ...task, sectionId: undefined, updatedAt: now };
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const allSections = state._allSections;
+            const section = allSections.find((item) => item.id === id);
+            if (!section) return state;
+            const newAllSections = allSections.map((item) =>
+                item.id === id
+                    ? { ...item, deletedAt: now, updatedAt: now }
+                    : item
+            );
+            const newAllTasks = state._allTasks.map((task) => {
+                if (task.sectionId !== id) return task;
+                return { ...task, sectionId: undefined, updatedAt: now };
+            });
+            const newVisibleSections = newAllSections.filter((item) => !item.deletedAt);
+            const newVisibleTasks = newAllTasks.filter((task) => !task.deletedAt && task.status !== 'archived');
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks, sections: newAllSections });
+            return {
+                sections: newVisibleSections,
+                _allSections: newAllSections,
+                tasks: newVisibleTasks,
+                _allTasks: newAllTasks,
+                lastDataChangeAt: changeAt,
+            };
         });
-        const newVisibleSections = newAllSections.filter((item) => !item.deletedAt);
-        const newVisibleTasks = newAllTasks.filter((task) => !task.deletedAt && task.status !== 'archived');
-        set({
-            sections: newVisibleSections,
-            _allSections: newAllSections,
-            tasks: newVisibleTasks,
-            _allTasks: newAllTasks,
-            lastDataChangeAt: changeAt,
-        });
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: newAllSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     addArea: async (name: string, initialProps?: Partial<Area>) => {
@@ -1512,183 +1471,172 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         if (!trimmedName) return null;
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const allAreas = get()._allAreas;
         const normalized = trimmedName.toLowerCase();
-        const existing = allAreas.find((area) => area?.name?.trim().toLowerCase() === normalized);
-        if (existing) {
-            if (initialProps && Object.keys(initialProps).length > 0) {
-                await get().updateArea(existing.id, { ...initialProps });
+        let snapshot: AppData | null = null;
+        let createdArea: Area | null = null;
+        let existingAreaId: string | null = null;
+        set((state) => {
+            const allAreas = state._allAreas;
+            const existing = allAreas.find((area) => area?.name?.trim().toLowerCase() === normalized);
+            if (existing) {
+                existingAreaId = existing.id;
+                return state;
             }
-            return get()._allAreas.find((area) => area.id === existing.id) ?? existing;
+            const maxOrder = allAreas.reduce(
+                (max, area) => Math.max(max, Number.isFinite(area.order) ? area.order : -1),
+                -1
+            );
+            const baseOrder = Number.isFinite(initialProps?.order) ? (initialProps?.order as number) : maxOrder + 1;
+            const newArea: Area = {
+                id: uuidv4(),
+                name: trimmedName,
+                ...initialProps,
+                order: baseOrder,
+                createdAt: initialProps?.createdAt ?? now,
+                updatedAt: now,
+            };
+            createdArea = newArea;
+            const newAllAreas = [...allAreas, newArea].sort((a, b) => a.order - b.order);
+            derivedCache = null;
+            snapshot = buildSaveSnapshot(state, { areas: newAllAreas });
+            return { areas: newAllAreas, _allAreas: newAllAreas, lastDataChangeAt: changeAt };
+        });
+        if (existingAreaId) {
+            if (initialProps && Object.keys(initialProps).length > 0) {
+                await get().updateArea(existingAreaId, { ...initialProps });
+            }
+            return get()._allAreas.find((area) => area.id === existingAreaId) ?? null;
         }
-        const maxOrder = allAreas.reduce(
-            (max, area) => Math.max(max, Number.isFinite(area.order) ? area.order : -1),
-            -1
-        );
-        const baseOrder = Number.isFinite(initialProps?.order) ? (initialProps?.order as number) : maxOrder + 1;
-        const newArea: Area = {
-            id: uuidv4(),
-            name: trimmedName,
-            ...initialProps,
-            order: baseOrder,
-            createdAt: initialProps?.createdAt ?? now,
-            updatedAt: now,
-        };
-        const newAllAreas = [...allAreas, newArea].sort((a, b) => a.order - b.order);
-        derivedCache = null;
-        set({ areas: newAllAreas, _allAreas: newAllAreas, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: get()._allTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: newAllAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
-        return newArea;
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
+        return createdArea;
     },
 
     updateArea: async (id: string, updates: Partial<Area>) => {
-        const allAreas = get()._allAreas;
-        const area = allAreas.find(a => a.id === id);
-        if (!area) return;
-        if (updates.name) {
-            const trimmedName = updates.name.trim();
-            if (!trimmedName) return;
-            const normalized = trimmedName.toLowerCase();
-            const existing = allAreas.find((a) => a.id !== id && a?.name?.trim().toLowerCase() === normalized);
-            if (existing) {
-                const now = new Date().toISOString();
-                const mergedArea: Area = { ...existing, ...updates, name: trimmedName, updatedAt: now };
-                const newAllAreas = allAreas
-                    .filter((a) => a.id !== id && a.id !== existing.id)
-                    .concat(mergedArea)
-                    .sort((a, b) => a.order - b.order);
-                const newAllProjects = get()._allProjects.map((project) => {
-                    if (project.areaId !== id) return project;
-                    return { ...project, areaId: existing.id, updatedAt: now };
-                });
-                const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
-                derivedCache = null;
-                set({
-                    areas: newAllAreas,
-                    _allAreas: newAllAreas,
-                    projects: newVisibleProjects,
-                    _allProjects: newAllProjects,
-                    lastDataChangeAt: Date.now(),
-                });
-                debouncedSave(
-                    {
-                        tasks: get()._allTasks,
-                        projects: newAllProjects,
-                        sections: get()._allSections,
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const allAreas = state._allAreas;
+            const area = allAreas.find(a => a.id === id);
+            if (!area) return state;
+            if (updates.name) {
+                const trimmedName = updates.name.trim();
+                if (!trimmedName) return state;
+                const normalized = trimmedName.toLowerCase();
+                const existing = allAreas.find((a) => a.id !== id && a?.name?.trim().toLowerCase() === normalized);
+                if (existing) {
+                    const now = new Date().toISOString();
+                    const mergedArea: Area = { ...existing, ...updates, name: trimmedName, updatedAt: now };
+                    const newAllAreas = allAreas
+                        .filter((a) => a.id !== id && a.id !== existing.id)
+                        .concat(mergedArea)
+                        .sort((a, b) => a.order - b.order);
+                    const newAllProjects = state._allProjects.map((project) => {
+                        if (project.areaId !== id) return project;
+                        return { ...project, areaId: existing.id, updatedAt: now };
+                    });
+                    const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
+                    derivedCache = null;
+                    snapshot = buildSaveSnapshot(state, { areas: newAllAreas, projects: newAllProjects });
+                    return {
                         areas: newAllAreas,
-                        settings: get().settings,
-                    },
-                    (msg) => set({ error: msg })
-                );
-                return;
+                        _allAreas: newAllAreas,
+                        projects: newVisibleProjects,
+                        _allProjects: newAllProjects,
+                        lastDataChangeAt: Date.now(),
+                    };
+                }
             }
+            const changeAt = Date.now();
+            const now = new Date().toISOString();
+            const nextOrder = Number.isFinite(updates.order) ? (updates.order as number) : area.order;
+            const nextName = updates.name ? updates.name.trim() : area.name;
+            const newAllAreas = allAreas
+                .map(a => (a.id === id ? { ...a, ...updates, name: nextName, order: nextOrder, updatedAt: now } : a))
+                .sort((a, b) => a.order - b.order);
+            derivedCache = null;
+            snapshot = buildSaveSnapshot(state, { areas: newAllAreas });
+            return { areas: newAllAreas, _allAreas: newAllAreas, lastDataChangeAt: changeAt };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
         }
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
-        const nextOrder = Number.isFinite(updates.order) ? (updates.order as number) : area.order;
-        const nextName = updates.name ? updates.name.trim() : area.name;
-        const newAllAreas = allAreas
-            .map(a => (a.id === id ? { ...a, ...updates, name: nextName, order: nextOrder, updatedAt: now } : a))
-            .sort((a, b) => a.order - b.order);
-        derivedCache = null;
-        set({ areas: newAllAreas, _allAreas: newAllAreas, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: get()._allTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: newAllAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
     },
 
     deleteArea: async (id: string) => {
-        const allAreas = get()._allAreas;
-        const areaExists = allAreas.some(a => a.id === id);
-        if (!areaExists) return;
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const newAllAreas = allAreas.filter(a => a.id !== id).sort((a, b) => a.order - b.order);
-        const newAllProjects = get()._allProjects.map((project) => {
-            if (project.areaId !== id) return project;
-            return { ...project, areaId: undefined, areaTitle: undefined, updatedAt: now };
-        });
-        const newAllTasks = get()._allTasks.map((task) => {
-            if (task.areaId !== id) return task;
-            return { ...task, areaId: undefined, updatedAt: now };
-        });
-        const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
-        const newVisibleTasks = newAllTasks.filter((task) => !task.deletedAt && task.status !== 'archived');
-        derivedCache = null;
-        set({
-            areas: newAllAreas,
-            _allAreas: newAllAreas,
-            projects: newVisibleProjects,
-            _allProjects: newAllProjects,
-            tasks: newVisibleTasks,
-            _allTasks: newAllTasks,
-            lastDataChangeAt: changeAt,
-        });
-        debouncedSave(
-            {
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const allAreas = state._allAreas;
+            const areaExists = allAreas.some(a => a.id === id);
+            if (!areaExists) return state;
+            const newAllAreas = allAreas.filter(a => a.id !== id).sort((a, b) => a.order - b.order);
+            const newAllProjects = state._allProjects.map((project) => {
+                if (project.areaId !== id) return project;
+                return { ...project, areaId: undefined, areaTitle: undefined, updatedAt: now };
+            });
+            const newAllTasks = state._allTasks.map((task) => {
+                if (task.areaId !== id) return task;
+                return { ...task, areaId: undefined, updatedAt: now };
+            });
+            const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
+            const newVisibleTasks = newAllTasks.filter((task) => !task.deletedAt && task.status !== 'archived');
+            derivedCache = null;
+            snapshot = buildSaveSnapshot(state, {
                 tasks: newAllTasks,
                 projects: newAllProjects,
-                sections: get()._allSections,
                 areas: newAllAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+            });
+            return {
+                areas: newAllAreas,
+                _allAreas: newAllAreas,
+                projects: newVisibleProjects,
+                _allProjects: newAllProjects,
+                tasks: newVisibleTasks,
+                _allTasks: newAllTasks,
+                lastDataChangeAt: changeAt,
+            };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     reorderAreas: async (orderedIds: string[]) => {
         if (orderedIds.length === 0) return;
-        const allAreas = get()._allAreas;
-        const areaById = new Map(allAreas.map(area => [area.id, area]));
-        const seen = new Set<string>();
-        const now = new Date().toISOString();
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const allAreas = state._allAreas;
+            const areaById = new Map(allAreas.map(area => [area.id, area]));
+            const seen = new Set<string>();
+            const now = new Date().toISOString();
 
-        const reordered: Area[] = [];
-        orderedIds.forEach((id, index) => {
-            const area = areaById.get(id);
-            if (!area) return;
-            seen.add(id);
-            reordered.push({ ...area, order: index, updatedAt: now });
+            const reordered: Area[] = [];
+            orderedIds.forEach((id, index) => {
+                const area = areaById.get(id);
+                if (!area) return;
+                seen.add(id);
+                reordered.push({ ...area, order: index, updatedAt: now });
+            });
+
+            const remaining = allAreas
+                .filter(area => !seen.has(area.id))
+                .sort((a, b) => a.order - b.order)
+                .map((area, idx) => ({
+                    ...area,
+                    order: reordered.length + idx,
+                    updatedAt: now,
+                }));
+
+            const newAllAreas = [...reordered, ...remaining];
+            derivedCache = null;
+            snapshot = buildSaveSnapshot(state, { areas: newAllAreas });
+            return { areas: newAllAreas, _allAreas: newAllAreas, lastDataChangeAt: Date.now() };
         });
-
-        const remaining = allAreas
-            .filter(area => !seen.has(area.id))
-            .sort((a, b) => a.order - b.order)
-            .map((area, idx) => ({
-                ...area,
-                order: reordered.length + idx,
-                updatedAt: now,
-            }));
-
-        const newAllAreas = [...reordered, ...remaining];
-        derivedCache = null;
-        set({ areas: newAllAreas, _allAreas: newAllAreas, lastDataChangeAt: Date.now() });
-        debouncedSave(
-            {
-                tasks: get()._allTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: newAllAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     reorderProjects: async (orderedIds: string[], areaId?: string) => {
@@ -1696,93 +1644,87 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const changeAt = Date.now();
         const now = new Date().toISOString();
         const targetAreaId = areaId ?? undefined;
-        const allProjects = get()._allProjects;
-        const isInArea = (project: Project) => (project.areaId ?? undefined) === targetAreaId && !project.deletedAt;
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const allProjects = state._allProjects;
+            const isInArea = (project: Project) => (project.areaId ?? undefined) === targetAreaId && !project.deletedAt;
 
-        const areaProjects = allProjects.filter(isInArea);
-        const orderedSet = new Set(orderedIds);
-        const remaining = areaProjects
-            .filter((project) => !orderedSet.has(project.id))
-            .sort((a, b) => (Number.isFinite(a.order) ? a.order : 0) - (Number.isFinite(b.order) ? b.order : 0));
+            const areaProjects = allProjects.filter(isInArea);
+            const orderedSet = new Set(orderedIds);
+            const remaining = areaProjects
+                .filter((project) => !orderedSet.has(project.id))
+                .sort((a, b) => (Number.isFinite(a.order) ? a.order : 0) - (Number.isFinite(b.order) ? b.order : 0));
 
-        const finalIds = [...orderedIds, ...remaining.map((project) => project.id)];
-        const orderById = new Map<string, number>();
-        finalIds.forEach((id, index) => {
-            orderById.set(id, index);
+            const finalIds = [...orderedIds, ...remaining.map((project) => project.id)];
+            const orderById = new Map<string, number>();
+            finalIds.forEach((id, index) => {
+                orderById.set(id, index);
+            });
+
+            const newAllProjects = allProjects.map((project) => {
+                if (!isInArea(project)) return project;
+                const nextOrder = orderById.get(project.id);
+                if (!Number.isFinite(nextOrder)) return project;
+                return { ...project, order: nextOrder as number, updatedAt: now };
+            });
+
+            const newVisibleProjects = newAllProjects.filter((p) => !p.deletedAt);
+            snapshot = buildSaveSnapshot(state, { projects: newAllProjects });
+            return { projects: newVisibleProjects, _allProjects: newAllProjects, lastDataChangeAt: changeAt };
         });
-
-        const newAllProjects = allProjects.map((project) => {
-            if (!isInArea(project)) return project;
-            const nextOrder = orderById.get(project.id);
-            if (!Number.isFinite(nextOrder)) return project;
-            return { ...project, order: nextOrder as number, updatedAt: now };
-        });
-
-        const newVisibleProjects = newAllProjects.filter((p) => !p.deletedAt);
-        set({ projects: newVisibleProjects, _allProjects: newAllProjects, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: get()._allTasks,
-                projects: newAllProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     reorderProjectTasks: async (projectId: string, orderedIds: string[], sectionId?: string | null) => {
         if (!projectId || orderedIds.length === 0) return;
         const changeAt = Date.now();
         const now = new Date().toISOString();
-        const allTasks = get()._allTasks;
-        const hasSectionFilter = sectionId !== undefined;
-        const isInProject = (task: Task) => {
-            if (task.projectId !== projectId || task.deletedAt) return false;
-            if (!hasSectionFilter) return true;
-            if (!sectionId) {
-                return !task.sectionId;
-            }
-            return task.sectionId === sectionId;
-        };
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const allTasks = state._allTasks;
+            const hasSectionFilter = sectionId !== undefined;
+            const isInProject = (task: Task) => {
+                if (task.projectId !== projectId || task.deletedAt) return false;
+                if (!hasSectionFilter) return true;
+                if (!sectionId) {
+                    return !task.sectionId;
+                }
+                return task.sectionId === sectionId;
+            };
 
-        const projectTasks = allTasks.filter(isInProject);
-        const orderedSet = new Set(orderedIds);
-        const remaining = projectTasks
-            .filter((task) => !orderedSet.has(task.id))
-            .sort((a, b) => {
-                const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
-                const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
-                if (aOrder !== bOrder) return aOrder - bOrder;
-                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+            const projectTasks = allTasks.filter(isInProject);
+            const orderedSet = new Set(orderedIds);
+            const remaining = projectTasks
+                .filter((task) => !orderedSet.has(task.id))
+                .sort((a, b) => {
+                    const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
+                    const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
+                    if (aOrder !== bOrder) return aOrder - bOrder;
+                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                });
+
+            const finalIds = [...orderedIds, ...remaining.map((task) => task.id)];
+            const orderById = new Map<string, number>();
+            finalIds.forEach((id, index) => {
+                orderById.set(id, index);
             });
 
-        const finalIds = [...orderedIds, ...remaining.map((task) => task.id)];
-        const orderById = new Map<string, number>();
-        finalIds.forEach((id, index) => {
-            orderById.set(id, index);
-        });
+            const newAllTasks = allTasks.map((task) => {
+                if (!isInProject(task)) return task;
+                const nextOrder = orderById.get(task.id);
+                if (!Number.isFinite(nextOrder)) return task;
+                return { ...task, orderNum: nextOrder as number, updatedAt: now };
+            });
 
-        const newAllTasks = allTasks.map((task) => {
-            if (!isInProject(task)) return task;
-            const nextOrder = orderById.get(task.id);
-            if (!Number.isFinite(nextOrder)) return task;
-            return { ...task, orderNum: nextOrder as number, updatedAt: now };
+            const newVisibleTasks = newAllTasks.filter((task) => !task.deletedAt && task.status !== 'archived');
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks });
+            return { tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt };
         });
-
-        const newVisibleTasks = newAllTasks.filter((task) => !task.deletedAt && task.status !== 'archived');
-        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     deleteTag: async (tagId: string) => {
@@ -1790,42 +1732,37 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         if (!normalizedTarget) return;
         const changeAt = Date.now();
         const now = new Date().toISOString();
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const newAllTasks = state._allTasks.map((task) => {
+                if (!task.tags || task.tags.length === 0) return task;
+                const filtered = task.tags.filter((tag) => normalizeTagId(tag) !== normalizedTarget);
+                if (filtered.length === task.tags.length) return task;
+                return { ...task, tags: filtered, updatedAt: now };
+            });
 
-        const newAllTasks = get()._allTasks.map((task) => {
-            if (!task.tags || task.tags.length === 0) return task;
-            const filtered = task.tags.filter((tag) => normalizeTagId(tag) !== normalizedTarget);
-            if (filtered.length === task.tags.length) return task;
-            return { ...task, tags: filtered, updatedAt: now };
+            const newAllProjects = state._allProjects.map((project) => {
+                if (!project.tagIds || project.tagIds.length === 0) return project;
+                const filtered = project.tagIds.filter((tag) => normalizeTagId(tag) !== normalizedTarget);
+                if (filtered.length === project.tagIds.length) return project;
+                return { ...project, tagIds: filtered, updatedAt: now };
+            });
+
+            const newVisibleTasks = newAllTasks.filter((t) => !t.deletedAt && t.status !== 'archived');
+            const newVisibleProjects = newAllProjects.filter((p) => !p.deletedAt);
+
+            snapshot = buildSaveSnapshot(state, { tasks: newAllTasks, projects: newAllProjects });
+            return {
+                tasks: newVisibleTasks,
+                projects: newVisibleProjects,
+                _allTasks: newAllTasks,
+                _allProjects: newAllProjects,
+                lastDataChangeAt: changeAt,
+            };
         });
-
-        const newAllProjects = get()._allProjects.map((project) => {
-            if (!project.tagIds || project.tagIds.length === 0) return project;
-            const filtered = project.tagIds.filter((tag) => normalizeTagId(tag) !== normalizedTarget);
-            if (filtered.length === project.tagIds.length) return project;
-            return { ...project, tagIds: filtered, updatedAt: now };
-        });
-
-        const newVisibleTasks = newAllTasks.filter((t) => !t.deletedAt && t.status !== 'archived');
-        const newVisibleProjects = newAllProjects.filter((p) => !p.deletedAt);
-
-        set({
-            tasks: newVisibleTasks,
-            projects: newVisibleProjects,
-            _allTasks: newAllTasks,
-            _allProjects: newAllProjects,
-            lastDataChangeAt: changeAt,
-        });
-
-        debouncedSave(
-            {
-                tasks: newAllTasks,
-                projects: newAllProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: get().settings,
-            },
-            (msg) => set({ error: msg })
-        );
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
 
     /**
@@ -1833,73 +1770,60 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
      * @param updates Settings to update
      */
     updateSettings: async (updates: Partial<AppData['settings']>) => {
-        const newSettings = { ...get().settings, ...updates };
         const archiveDaysUpdate = updates.gtd?.autoArchiveDays !== undefined;
+        let snapshot: AppData | null = null;
+        set((state) => {
+            const newSettings = { ...state.settings, ...updates };
+            if (archiveDaysUpdate) {
+                const configuredArchiveDays = newSettings.gtd?.autoArchiveDays;
+                const archiveDays = Number.isFinite(configuredArchiveDays)
+                    ? Math.max(0, Math.floor(configuredArchiveDays as number))
+                    : 7;
+                const shouldAutoArchive = archiveDays > 0;
+                const cutoffMs = shouldAutoArchive ? Date.now() - archiveDays * 24 * 60 * 60 * 1000 : 0;
+                const nowIso = new Date().toISOString();
+                let didAutoArchive = false;
 
-        if (archiveDaysUpdate) {
-            const configuredArchiveDays = newSettings.gtd?.autoArchiveDays;
-            const archiveDays = Number.isFinite(configuredArchiveDays)
-                ? Math.max(0, Math.floor(configuredArchiveDays as number))
-                : 7;
-            const shouldAutoArchive = archiveDays > 0;
-            const cutoffMs = shouldAutoArchive ? Date.now() - archiveDays * 24 * 60 * 60 * 1000 : 0;
-            const nowIso = new Date().toISOString();
-            let didAutoArchive = false;
+                let newAllTasks = state._allTasks;
+                if (shouldAutoArchive) {
+                    newAllTasks = newAllTasks.map((task) => {
+                        if (task.deletedAt) return task;
+                        if (task.status !== 'done') return task;
+                        const completedAt = safeParseDate(task.completedAt)?.getTime() ?? NaN;
+                        const updatedAt = safeParseDate(task.updatedAt)?.getTime() ?? NaN;
+                        const resolvedCompletedAt = Number.isFinite(completedAt) ? completedAt : updatedAt;
+                        if (!Number.isFinite(resolvedCompletedAt) || resolvedCompletedAt <= 0) return task;
+                        if (resolvedCompletedAt >= cutoffMs) return task;
+                        didAutoArchive = true;
+                        return {
+                            ...task,
+                            status: 'archived',
+                            isFocusedToday: false,
+                            updatedAt: nowIso,
+                            completedAt: Number.isFinite(completedAt) ? task.completedAt : task.updatedAt || nowIso,
+                        };
+                    });
+                }
 
-            let newAllTasks = get()._allTasks;
-            if (shouldAutoArchive) {
-                newAllTasks = newAllTasks.map((task) => {
-                    if (task.deletedAt) return task;
-                    if (task.status !== 'done') return task;
-                    const completedAt = safeParseDate(task.completedAt)?.getTime() ?? NaN;
-                    const updatedAt = safeParseDate(task.updatedAt)?.getTime() ?? NaN;
-                    const resolvedCompletedAt = Number.isFinite(completedAt) ? completedAt : updatedAt;
-                    if (!Number.isFinite(resolvedCompletedAt) || resolvedCompletedAt <= 0) return task;
-                    if (resolvedCompletedAt >= cutoffMs) return task;
-                    didAutoArchive = true;
+                if (didAutoArchive) {
+                    const newVisibleTasks = newAllTasks.filter((t) => !t.deletedAt && t.status !== 'archived');
+                    snapshot = buildSaveSnapshot(state, { tasks: newAllTasks, settings: newSettings });
                     return {
-                        ...task,
-                        status: 'archived',
-                        isFocusedToday: false,
-                        updatedAt: nowIso,
-                        completedAt: Number.isFinite(completedAt) ? task.completedAt : task.updatedAt || nowIso,
-                    };
-                });
-            }
-
-            if (didAutoArchive) {
-                const newVisibleTasks = newAllTasks.filter((t) => !t.deletedAt && t.status !== 'archived');
-                set({
-                    tasks: newVisibleTasks,
-                    _allTasks: newAllTasks,
-                    settings: newSettings,
-                    lastDataChangeAt: Date.now(),
-                });
-                debouncedSave(
-                    {
-                        tasks: newAllTasks,
-                        projects: get()._allProjects,
-                        sections: get()._allSections,
-                        areas: get()._allAreas,
+                        tasks: newVisibleTasks,
+                        _allTasks: newAllTasks,
                         settings: newSettings,
-                    },
-                    (msg) => set({ error: msg })
-                );
-                return;
+                        lastDataChangeAt: Date.now(),
+                    };
+                }
             }
-        }
 
-        set({ settings: newSettings });
-        debouncedSave(
-            {
-                tasks: get()._allTasks,
-                projects: get()._allProjects,
-                sections: get()._allSections,
-                areas: get()._allAreas,
-                settings: newSettings,
-            },
-            (msg) => set({ error: msg })
-        );
+            snapshot = buildSaveSnapshot(state, { settings: newSettings });
+            return { settings: newSettings };
+        });
+
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
     },
     getDerivedState: () => {
         const state = get();
