@@ -14,6 +14,21 @@ Mindwtr is a cross-platform Getting Things Done (GTD) productivity app that help
 
 Yes! Mindwtr is open source and free to use under the MIT license.
 
+### Is there a roadmap or upcoming features page?
+
+We don’t maintain a fixed roadmap page. The living roadmap is the GitHub Issues list:
+https://github.com/dongdongbh/Mindwtr/issues
+
+If you have a feature request, please open an issue and describe the workflow you’re trying to support.
+
+### Can I open multiple windows?
+
+Not currently. The desktop app is single-window to keep the local-first SQLite data model safe and consistent. Multi-window support is a common request, but not available yet.
+
+### Is there a donation page?
+
+Yes — GitHub Sponsors: https://github.com/sponsors/dongdongbh
+
 ### What languages are supported?
 
 Mindwtr currently supports:
@@ -85,6 +100,30 @@ Mindwtr does **not** offer an `add@mindwtr.com` inbox because that would require
 ### What is GTD?
 
 Getting Things Done (GTD) is a productivity methodology created by David Allen. It consists of five steps: Capture, Clarify, Organize, Reflect, and Engage. See [[GTD Overview]].
+
+### How do GTD Horizons map to Mindwtr?
+
+Mindwtr natively models the lower horizons:
+
+- **Horizon 0 (Actions):** Next Actions and task lists.
+- **Horizon 1 (Projects):** Explicit Project entities.
+- **Horizon 2 (Areas):** Areas group related projects.
+
+For Horizons 3–5 (Goals, Vision, Purpose), there isn’t a dedicated entity yet. Most users track them with:
+
+- A **Reference** list (or a “Goals” area)
+- Project notes and links to those reference items
+- The Weekly Review checklist
+
+If you rely on explicit Goal/Vision objects, please open an issue with your desired workflow and review cadence.
+
+### How do I enable Due Date, Priority, or Time Estimate?
+
+These fields are hidden by default to keep the UI clean. Enable them here:
+
+**Settings → GTD → Task Editor**
+
+You can also reorder the fields there.
 
 
 

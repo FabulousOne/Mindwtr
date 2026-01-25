@@ -12,16 +12,22 @@ import { rescheduleTask } from './task-utils';
 let storage: StorageAdapter = noopStorage;
 
 export function applyTaskUpdates(oldTask: Task, updates: Partial<Task>, now: string): { updatedTask: Task; nextRecurringTask: Task | null } {
+    let normalizedUpdates = updates;
+    if (Object.prototype.hasOwnProperty.call(updates, 'textDirection') && updates.textDirection === undefined) {
+        normalizedUpdates = { ...updates };
+        delete normalizedUpdates.textDirection;
+    }
+    const updatesToApply = normalizedUpdates;
     const incomingStatus = updates.status ?? oldTask.status;
     const statusChanged = incomingStatus !== oldTask.status;
 
-    let finalUpdates: Partial<Task> = updates;
+    let finalUpdates: Partial<Task> = updatesToApply;
     let nextRecurringTask: Task | null = null;
     const isCompleteStatus = (status: TaskStatus) => status === 'done' || status === 'archived';
 
     if (statusChanged && incomingStatus === 'done') {
         finalUpdates = {
-            ...updates,
+            ...updatesToApply,
             status: incomingStatus,
             completedAt: now,
             isFocusedToday: false,
@@ -29,21 +35,21 @@ export function applyTaskUpdates(oldTask: Task, updates: Partial<Task>, now: str
         nextRecurringTask = createNextRecurringTask(oldTask, now, oldTask.status);
     } else if (statusChanged && incomingStatus === 'archived') {
         finalUpdates = {
-            ...updates,
+            ...updatesToApply,
             status: incomingStatus,
             completedAt: oldTask.completedAt || now,
             isFocusedToday: false,
         };
     } else if (statusChanged && isCompleteStatus(oldTask.status) && !isCompleteStatus(incomingStatus)) {
         finalUpdates = {
-            ...updates,
+            ...updatesToApply,
             status: incomingStatus,
             completedAt: undefined,
         };
     }
 
-    if (Object.prototype.hasOwnProperty.call(updates, 'dueDate') && incomingStatus !== 'reference') {
-        const rescheduled = rescheduleTask(oldTask, updates.dueDate);
+    if (Object.prototype.hasOwnProperty.call(updatesToApply, 'dueDate') && incomingStatus !== 'reference') {
+        const rescheduled = rescheduleTask(oldTask, updatesToApply.dueDate);
         finalUpdates = {
             ...finalUpdates,
             dueDate: rescheduled.dueDate,

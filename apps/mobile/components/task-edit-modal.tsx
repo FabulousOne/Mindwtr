@@ -1925,7 +1925,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                         onPress={() => {
                                             setEditedTask((prev) => ({
                                                 ...prev,
-                                                textDirection: option.value === 'auto' ? undefined : option.value,
+                                                textDirection: option.value,
                                             }));
                                         }}
                                     >

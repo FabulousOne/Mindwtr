@@ -635,7 +635,7 @@ export const TaskItem = memo(function TaskItem({
             recurrenceValue.rrule = editRecurrenceRRule;
         }
         const resolvedTextDirection = editTextDirectionRef.current ?? 'auto';
-        const nextTextDirection = resolvedTextDirection === 'auto' ? undefined : resolvedTextDirection;
+        const nextTextDirection = resolvedTextDirection;
         const currentContexts = editContexts.split(',').map(c => c.trim()).filter(Boolean);
         const mergedContexts = Array.from(new Set([...currentContexts, ...(parsedProps.contexts || [])]));
         const currentTags = editTags.split(',').map(c => c.trim()).filter(Boolean);
