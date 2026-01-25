@@ -10,9 +10,42 @@ type RateLimitState = {
     resetAt: number;
 };
 
+type LogLevel = 'info' | 'warn' | 'error';
+type LogEntry = {
+    ts: string;
+    level: LogLevel;
+    scope: 'cloud';
+    message: string;
+    context?: Record<string, unknown>;
+};
+
+const writeLog = (entry: LogEntry) => {
+    const line = `${JSON.stringify(entry)}\n`;
+    if (entry.level === 'error') {
+        process.stderr.write(line);
+    } else {
+        process.stdout.write(line);
+    }
+};
+
+const logInfo = (message: string, context?: Record<string, unknown>) => {
+    writeLog({ ts: new Date().toISOString(), level: 'info', scope: 'cloud', message, context });
+};
+
+const logError = (message: string, error?: unknown) => {
+    const context: Record<string, unknown> = {};
+    if (error instanceof Error) {
+        context.error = error.message;
+        if (error.stack) context.stack = error.stack;
+    } else if (error !== undefined) {
+        context.error = String(error);
+    }
+    writeLog({ ts: new Date().toISOString(), level: 'error', scope: 'cloud', message, context: Object.keys(context).length ? context : undefined });
+};
+
 const corsOrigin = process.env.MINDWTR_CLOUD_CORS_ORIGIN || '*';
 const shutdown = (signal: string) => {
-    console.log(`[mindwtr-cloud] received ${signal}, shutting down`);
+    logInfo(`received ${signal}, shutting down`);
     process.exit(0);
 };
 
@@ -129,8 +162,8 @@ async function main() {
         cleanupTimer.unref();
     }
 
-    console.log(`[mindwtr-cloud] dataDir: ${dataDir}`);
-    console.log(`[mindwtr-cloud] listening on http://${host}:${port}`);
+    logInfo(`dataDir: ${dataDir}`);
+    logInfo(`listening on http://${host}:${port}`);
 
     Bun.serve({
         hostname: host,
@@ -273,6 +306,6 @@ async function main() {
 }
 
 main().catch((err) => {
-    console.error(err);
+    logError('Failed to start server', err);
     process.exit(1);
 });

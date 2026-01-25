@@ -5,6 +5,41 @@ import * as z from 'zod';
 
 import { createService } from './service.js';
 
+type LogLevel = 'info' | 'error';
+type LogEntry = {
+  ts: string;
+  level: LogLevel;
+  scope: 'mcp';
+  message: string;
+  context?: Record<string, unknown>;
+};
+
+const writeLog = (entry: LogEntry) => {
+  const line = `${JSON.stringify(entry)}\n`;
+  if (entry.level === 'error') {
+    process.stderr.write(line);
+  } else {
+    process.stdout.write(line);
+  }
+};
+
+const logError = (message: string, error?: unknown) => {
+  const context: Record<string, unknown> = {};
+  if (error instanceof Error) {
+    context.error = error.message;
+    if (error.stack) context.stack = error.stack;
+  } else if (error !== undefined) {
+    context.error = String(error);
+  }
+  writeLog({
+    ts: new Date().toISOString(),
+    level: 'error',
+    scope: 'mcp',
+    message,
+    context: Object.keys(context).length ? context : undefined,
+  });
+};
+
 const args = process.argv.slice(2);
 
 const parseArgs = (argv: string[]) => {
@@ -244,10 +279,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('[mindwtr-mcp] Failed to start server:');
-  console.error(error instanceof Error ? error.message : String(error));
-  if (error instanceof Error && error.stack) {
-    console.error('\nStack trace:', error.stack);
-  }
+  logError('Failed to start server', error);
   process.exit(1);
 });
