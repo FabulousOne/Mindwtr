@@ -45,6 +45,10 @@ const SettingsSyncPage = lazy(() => import('./settings/SettingsSyncPage').then((
 const SettingsAboutPage = lazy(() => import('./settings/SettingsAboutPage').then((m) => ({ default: m.SettingsAboutPage })));
 
 const THEME_STORAGE_KEY = 'mindwtr-theme';
+const UPDATE_BADGE_AVAILABLE_KEY = 'mindwtr-update-available';
+const UPDATE_BADGE_LAST_CHECK_KEY = 'mindwtr-update-last-check';
+const UPDATE_BADGE_LATEST_KEY = 'mindwtr-update-latest';
+const UPDATE_BADGE_INTERVAL_MS = 1000 * 60 * 60 * 24;
 
 const LANGUAGES: { id: Language; label: string; native: string }[] = [
     { id: 'en', label: 'English', native: 'English' },
@@ -61,6 +65,20 @@ const LANGUAGES: { id: Language; label: string; native: string }[] = [
     { id: 'it', label: 'Italian', native: 'Italiano' },
     { id: 'tr', label: 'Turkish', native: 'Türkçe' },
 ];
+
+const compareVersions = (v1: string, v2: string): number => {
+    const clean1 = v1.replace(/^v/, '');
+    const clean2 = v2.replace(/^v/, '');
+    const parts1 = clean1.split('.').map(Number);
+    const parts2 = clean2.split('.').map(Number);
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i += 1) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        if (p1 > p2) return 1;
+        if (p1 < p2) return -1;
+    }
+    return 0;
+};
 
 const maskCalendarUrl = (url: string): string => {
     const trimmed = url.trim();
@@ -123,10 +141,25 @@ export function SettingsView() {
     const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
     const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
     const [linuxDistro, setLinuxDistro] = useState<LinuxDistroInfo | null>(null);
+    const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
 
     const showSaved = useCallback(() => {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+    }, []);
+
+    const persistUpdateBadge = useCallback((next: boolean, latestVersion?: string) => {
+        setHasUpdateBadge(next);
+        try {
+            localStorage.setItem(UPDATE_BADGE_AVAILABLE_KEY, next ? 'true' : 'false');
+            if (next && latestVersion) {
+                localStorage.setItem(UPDATE_BADGE_LATEST_KEY, latestVersion);
+            } else {
+                localStorage.removeItem(UPDATE_BADGE_LATEST_KEY);
+            }
+        } catch (error) {
+            reportError('Failed to persist update badge state', error);
+        }
     }, []);
     const selectSyncFolderTitle = useMemo(() => {
         const key = 'settings.selectSyncFolderTitle';
@@ -214,6 +247,58 @@ export function SettingsView() {
             window.clearTimeout(timer);
         };
     }, [isTauri]);
+
+    useEffect(() => {
+        if (!isTauri || !appVersion || appVersion === 'web') return;
+        try {
+            const storedAvailable = localStorage.getItem(UPDATE_BADGE_AVAILABLE_KEY);
+            const storedLatest = localStorage.getItem(UPDATE_BADGE_LATEST_KEY);
+            if (storedAvailable === 'true' && storedLatest && compareVersions(storedLatest, appVersion) > 0) {
+                setHasUpdateBadge(true);
+                return;
+            }
+            setHasUpdateBadge(false);
+            if (storedAvailable === 'true') {
+                localStorage.setItem(UPDATE_BADGE_AVAILABLE_KEY, 'false');
+                localStorage.removeItem(UPDATE_BADGE_LATEST_KEY);
+            }
+        } catch (error) {
+            reportError('Failed to read update badge state', error);
+        }
+    }, [appVersion, isTauri]);
+
+    useEffect(() => {
+        if (!isTauri || !appVersion || appVersion === 'web') return;
+        let lastCheck = 0;
+        try {
+            lastCheck = Number(localStorage.getItem(UPDATE_BADGE_LAST_CHECK_KEY) || 0);
+        } catch (error) {
+            reportError('Failed to read update check timestamp', error);
+        }
+        if (Date.now() - lastCheck < UPDATE_BADGE_INTERVAL_MS) return;
+        try {
+            localStorage.setItem(UPDATE_BADGE_LAST_CHECK_KEY, String(Date.now()));
+        } catch (error) {
+            reportError('Failed to persist update check timestamp', error);
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const info = await checkForUpdates(appVersion);
+                if (cancelled) return;
+                if (info.hasUpdate) {
+                    persistUpdateBadge(true, info.latestVersion);
+                } else {
+                    persistUpdateBadge(false);
+                }
+            } catch (error) {
+                reportError('Background update check failed', error);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [appVersion, isTauri, persistUpdateBadge]);
 
     useEffect(() => {
         if (!loggingEnabled) {
@@ -340,12 +425,19 @@ export function SettingsView() {
         setUpdateError(null);
         setUpdateNotice(null);
         try {
+            try {
+                localStorage.setItem(UPDATE_BADGE_LAST_CHECK_KEY, String(Date.now()));
+            } catch (error) {
+                reportError('Failed to persist update check timestamp', error);
+            }
             const info = await checkForUpdates(appVersion);
             if (!info || !info.hasUpdate) {
                 setUpdateNotice(t.upToDate);
+                persistUpdateBadge(false);
                 return;
             }
             setUpdateInfo(info);
+            persistUpdateBadge(true, info.latestVersion);
             if (info.platform === 'linux' && linuxFlavor === 'arch') {
                 setDownloadNotice(t.downloadAURHint);
             } else {
@@ -538,6 +630,8 @@ export function SettingsView() {
         icon: ComponentType<{ className?: string }>;
         label: string;
         description?: string;
+        badge?: boolean;
+        badgeLabel?: string;
     }>>(() => [
         { id: 'main', icon: Monitor, label: t.general, description: `${t.appearance} • ${t.language} • ${t.keybindings}` },
         { id: 'gtd', icon: ListChecks, label: t.gtd, description: t.gtdDesc },
@@ -545,8 +639,8 @@ export function SettingsView() {
         { id: 'sync', icon: Database, label: t.sync },
         { id: 'ai', icon: Sparkles, label: t.ai, description: t.aiDesc },
         { id: 'calendar', icon: CalendarDays, label: t.calendar },
-        { id: 'about', icon: Info, label: t.about },
-    ], [t]);
+        { id: 'about', icon: Info, label: t.about, badge: hasUpdateBadge, badgeLabel: t.updateAvailable },
+    ], [hasUpdateBadge, t]);
 
     const SyncPage = () => {
         const {

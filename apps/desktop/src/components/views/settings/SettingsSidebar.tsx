@@ -7,6 +7,8 @@ type NavItem = {
     icon: ComponentType<{ className?: string }>;
     label: string;
     description?: string;
+    badge?: boolean;
+    badgeLabel?: string;
 };
 
 type SettingsSidebarProps = {
@@ -41,7 +43,18 @@ export function SettingsSidebar({ title, subtitle, items, activeId, onSelect }: 
                         >
                             <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
                             <div>
-                                <div className="text-sm font-medium">{item.label}</div>
+                                <div className="text-sm font-medium flex items-center gap-2">
+                                    <span>{item.label}</span>
+                                    {item.badge && (
+                                        <span className="inline-flex items-center gap-1">
+                                            <span
+                                                aria-hidden="true"
+                                                className="h-2 w-2 rounded-full bg-red-500"
+                                            />
+                                            <span className="sr-only">{item.badgeLabel ?? 'Update available'}</span>
+                                        </span>
+                                    )}
+                                </div>
                                 {item.description && (
                                     <div className="text-xs text-muted-foreground">{item.description}</div>
                                 )}

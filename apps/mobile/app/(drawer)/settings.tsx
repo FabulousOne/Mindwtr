@@ -102,8 +102,26 @@ const WHISPER_MODELS: Array<{ id: string; fileName: string; label: string }> = [
     { id: 'whisper-base.en', fileName: 'ggml-base.en.bin', label: 'whisper-base.en' },
 ];
 const DEFAULT_WHISPER_MODEL = WHISPER_MODELS[0]?.id ?? 'whisper-tiny';
+const UPDATE_BADGE_AVAILABLE_KEY = 'mindwtr-update-available';
+const UPDATE_BADGE_LAST_CHECK_KEY = 'mindwtr-update-last-check';
+const UPDATE_BADGE_LATEST_KEY = 'mindwtr-update-latest';
+const UPDATE_BADGE_INTERVAL_MS = 1000 * 60 * 60 * 24;
 
 const formatError = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const compareVersions = (v1: string, v2: string): number => {
+    const clean1 = v1.replace(/^v/, '');
+    const clean2 = v2.replace(/^v/, '');
+    const parts1 = clean1.split('.').map(Number);
+    const parts2 = clean2.split('.').map(Number);
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i += 1) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        if (p1 > p2) return 1;
+        if (p1 < p2) return -1;
+    }
+    return 0;
+};
 
 const buildSettingsExtra = (message?: string, error?: unknown): Record<string, string> | undefined => {
     const extra: Record<string, string> = {};
@@ -181,6 +199,7 @@ export default function SettingsPage() {
     const [cloudUrl, setCloudUrl] = useState('');
     const [cloudToken, setCloudToken] = useState('');
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+    const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
     const [digestTimePicker, setDigestTimePicker] = useState<'morning' | 'evening' | null>(null);
     const [weeklyReviewTimePicker, setWeeklyReviewTimePicker] = useState(false);
     const [weeklyReviewDayPickerOpen, setWeeklyReviewDayPickerOpen] = useState(false);
@@ -199,6 +218,7 @@ export default function SettingsPage() {
     const tc = useThemeColors();
     const insets = useSafeAreaInsets();
     const isExpoGo = Constants.appOwnership === 'expo';
+    const currentVersion = Constants.expoConfig?.version || '0.0.0';
     const notificationsEnabled = settings.notificationsEnabled !== false;
     const dailyDigestMorningEnabled = settings.dailyDigestMorningEnabled === true;
     const dailyDigestEveningEnabled = settings.dailyDigestEveningEnabled === true;
@@ -603,6 +623,78 @@ export default function SettingsPage() {
     const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=tech.dongdongbh.mindwtr';
     const PLAY_STORE_MARKET_URL = 'market://details?id=tech.dongdongbh.mindwtr';
 
+    const persistUpdateBadge = useCallback(async (next: boolean, latestVersion?: string) => {
+        setHasUpdateBadge(next);
+        try {
+            await AsyncStorage.setItem(UPDATE_BADGE_AVAILABLE_KEY, next ? 'true' : 'false');
+            if (next && latestVersion) {
+                await AsyncStorage.setItem(UPDATE_BADGE_LATEST_KEY, latestVersion);
+            } else {
+                await AsyncStorage.removeItem(UPDATE_BADGE_LATEST_KEY);
+            }
+        } catch (error) {
+            logSettingsWarn('Failed to persist update badge state', error);
+        }
+    }, []);
+
+    const fetchLatestRelease = useCallback(async () => {
+        const response = await fetch(GITHUB_RELEASES_API, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'Mindwtr-App'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`GitHub API error: ${response.status}`);
+        }
+        return response.json();
+    }, [GITHUB_RELEASES_API]);
+
+    useEffect(() => {
+        let cancelled = false;
+        AsyncStorage.multiGet([UPDATE_BADGE_AVAILABLE_KEY, UPDATE_BADGE_LATEST_KEY])
+            .then((entries) => {
+                if (cancelled) return;
+                const entryMap = new Map(entries);
+                const storedAvailable = entryMap.get(UPDATE_BADGE_AVAILABLE_KEY) === 'true';
+                const storedLatest = entryMap.get(UPDATE_BADGE_LATEST_KEY) ?? '';
+                const isValid = storedAvailable && storedLatest && compareVersions(storedLatest, currentVersion) > 0;
+                setHasUpdateBadge(isValid);
+                if (storedAvailable && !isValid) {
+                    AsyncStorage.setItem(UPDATE_BADGE_AVAILABLE_KEY, 'false').catch(logSettingsWarn);
+                    AsyncStorage.removeItem(UPDATE_BADGE_LATEST_KEY).catch(logSettingsWarn);
+                }
+            })
+            .catch((error) => logSettingsWarn('Failed to read update badge state', error));
+        return () => {
+            cancelled = true;
+        };
+    }, [currentVersion]);
+
+    useEffect(() => {
+        if (isExpoGo) return;
+        let cancelled = false;
+        const checkUpdates = async () => {
+            try {
+                const lastCheckRaw = await AsyncStorage.getItem(UPDATE_BADGE_LAST_CHECK_KEY);
+                const lastCheck = Number(lastCheckRaw || 0);
+                if (Date.now() - lastCheck < UPDATE_BADGE_INTERVAL_MS) return;
+                await AsyncStorage.setItem(UPDATE_BADGE_LAST_CHECK_KEY, String(Date.now()));
+                const release = await fetchLatestRelease();
+                const latestVersion = release.tag_name?.replace(/^v/, '') || '0.0.0';
+                const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
+                if (cancelled) return;
+                await persistUpdateBadge(hasUpdate, hasUpdate ? latestVersion : undefined);
+            } catch (error) {
+                logSettingsWarn('Background update check failed', error);
+            }
+        };
+        void checkUpdates();
+        return () => {
+            cancelled = true;
+        };
+    }, [currentVersion, fetchLatestRelease, isExpoGo, persistUpdateBadge]);
+
     const handleCheckUpdates = async () => {
         setIsCheckingUpdate(true);
         try {
@@ -623,34 +715,11 @@ export default function SettingsPage() {
                 return;
             }
 
-            const response = await fetch(GITHUB_RELEASES_API, {
-                headers: {
-                    'Accept': 'application/vnd.github.v3+json',
-                    'User-Agent': 'Mindwtr-App'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`GitHub API error: ${response.status}`);
-            }
-
-            const release = await response.json();
+            await AsyncStorage.setItem(UPDATE_BADGE_LAST_CHECK_KEY, String(Date.now()));
+            const release = await fetchLatestRelease();
             const latestVersion = release.tag_name?.replace(/^v/, '') || '0.0.0';
-            const currentVersion = Constants.expoConfig?.version || '0.0.0';
 
             // Compare versions
-            const compareVersions = (v1: string, v2: string): number => {
-                const parts1 = v1.split('.').map(Number);
-                const parts2 = v2.split('.').map(Number);
-                for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-                    const p1 = parts1[i] || 0;
-                    const p2 = parts2[i] || 0;
-                    if (p1 > p2) return 1;
-                    if (p1 < p2) return -1;
-                }
-                return 0;
-            };
-
             const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
 
             if (hasUpdate) {
@@ -676,11 +745,13 @@ export default function SettingsPage() {
                         }
                     ]
                 );
+                await persistUpdateBadge(true, latestVersion);
             } else {
                 Alert.alert(
                     localize('Up to Date', '已是最新'),
                     localize('You are using the latest version!', '您正在使用最新版本！')
                 );
+                await persistUpdateBadge(false);
             }
         } catch (error) {
             logSettingsError('Update check failed:', error);
@@ -902,10 +973,19 @@ export default function SettingsPage() {
     );
 
     // Menu Item
-    const MenuItem = ({ title, onPress }: { title: string; onPress: () => void }) => (
+    const MenuItem = ({ title, onPress, showIndicator }: { title: string; onPress: () => void; showIndicator?: boolean }) => (
         <TouchableOpacity style={[styles.menuItem, { borderBottomColor: tc.border }]} onPress={onPress}>
             <Text style={[styles.menuLabel, { color: tc.text }]}>{title}</Text>
-            <Text style={[styles.chevron, { color: tc.secondaryText }]}>›</Text>
+            <View style={styles.menuRight}>
+                {showIndicator && (
+                    <View
+                        accessibilityLabel={localize('Update available', '有可用更新')}
+                        accessibilityRole="status"
+                        style={styles.updateDot}
+                    />
+                )}
+                <Text style={[styles.chevron, { color: tc.secondaryText }]}>›</Text>
+            </View>
         </TouchableOpacity>
     );
 
@@ -3154,7 +3234,7 @@ export default function SettingsPage() {
                     <MenuItem title={t('settings.notifications')} onPress={() => setCurrentScreen('notifications')} />
                     <MenuItem title={t('settings.dataSync')} onPress={() => setCurrentScreen('sync')} />
                     <MenuItem title={t('settings.advanced')} onPress={() => setCurrentScreen('advanced')} />
-                    <MenuItem title={t('settings.about')} onPress={() => setCurrentScreen('about')} />
+                    <MenuItem title={t('settings.about')} onPress={() => setCurrentScreen('about')} showIndicator={hasUpdateBadge} />
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -3174,6 +3254,8 @@ const styles = StyleSheet.create({
     menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 },
     menuLabel: { fontSize: 17, fontWeight: '400' },
     chevron: { fontSize: 24, fontWeight: '300' },
+    menuRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    updateDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444' },
     settingCard: { borderRadius: 12, overflow: 'hidden' },
     settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
     settingRowColumn: { padding: 16 },
