@@ -54,7 +54,8 @@ export function QuickCaptureSheet({
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [startPickerMode, setStartPickerMode] = useState<'date' | 'time' | null>(null);
+  const [pendingStartDate, setPendingStartDate] = useState<Date | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [projectQuery, setProjectQuery] = useState('');
@@ -278,7 +279,8 @@ export function QuickCaptureSheet({
     setShowProjectPicker(false);
     setShowPriorityPicker(false);
     setShowDatePicker(false);
-    setShowStartPicker(false);
+    setStartPickerMode(null);
+    setPendingStartDate(null);
   };
 
   const handleClose = () => {
@@ -559,7 +561,10 @@ export function QuickCaptureSheet({
           <View style={styles.optionsRow}>
             <TouchableOpacity
               style={[styles.optionChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
-              onPress={() => setShowStartPicker(true)}
+              onPress={() => {
+                setPendingStartDate(null);
+                setStartPickerMode('date');
+              }}
               onLongPress={() => setStartTime(null)}
             >
               <Clock size={16} color={tc.text} />
@@ -634,20 +639,42 @@ export function QuickCaptureSheet({
         />
       )}
 
-      {showStartPicker && (
+      {startPickerMode && (
         <DateTimePicker
-          value={startTime ?? new Date()}
-          mode="datetime"
+          value={(() => {
+            if (Platform.OS === 'ios') return startTime ?? new Date();
+            if (startPickerMode === 'time') return pendingStartDate ?? startTime ?? new Date();
+            return startTime ?? new Date();
+          })()}
+          mode={Platform.OS === 'ios' ? 'datetime' : startPickerMode}
           display={Platform.OS === 'ios' ? 'inline' : 'default'}
           onChange={(event, selectedDate) => {
             if (event.type === 'dismissed') {
-              setShowStartPicker(false);
+              setStartPickerMode(null);
+              setPendingStartDate(null);
               return;
             }
-            if (Platform.OS !== 'ios') {
-              setShowStartPicker(false);
+            if (!selectedDate) return;
+            if (Platform.OS === 'ios') {
+              setStartTime(selectedDate);
+              return;
             }
-            if (selectedDate) setStartTime(selectedDate);
+            if (startPickerMode === 'date') {
+              const base = new Date(selectedDate);
+              const existing = startTime ?? pendingStartDate;
+              if (existing) {
+                base.setHours(existing.getHours(), existing.getMinutes(), 0, 0);
+              }
+              setPendingStartDate(base);
+              setStartPickerMode('time');
+              return;
+            }
+            const base = pendingStartDate ?? startTime ?? new Date();
+            const combined = new Date(base);
+            combined.setHours(selectedDate.getHours(), selectedDate.getMinutes(), 0, 0);
+            setStartTime(combined);
+            setPendingStartDate(null);
+            setStartPickerMode(null);
           }}
         />
       )}
