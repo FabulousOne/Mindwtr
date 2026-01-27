@@ -115,7 +115,6 @@ export function SettingsView() {
     const windowDecorationsEnabled = settings?.window?.decorations !== false;
     const closeBehavior = settings?.window?.closeBehavior ?? 'ask';
     const trayVisible = settings?.window?.showTray !== false;
-
     const [saved, setSaved] = useState(false);
     const [appVersion, setAppVersion] = useState('0.1.0');
     const [logPath, setLogPath] = useState('');
@@ -160,6 +159,46 @@ export function SettingsView() {
             reportError('Failed to persist update badge state', error);
         }
     }, []);
+
+    const {
+        aiEnabled,
+        aiProvider,
+        aiModel,
+        aiModelOptions,
+        aiCopilotModel,
+        aiCopilotOptions,
+        aiReasoningEffort,
+        aiThinkingBudget,
+        anthropicThinkingEnabled,
+        aiApiKey,
+        speechEnabled,
+        speechProvider,
+        speechModel,
+        speechModelOptions,
+        speechLanguage,
+        speechMode,
+        speechFieldStrategy,
+        speechApiKey,
+        speechOfflineReady,
+        speechOfflineSize,
+        speechDownloadState,
+        speechDownloadError,
+        onUpdateAISettings,
+        onUpdateSpeechSettings,
+        onProviderChange,
+        onSpeechProviderChange,
+        onToggleAnthropicThinking,
+        onAiApiKeyChange,
+        onSpeechApiKeyChange,
+        onDownloadWhisperModel,
+        onDeleteWhisperModel,
+    } = useAiSettings({
+        isTauri,
+        settings,
+        updateSettings,
+        showSaved,
+        enabled: true,
+    });
     const selectSyncFolderTitle = useMemo(() => {
         const key = 'settings.selectSyncFolderTitle';
         const translated = translate(key);
@@ -733,86 +772,6 @@ export function SettingsView() {
         );
     };
 
-    const AiPage = () => {
-        const {
-            aiEnabled,
-            aiProvider,
-            aiModel,
-            aiModelOptions,
-            aiCopilotModel,
-            aiCopilotOptions,
-            aiReasoningEffort,
-            aiThinkingBudget,
-            anthropicThinkingEnabled,
-            aiApiKey,
-            speechEnabled,
-            speechProvider,
-            speechModel,
-            speechModelOptions,
-            speechLanguage,
-            speechMode,
-            speechFieldStrategy,
-            speechApiKey,
-            speechOfflineReady,
-            speechOfflineSize,
-            speechDownloadState,
-            speechDownloadError,
-            onUpdateAISettings,
-            onUpdateSpeechSettings,
-            onProviderChange,
-            onSpeechProviderChange,
-            onToggleAnthropicThinking,
-            onAiApiKeyChange,
-            onSpeechApiKeyChange,
-            onDownloadWhisperModel,
-            onDeleteWhisperModel,
-        } = useAiSettings({
-            isTauri,
-            settings,
-            updateSettings,
-            showSaved,
-            enabled: true,
-        });
-
-        return (
-            <SettingsAiPage
-                t={t}
-                aiEnabled={aiEnabled}
-                aiProvider={aiProvider}
-                aiModel={aiModel}
-                aiModelOptions={aiModelOptions}
-                aiCopilotModel={aiCopilotModel}
-                aiCopilotOptions={aiCopilotOptions}
-                aiReasoningEffort={aiReasoningEffort}
-                aiThinkingBudget={aiThinkingBudget}
-                anthropicThinkingEnabled={anthropicThinkingEnabled}
-                anthropicThinkingOptions={anthropicThinkingOptions}
-                aiApiKey={aiApiKey}
-                speechEnabled={speechEnabled}
-                speechProvider={speechProvider}
-                speechModel={speechModel}
-                speechModelOptions={speechModelOptions}
-                speechLanguage={speechLanguage}
-                speechMode={speechMode}
-                speechFieldStrategy={speechFieldStrategy}
-                speechApiKey={speechApiKey}
-                speechOfflineReady={speechOfflineReady}
-                speechOfflineSize={speechOfflineSize}
-                speechDownloadState={speechDownloadState}
-                speechDownloadError={speechDownloadError}
-                onUpdateAISettings={onUpdateAISettings}
-                onUpdateSpeechSettings={onUpdateSpeechSettings}
-                onProviderChange={onProviderChange}
-                onSpeechProviderChange={onSpeechProviderChange}
-                onToggleAnthropicThinking={onToggleAnthropicThinking}
-                onAiApiKeyChange={onAiApiKeyChange}
-                onSpeechApiKeyChange={onSpeechApiKeyChange}
-                onDownloadWhisperModel={onDownloadWhisperModel}
-                onDeleteWhisperModel={onDeleteWhisperModel}
-            />
-        );
-    };
-
     const CalendarPage = () => {
         const {
             externalCalendars,
@@ -883,7 +842,43 @@ export function SettingsView() {
         }
 
         if (page === 'ai') {
-            return <AiPage />;
+            return (
+                <SettingsAiPage
+                    t={t}
+                    aiEnabled={aiEnabled}
+                    aiProvider={aiProvider}
+                    aiModel={aiModel}
+                    aiModelOptions={aiModelOptions}
+                    aiCopilotModel={aiCopilotModel}
+                    aiCopilotOptions={aiCopilotOptions}
+                    aiReasoningEffort={aiReasoningEffort}
+                    aiThinkingBudget={aiThinkingBudget}
+                    anthropicThinkingEnabled={anthropicThinkingEnabled}
+                    anthropicThinkingOptions={anthropicThinkingOptions}
+                    aiApiKey={aiApiKey}
+                    speechEnabled={speechEnabled}
+                    speechProvider={speechProvider}
+                    speechModel={speechModel}
+                    speechModelOptions={speechModelOptions}
+                    speechLanguage={speechLanguage}
+                    speechMode={speechMode}
+                    speechFieldStrategy={speechFieldStrategy}
+                    speechApiKey={speechApiKey}
+                    speechOfflineReady={speechOfflineReady}
+                    speechOfflineSize={speechOfflineSize}
+                    speechDownloadState={speechDownloadState}
+                    speechDownloadError={speechDownloadError}
+                    onUpdateAISettings={onUpdateAISettings}
+                    onUpdateSpeechSettings={onUpdateSpeechSettings}
+                    onProviderChange={onProviderChange}
+                    onSpeechProviderChange={onSpeechProviderChange}
+                    onToggleAnthropicThinking={onToggleAnthropicThinking}
+                    onAiApiKeyChange={onAiApiKeyChange}
+                    onSpeechApiKeyChange={onSpeechApiKeyChange}
+                    onDownloadWhisperModel={onDownloadWhisperModel}
+                    onDeleteWhisperModel={onDeleteWhisperModel}
+                />
+            );
         }
 
         if (page === 'notifications') {
