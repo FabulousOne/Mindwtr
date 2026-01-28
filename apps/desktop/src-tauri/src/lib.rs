@@ -2341,7 +2341,7 @@ fn set_tray_visible(app: tauri::AppHandle, visible: bool) -> Result<(), String> 
     if let Some(tray) = app.tray_by_id("main") {
         tray.set_visible(visible).map_err(|e| e.to_string())
     } else {
-        Err("Tray icon not found".to_string())
+        Ok(())
     }
 }
 
@@ -2430,6 +2430,10 @@ fn is_niri_session() -> bool {
     false
 }
 
+fn is_flatpak() -> bool {
+    env::var("FLATPAK_ID").is_ok() || env::var("FLATPAK_SANDBOX_DIR").is_ok()
+}
+
 fn diagnostics_enabled() -> bool {
     match env::var("MINDWTR_DIAGNOSTICS") {
         Ok(value) => matches!(
@@ -2475,42 +2479,46 @@ pub fn run() {
                 }
             }
 
-            // Build system tray with Quick Add entry.
-            let handle = app.handle();
-            let quick_add_item = MenuItem::with_id(handle, "quick_add", "Quick Add", true, None::<&str>)?;
-            let show_item = MenuItem::with_id(handle, "show", "Show Mindwtr", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(handle, "quit", "Quit", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(handle, &[&quick_add_item, &show_item, &quit_item])?;
+            if !(cfg!(target_os = "linux") && is_flatpak()) {
+                // Build system tray with Quick Add entry.
+                let handle = app.handle();
+                let quick_add_item = MenuItem::with_id(handle, "quick_add", "Quick Add", true, None::<&str>)?;
+                let show_item = MenuItem::with_id(handle, "show", "Show Mindwtr", true, None::<&str>)?;
+                let quit_item = MenuItem::with_id(handle, "quit", "Quit", true, None::<&str>)?;
+                let tray_menu = Menu::with_items(handle, &[&quick_add_item, &show_item, &quit_item])?;
 
-            let tray_icon = Image::from_bytes(include_bytes!("../icons/tray.png"))
-                .unwrap_or_else(|_| handle.default_window_icon().unwrap().clone());
+                let tray_icon = Image::from_bytes(include_bytes!("../icons/tray.png"))
+                    .unwrap_or_else(|_| handle.default_window_icon().unwrap().clone());
 
-            TrayIconBuilder::with_id("main")
-                .icon(tray_icon)
-                .menu(&tray_menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(move |app, event| {
-                    match event.id().as_ref() {
-                        "quick_add" => {
-                            show_main_and_emit(app);
+                TrayIconBuilder::with_id("main")
+                    .icon(tray_icon)
+                    .menu(&tray_menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(move |app, event| {
+                        match event.id().as_ref() {
+                            "quick_add" => {
+                                show_main_and_emit(app);
+                            }
+                            "show" => {
+                                show_main(app);
+                            }
+                            "quit" => {
+                                app.exit(0);
+                            }
+                            _ => {}
                         }
-                        "show" => {
-                            show_main(app);
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click { button, button_state, .. } = event {
+                            if button == MouseButton::Left && button_state == MouseButtonState::Up {
+                                show_main(tray.app_handle());
+                            }
                         }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
-                    }
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { button, button_state, .. } = event {
-                        if button == MouseButton::Left && button_state == MouseButtonState::Up {
-                            show_main(tray.app_handle());
-                        }
-                    }
-                })
-                .build(handle)?;
+                    })
+                    .build(handle)?;
+            } else {
+                log::info!("Tray disabled inside Flatpak sandbox.");
+            }
 
             // Global hotkey for Quick Add.
             handle
