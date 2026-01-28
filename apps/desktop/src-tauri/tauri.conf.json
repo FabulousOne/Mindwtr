@@ -28,7 +28,6 @@
   "bundle": {
     "active": true,
     "targets": [
-      "msix",
       "nsis",
       "appimage",
       "deb",
@@ -42,14 +41,7 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "windows": {
-      "msix": {
-        "identityName": "DongdaLi.Mindwtr",
-        "publisher": "CN=76AC9B15-7A1B-49FF-9342-2BE80735A1E6",
-        "publisherDisplayName": "Dongda Li"
-      }
-    }
+    ]
   },
   "plugins": {
     "shell": {
