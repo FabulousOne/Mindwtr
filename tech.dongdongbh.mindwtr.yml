@@ -31,7 +31,7 @@ modules:
     sources:
       - type: file
         dest-filename: mindwtr.deb
-        path: mindwtr_0.6.2_amd64.deb
-        sha256: 3c62427808f2241efa52d3f0c003a89b64fd902898fb73fa5d46ce4ee0c2f38a
+        url: https://github.com/dongdongbh/Mindwtr/releases/download/v0.6.3/mindwtr_0.6.3_amd64.deb
+        sha256: 54d710bb957bbe2d070de9e3798b7adea484e8ad12f6c7e05158a00d39a49190
       - type: file
         path: tech.dongdongbh.mindwtr.metainfo.xml
