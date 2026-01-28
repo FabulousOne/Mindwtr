@@ -222,10 +222,18 @@ export function BoardView() {
         const { active, over } = event;
 
         if (over && active.id !== over.id) {
-            // If dropped over a column (which has an ID matching a TaskStatus)
             const status = over.id as TaskStatus;
             if (COLUMNS.some(c => c.id === status)) {
-                moveTask(active.id as string, status);
+                const currentTask = tasks.find((task) => task.id === active.id);
+                if (currentTask) {
+                    if (activeTask && currentTask.status !== activeTask.status) {
+                        setActiveTask(null);
+                        return;
+                    }
+                    if (currentTask.status !== status) {
+                        moveTask(active.id as string, status);
+                    }
+                }
             }
         }
 
