@@ -116,7 +116,7 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
     <img src="https://img.shields.io/winget/v/dongdongbh.Mindwtr?label=Winget&logo=windows&logoColor=white&color=00D2FF" alt="Winget Version">
   </a>
 
-  <a href="https://apps.microsoft.com/detail/9n0v5b0b6frx?cid=DevShareMCLPCS&hl=en-US&gl=US">
+  <a href="https://apps.microsoft.com/detail/9n0v5b0b6frx?ocid=webpdpshare">
     <img src="https://img.shields.io/badge/Microsoft_Store-Install-0078D6?logo=microsoft&logoColor=white" alt="Microsoft Store">
   </a>
 
