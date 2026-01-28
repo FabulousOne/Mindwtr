@@ -158,8 +158,22 @@ if (typeof global !== 'undefined') {
 }
 
 function setupURLPolyfill() {
-    // No-op now, globals are already set at module load time
-    // Kept for backward compatibility with existing code
+    // Ensure globals are set in case tests or other shims reset them.
+    if (typeof globalThis !== 'undefined') {
+        globalThis.URL = URLPoly;
+        globalThis.URLSearchParams = URLSearchParamsPoly;
+    }
+    if (typeof global !== 'undefined') {
+        global.URL = URLPoly;
+        global.URLSearchParams = URLSearchParamsPoly;
+    }
+    // Patch createObjectURL/revokeObjectURL if missing (e.g. strict Hermes)
+    if (!URLPoly.createObjectURL) {
+        URLPoly.createObjectURL = FallbackURL.createObjectURL;
+    }
+    if (!URLPoly.revokeObjectURL) {
+        URLPoly.revokeObjectURL = FallbackURL.revokeObjectURL;
+    }
 }
 
 module.exports = {

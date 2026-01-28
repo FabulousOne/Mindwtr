@@ -30,3 +30,28 @@ vi.mock('expo-av', () => ({
     },
   },
 }));
+
+vi.mock('expo-file-system', () => ({
+  Directory: {
+    cache: 'cache',
+    document: 'document',
+  },
+  File: class {},
+  Paths: {
+    cache: 'cache',
+    document: 'document',
+  },
+}));
+
+vi.mock('expo-file-system/legacy', () => ({
+  documentDirectory: 'document',
+  cacheDirectory: 'cache',
+  getInfoAsync: vi.fn().mockResolvedValue({ exists: false }),
+  makeDirectoryAsync: vi.fn().mockResolvedValue(undefined),
+  readAsStringAsync: vi.fn().mockResolvedValue(''),
+  writeAsStringAsync: vi.fn().mockResolvedValue(undefined),
+  readDirectoryAsync: vi.fn().mockResolvedValue([]),
+  deleteAsync: vi.fn().mockResolvedValue(undefined),
+  copyAsync: vi.fn().mockResolvedValue(undefined),
+  moveAsync: vi.fn().mockResolvedValue(undefined),
+}));
