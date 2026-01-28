@@ -17,7 +17,7 @@ interface TaskEditAreaPickerProps {
 
 export function TaskEditAreaPicker({
     visible,
-    areas,
+    areas = [],
     tc,
     t,
     onClose,

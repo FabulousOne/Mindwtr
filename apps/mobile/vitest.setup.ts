@@ -44,6 +44,7 @@ vi.mock('expo-file-system', () => ({
 }));
 
 vi.mock('expo-file-system/legacy', () => ({
+  __esModule: true,
   documentDirectory: 'document',
   cacheDirectory: 'cache',
   StorageAccessFramework: {
