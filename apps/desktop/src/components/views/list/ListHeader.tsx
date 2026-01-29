@@ -116,10 +116,10 @@ export function ListHeader({
                             ? "bg-primary/10 text-primary border-primary"
                             : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
                     )}
-                    title={`${densityTitle}: ${densityLabel}`}
+                    title={densityTitle}
                 >
                     <ChevronsUpDown className="w-3.5 h-3.5" />
-                    {densityTitle}: {densityLabel}
+                    {densityLabel}
                 </button>
             </div>
         </header>
