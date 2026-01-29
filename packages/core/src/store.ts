@@ -183,6 +183,8 @@ interface TaskStore {
     updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
     /** Delete a project */
     deleteProject: (id: string) => Promise<void>;
+    /** Duplicate a project with its sections/tasks (fresh task state) */
+    duplicateProject: (id: string) => Promise<Project | null>;
     /** Toggle focus status of a project (max 5) */
     toggleProjectFocus: (id: string) => Promise<void>;
 
@@ -1555,6 +1557,138 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         if (snapshot) {
             debouncedSave(snapshot, (msg) => set({ error: msg }));
         }
+    },
+
+    /**
+     * Duplicate a project with its sections and tasks.
+     * - Creates a new project named "{Original} (Copy)"
+     * - Copies sections/tasks, resets task status + scheduling
+     */
+    duplicateProject: async (id: string) => {
+        const changeAt = Date.now();
+        const now = new Date().toISOString();
+        let snapshot: AppData | null = null;
+        let createdProject: Project | null = null;
+        set((state) => {
+            const sourceProject = state._allProjects.find((project) => project.id === id && !project.deletedAt);
+            if (!sourceProject) return state;
+            const deviceState = ensureDeviceId(state.settings);
+            const targetAreaId = sourceProject.areaId;
+            const maxOrder = state._allProjects
+                .filter((project) => !project.deletedAt && (project.areaId ?? undefined) === (targetAreaId ?? undefined))
+                .reduce((max, project) => Math.max(max, Number.isFinite(project.order) ? project.order : -1), -1);
+            const baseOrder = maxOrder + 1;
+
+            const projectAttachments = (sourceProject.attachments || [])
+                .filter((attachment) => !attachment.deletedAt)
+                .map((attachment) => ({
+                    ...attachment,
+                    id: uuidv4(),
+                    createdAt: now,
+                    updatedAt: now,
+                    deletedAt: undefined,
+                }));
+
+            const newProject: Project = {
+                ...sourceProject,
+                id: uuidv4(),
+                title: `${sourceProject.title} (Copy)`,
+                order: baseOrder,
+                isFocused: false,
+                attachments: projectAttachments.length > 0 ? projectAttachments : undefined,
+                createdAt: now,
+                updatedAt: now,
+                deletedAt: undefined,
+                rev: 1,
+                revBy: deviceState.deviceId,
+            };
+            createdProject = newProject;
+
+            const sourceSections = state._allSections.filter(
+                (section) => section.projectId === sourceProject.id && !section.deletedAt
+            );
+            const sectionIdMap = new Map<string, string>();
+            const newSections = sourceSections.map((section) => {
+                const newId = uuidv4();
+                sectionIdMap.set(section.id, newId);
+                return {
+                    ...section,
+                    id: newId,
+                    projectId: newProject.id,
+                    createdAt: now,
+                    updatedAt: now,
+                    deletedAt: undefined,
+                    rev: 1,
+                    revBy: deviceState.deviceId,
+                };
+            });
+
+            const sourceTasks = state._allTasks.filter(
+                (task) => task.projectId === sourceProject.id && !task.deletedAt
+            );
+            const newTasks = sourceTasks.map((task) => {
+                const checklist = task.checklist?.map((item) => ({
+                    ...item,
+                    id: uuidv4(),
+                    isCompleted: false,
+                }));
+                const attachments = (task.attachments || [])
+                    .filter((attachment) => !attachment.deletedAt)
+                    .map((attachment) => ({
+                        ...attachment,
+                        id: uuidv4(),
+                        createdAt: now,
+                        updatedAt: now,
+                        deletedAt: undefined,
+                    }));
+                const nextSectionId = task.sectionId ? sectionIdMap.get(task.sectionId) : undefined;
+                return {
+                    ...task,
+                    id: uuidv4(),
+                    projectId: newProject.id,
+                    sectionId: nextSectionId,
+                    status: 'next',
+                    startTime: undefined,
+                    dueDate: undefined,
+                    reviewAt: undefined,
+                    completedAt: undefined,
+                    isFocusedToday: false,
+                    pushCount: 0,
+                    checklist,
+                    attachments: attachments.length > 0 ? attachments : undefined,
+                    createdAt: now,
+                    updatedAt: now,
+                    deletedAt: undefined,
+                    purgedAt: undefined,
+                    rev: 1,
+                    revBy: deviceState.deviceId,
+                };
+            });
+
+            const newAllProjects = [...state._allProjects, newProject];
+            const newAllSections = [...state._allSections, ...newSections];
+            const newAllTasks = [...state._allTasks, ...newTasks];
+            snapshot = buildSaveSnapshot(state, {
+                tasks: newAllTasks,
+                projects: newAllProjects,
+                sections: newAllSections,
+                ...(deviceState.updated ? { settings: deviceState.settings } : {}),
+            });
+            return {
+                projects: [...state.projects, newProject],
+                sections: [...state.sections, ...newSections],
+                tasks: [...state.tasks, ...newTasks],
+                _allProjects: newAllProjects,
+                _allSections: newAllSections,
+                _allTasks: newAllTasks,
+                lastDataChangeAt: changeAt,
+                ...(deviceState.updated ? { settings: deviceState.settings } : {}),
+            };
+        });
+        if (snapshot) {
+            debouncedSave(snapshot, (msg) => set({ error: msg }));
+        }
+        return createdProject;
     },
 
     /**

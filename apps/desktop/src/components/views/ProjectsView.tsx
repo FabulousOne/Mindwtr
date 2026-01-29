@@ -54,6 +54,7 @@ export function ProjectsView() {
         addProject,
         updateProject,
         deleteProject,
+        duplicateProject,
         updateTask,
         addSection,
         updateSection,
@@ -78,6 +79,7 @@ export function ProjectsView() {
             addProject: state.addProject,
             updateProject: state.updateProject,
             deleteProject: state.deleteProject,
+            duplicateProject: state.duplicateProject,
             updateTask: state.updateTask,
             addSection: state.addSection,
             updateSection: state.updateSection,
@@ -129,6 +131,13 @@ export function ProjectsView() {
     const NO_TAGS = '__none__';
     const [selectedArea, setSelectedArea] = useState(ALL_AREAS);
     const [selectedTag, setSelectedTag] = useState(ALL_TAGS);
+
+    const handleDuplicateProject = useCallback(async (projectId: string) => {
+        const created = await duplicateProject(projectId);
+        if (created) {
+            setSelectedProjectId(created.id);
+        }
+    }, [duplicateProject, setSelectedProjectId]);
 
     useEffect(() => {
         if (!perf.enabled) return;
@@ -770,6 +779,7 @@ export function ProjectsView() {
                         projects={projects}
                         toggleProjectFocus={toggleProjectFocus}
                         reorderProjects={reorderProjects}
+                        onDuplicateProject={handleDuplicateProject}
                     />
 
                     {/* Project Details & Tasks */}

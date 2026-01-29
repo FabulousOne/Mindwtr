@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { AlertTriangle, ChevronDown, ChevronRight, CornerDownRight, Folder, Plus, Star } from 'lucide-react';
@@ -53,6 +53,7 @@ interface ProjectsSidebarProps {
     projects: Project[];
     toggleProjectFocus: (projectId: string) => void;
     reorderProjects: (projectIds: string[], areaId?: string) => void;
+    onDuplicateProject: (projectId: string) => void;
 }
 
 export function ProjectsSidebar({
@@ -88,6 +89,7 @@ export function ProjectsSidebar({
     projects,
     toggleProjectFocus,
     reorderProjects,
+    onDuplicateProject,
 }: ProjectsSidebarProps) {
     const projectSensors = useSensors(
         useSensor(PointerSensor, {
@@ -96,6 +98,33 @@ export function ProjectsSidebar({
     );
 
     const focusedCount = useMemo(() => projects.filter((project) => project.isFocused).length, [projects]);
+    const [contextMenu, setContextMenu] = useState<{ projectId: string; x: number; y: number } | null>(null);
+    const contextMenuRef = useRef<HTMLDivElement | null>(null);
+
+    const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+    useEffect(() => {
+        if (!contextMenu) return;
+        const handlePointer = (event: MouseEvent) => {
+            if (contextMenuRef.current && contextMenuRef.current.contains(event.target as Node)) return;
+            closeContextMenu();
+        };
+        const handleKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') closeContextMenu();
+        };
+        window.addEventListener('mousedown', handlePointer);
+        window.addEventListener('scroll', handlePointer, true);
+        window.addEventListener('resize', handlePointer);
+        window.addEventListener('contextmenu', handlePointer);
+        window.addEventListener('keydown', handleKey);
+        return () => {
+            window.removeEventListener('mousedown', handlePointer);
+            window.removeEventListener('scroll', handlePointer, true);
+            window.removeEventListener('resize', handlePointer);
+            window.removeEventListener('contextmenu', handlePointer);
+            window.removeEventListener('keydown', handleKey);
+        };
+    }, [contextMenu, closeContextMenu]);
 
     const handleProjectDragEnd = (areaId: string, areaProjects: Project[]) => (event: DragEndEvent) => {
         const { active, over } = event;
@@ -257,6 +286,14 @@ export function ProjectsSidebar({
                                                                         : "border-transparent hover:bg-muted/50",
                                                                 isDragging && "opacity-70",
                                                             )}
+                                                            onContextMenu={(event) => {
+                                                                event.preventDefault();
+                                                                setContextMenu({
+                                                                    projectId: project.id,
+                                                                    x: event.clientX,
+                                                                    y: event.clientY,
+                                                                });
+                                                            }}
                                                         >
                                                             <div
                                                                 className="flex items-center gap-2 p-2"
@@ -364,6 +401,14 @@ export function ProjectsSidebar({
                                                                             isDragging && "opacity-70",
                                                                         )}
                                                                         onClick={() => onSelectProject(project.id)}
+                                                                        onContextMenu={(event) => {
+                                                                            event.preventDefault();
+                                                                            setContextMenu({
+                                                                                projectId: project.id,
+                                                                                x: event.clientX,
+                                                                                y: event.clientY,
+                                                                            });
+                                                                        }}
                                                                     >
                                                                         <div className="flex items-center gap-2 p-2">
                                                                             {handle}
@@ -409,6 +454,25 @@ export function ProjectsSidebar({
                     </div>
                 )}
             </div>
+
+            {contextMenu && (
+                <div
+                    ref={contextMenuRef}
+                    className="fixed z-50 min-w-[160px] rounded-md border border-border bg-card shadow-lg p-1 text-sm"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                >
+                    <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 rounded hover:bg-muted transition-colors"
+                        onClick={() => {
+                            onDuplicateProject(contextMenu.projectId);
+                            closeContextMenu();
+                        }}
+                    >
+                        {t('projects.duplicate')}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
