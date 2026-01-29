@@ -78,6 +78,8 @@ const en: Record<string, string> = {
         'keybindings.list.toggleDone': 'Toggle done',
         'keybindings.list.delete': 'Delete selected task',
         'keybindings.list.newTask': 'Focus add-task input',
+        'keybindings.list.toggleDetails': 'Toggle list details',
+        'keybindings.list.toggleDensity': 'Toggle density',
 
         // Tabs (Mobile)
         'tab.inbox': 'Inbox',
@@ -1009,6 +1011,8 @@ const zh: Record<string, string> = {
         'keybindings.list.toggleDone': '切换完成状态',
         'keybindings.list.delete': '删除选中的任务',
         'keybindings.list.newTask': '聚焦添加任务输入框',
+        'keybindings.list.toggleDetails': '切换详情显示',
+        'keybindings.list.toggleDensity': '切换密度',
 
         // Tabs (Mobile)
         'tab.inbox': '收集箱',

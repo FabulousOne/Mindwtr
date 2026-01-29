@@ -41,6 +41,8 @@ export function KeybindingHelpModal({ style, onClose, currentView, t }: Keybindi
         { keys: 'x', labelKey: 'keybindings.list.toggleDone' },
         { keys: 'dd', labelKey: 'keybindings.list.delete' },
         { keys: 'o', labelKey: 'keybindings.list.newTask' },
+        { keys: 'Ctrl+Shift+D / Cmd+Shift+D', labelKey: 'keybindings.list.toggleDetails' },
+        { keys: 'Ctrl+Shift+C / Cmd+Shift+C', labelKey: 'keybindings.list.toggleDensity' },
     ];
 
     const emacsGlobal: HelpItem[] = [
@@ -71,6 +73,8 @@ export function KeybindingHelpModal({ style, onClose, currentView, t }: Keybindi
         { keys: 'Ctrl-t', labelKey: 'keybindings.list.toggleDone' },
         { keys: 'Ctrl-d', labelKey: 'keybindings.list.delete' },
         { keys: 'Ctrl-o', labelKey: 'keybindings.list.newTask' },
+        { keys: 'Ctrl+Shift+D / Cmd+Shift+D', labelKey: 'keybindings.list.toggleDetails' },
+        { keys: 'Ctrl+Shift+C / Cmd+Shift+C', labelKey: 'keybindings.list.toggleDensity' },
     ];
 
     const globalItems = style === 'emacs' ? emacsGlobal : vimGlobal;

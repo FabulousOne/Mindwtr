@@ -104,6 +104,8 @@ export function KeybindingProvider({
     );
     const { t } = useLanguage();
     const toggleFocusMode = useUiStore((state) => state.toggleFocusMode);
+    const listOptions = useUiStore((state) => state.listOptions);
+    const setListOptions = useUiStore((state) => state.setListOptions);
 
     const initialStyle: KeybindingStyle =
         settings.keybindingStyle === 'vim' || settings.keybindingStyle === 'emacs'
@@ -116,6 +118,14 @@ export function KeybindingProvider({
     const toggleSidebar = useCallback(() => {
         updateSettings({ sidebarCollapsed: !isSidebarCollapsed }).catch((error) => reportError('Failed to update settings', error));
     }, [updateSettings, isSidebarCollapsed]);
+    const toggleListDetails = useCallback(() => {
+        setListOptions({ showDetails: !listOptions.showDetails });
+    }, [listOptions.showDetails, setListOptions]);
+    const toggleDensity = useCallback(() => {
+        const nextDensity = settings.appearance?.density === 'compact' ? 'comfortable' : 'compact';
+        updateSettings({ appearance: { density: nextDensity } })
+            .catch((error) => reportError('Failed to update density', error));
+    }, [settings.appearance?.density, updateSettings]);
 
     const scopeRef = useRef<TaskListScope | null>(null);
     const pendingRef = useRef<{ key: string | null; timestamp: number }>({ key: null, timestamp: 0 });
@@ -372,15 +382,27 @@ export function KeybindingProvider({
                     }
                 }
             }
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'KeyA' && !isEditableTarget(e.target)) {
-                e.preventDefault();
-                triggerQuickAdd();
-                return;
-            }
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'Backslash' && !isEditableTarget(e.target)) {
-                e.preventDefault();
-                toggleFocusMode();
-                return;
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && !isEditableTarget(e.target)) {
+                if (e.code === 'KeyA') {
+                    e.preventDefault();
+                    triggerQuickAdd();
+                    return;
+                }
+                if (e.code === 'Backslash') {
+                    e.preventDefault();
+                    toggleFocusMode();
+                    return;
+                }
+                if (e.code === 'KeyD') {
+                    e.preventDefault();
+                    toggleListDetails();
+                    return;
+                }
+                if (e.code === 'KeyC') {
+                    e.preventDefault();
+                    toggleDensity();
+                    return;
+                }
             }
             if ((e.ctrlKey || e.metaKey) && !e.altKey && e.code === 'Backslash' && !isEditableTarget(e.target)) {
                 e.preventDefault();
@@ -401,7 +423,7 @@ export function KeybindingProvider({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [style, vimGoMap, emacsAltMap, onNavigate, isHelpOpen, toggleSidebar, toggleFocusMode, currentView]);
+    }, [style, vimGoMap, emacsAltMap, onNavigate, isHelpOpen, toggleSidebar, toggleFocusMode, toggleListDetails, toggleDensity, currentView]);
 
     const contextValue = useMemo<KeybindingContextType>(() => ({
         style,
