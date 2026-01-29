@@ -66,7 +66,6 @@ export function ProjectsView() {
         highlightTaskId,
         setHighlightTask,
         settings,
-        updateSettings,
     } = useTaskStore(
         (state) => ({
             projects: state.projects,
@@ -93,7 +92,6 @@ export function ProjectsView() {
             highlightTaskId: state.highlightTaskId,
             setHighlightTask: state.setHighlightTask,
             settings: state.settings,
-            updateSettings: state.updateSettings,
         }),
         shallow
     );
@@ -253,16 +251,9 @@ export function ProjectsView() {
 
     const sortAreasByName = () => reorderAreas(sortAreasByNameIds(sortedAreas));
     const sortAreasByColor = () => reorderAreas(sortAreasByColorIds(sortedAreas));
-    const handleAreaFilterChange = useCallback(
-        (value: string) => {
-            updateSettings({ filters: { ...(settings?.filters ?? {}), areaId: value } })
-                .catch((error) => logWarn('Failed to update area filter', error));
-        },
-        [settings?.filters, updateSettings],
-    );
 
     // Group tasks by project to avoid O(N*M) filtering
-    const { tasksByProject, areaTasks, areaOptions } = useMemo(() => {
+    const { tasksByProject, areaTasks } = useMemo(() => {
         const map = projects.reduce((acc, project) => {
             acc[project.id] = [];
             return acc;
@@ -283,20 +274,9 @@ export function ProjectsView() {
             }
             return task.areaId === selectedArea;
         });
-        const visibleProjects = projects.filter(p => !p.deletedAt);
-        const hasNoArea = visibleProjects.some((project) => !project.areaId || !areaById.has(project.areaId))
-            || tasks.some((task) => (
-                !task.projectId
-                && (!task.areaId || !areaById.has(task.areaId))
-                && !task.deletedAt
-                && task.status !== 'archived'
-                && task.status !== 'done'
-                && task.status !== 'reference'
-            ));
         return {
             tasksByProject: map,
             areaTasks: filteredAreaTasks,
-            areaOptions: { list: sortedAreas, hasNoArea },
         };
     }, [projects, tasks, selectedArea, areaById, sortedAreas, ALL_AREAS, NO_AREA]);
 
@@ -764,13 +744,9 @@ export function ProjectsView() {
                 <div className="flex h-full gap-6">
                     <ProjectsSidebar
                         t={t}
-                        selectedArea={selectedArea}
                         selectedTag={selectedTag}
-                        allAreasId={ALL_AREAS}
-                        noAreaId={NO_AREA}
                         allTagsId={ALL_TAGS}
                         noTagsId={NO_TAGS}
-                        areaOptions={areaOptions}
                         tagOptions={tagOptions}
                         isCreating={isCreating}
                         isCreatingProject={isCreatingProject}
@@ -779,7 +755,6 @@ export function ProjectsView() {
                         onCancelCreate={() => setIsCreating(false)}
                         onCreateProject={handleCreateProject}
                         onChangeNewProjectTitle={setNewProjectTitle}
-                        onSelectArea={handleAreaFilterChange}
                         onSelectTag={setSelectedTag}
                         groupedActiveProjects={groupedActiveProjects}
                         groupedDeferredProjects={groupedDeferredProjects}

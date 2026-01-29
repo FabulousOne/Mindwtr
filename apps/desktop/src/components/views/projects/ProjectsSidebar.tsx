@@ -6,11 +6,6 @@ import { cn } from '../../../lib/utils';
 import { SortableProjectRow } from './SortableRows';
 import type { Area, Project, Task } from '@mindwtr/core';
 
-type AreaOptionList = {
-    list: Area[];
-    hasNoArea: boolean;
-};
-
 type TagOptionList = {
     list: string[];
     hasNoTags: boolean;
@@ -22,13 +17,9 @@ type TasksByProject = Record<string, Task[]>;
 
 interface ProjectsSidebarProps {
     t: (key: string) => string;
-    selectedArea: string;
     selectedTag: string;
-    allAreasId: string;
-    noAreaId: string;
     allTagsId: string;
     noTagsId: string;
-    areaOptions: AreaOptionList;
     tagOptions: TagOptionList;
     isCreating: boolean;
     isCreatingProject: boolean;
@@ -37,7 +28,6 @@ interface ProjectsSidebarProps {
     onCancelCreate: () => void;
     onCreateProject: (event: React.FormEvent) => void;
     onChangeNewProjectTitle: (value: string) => void;
-    onSelectArea: (value: string) => void;
     onSelectTag: (value: string) => void;
     groupedActiveProjects: GroupedProjects;
     groupedDeferredProjects: GroupedProjects;
@@ -58,13 +48,9 @@ interface ProjectsSidebarProps {
 
 export function ProjectsSidebar({
     t,
-    selectedArea,
     selectedTag,
-    allAreasId,
-    noAreaId,
     allTagsId,
     noTagsId,
-    areaOptions,
     tagOptions,
     isCreating,
     isCreatingProject,
@@ -73,7 +59,6 @@ export function ProjectsSidebar({
     onCancelCreate,
     onCreateProject,
     onChangeNewProjectTitle,
-    onSelectArea,
     onSelectTag,
     groupedActiveProjects,
     groupedDeferredProjects,
@@ -149,26 +134,6 @@ export function ProjectsSidebar({
                 </button>
             </div>
 
-            <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    {t('projects.areaFilter')}
-                </label>
-                <select
-                    value={selectedArea}
-                    onChange={(e) => onSelectArea(e.target.value)}
-                    className="w-full text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
-                >
-                    <option value={allAreasId}>{t('projects.allAreas')}</option>
-                    {areaOptions.list.map((area) => (
-                        <option key={area.id} value={area.id}>
-                            {area.name}
-                        </option>
-                    ))}
-                    {areaOptions.hasNoArea && (
-                        <option value={noAreaId}>{t('projects.noArea')}</option>
-                    )}
-                </select>
-            </div>
             <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {t('projects.tagFilter')}
