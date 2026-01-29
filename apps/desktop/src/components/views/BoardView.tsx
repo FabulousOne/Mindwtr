@@ -59,7 +59,7 @@ function DroppableColumn({
     return (
         <div
             ref={setNodeRef}
-            className={`flex flex-col h-full min-w-[240px] flex-1 bg-muted/30 rounded-lg p-4 border border-border/50 border-t-4 ${STATUS_BORDER[id]}`}
+            className={`flex flex-col h-full min-w-[280px] flex-1 bg-muted/30 rounded-lg p-3 border border-border/50 border-t-4 ${STATUS_BORDER[id]}`}
         >
             <h3 className="font-semibold mb-4 flex items-center justify-between">
                 {label}
@@ -111,6 +111,7 @@ function DraggableTask({ task }: { task: Task }) {
                     readOnly={task.status === 'done'}
                     showStatusSelect={false}
                     showProjectBadgeInActions={false}
+                    actionsOverlay
                     enableDoubleClickEdit
                 />
             </div>
@@ -118,23 +119,26 @@ function DraggableTask({ task }: { task: Task }) {
     }
 
     return (
-        <div ref={setNodeRef} style={style} className="touch-none relative">
-            <button
-                type="button"
-                {...listeners}
-                {...attributes}
-                onClick={(event) => event.stopPropagation()}
-                className="absolute -left-2 top-3 z-10 text-muted-foreground/70 hover:text-foreground cursor-grab active:cursor-grabbing"
-                aria-label="Drag task"
-                title="Drag task"
-            >
-                <GripVertical className="w-4 h-4" />
-            </button>
+        <div ref={setNodeRef} style={style} className="touch-none">
             <TaskItem
                 task={task}
                 readOnly={task.status === 'done'}
                 showStatusSelect={false}
                 showProjectBadgeInActions={false}
+                actionsOverlay
+                dragHandle={(
+                    <button
+                        type="button"
+                        {...listeners}
+                        {...attributes}
+                        onClick={(event) => event.stopPropagation()}
+                        className="text-muted-foreground/70 hover:text-foreground p-1 rounded hover:bg-muted/50 cursor-grab active:cursor-grabbing"
+                        aria-label="Drag task"
+                        title="Drag task"
+                    >
+                        <GripVertical className="w-4 h-4" />
+                    </button>
+                )}
                 enableDoubleClickEdit
             />
         </div>
@@ -484,7 +488,12 @@ export function BoardView() {
                     <DragOverlay>
                         {activeTask ? (
                             <div className="w-80 rotate-3 cursor-grabbing">
-                                <TaskItem task={activeTask} showStatusSelect={false} showProjectBadgeInActions={false} />
+                                <TaskItem
+                                    task={activeTask}
+                                    showStatusSelect={false}
+                                    showProjectBadgeInActions={false}
+                                    actionsOverlay
+                                />
                             </div>
                         ) : null}
                     </DragOverlay>

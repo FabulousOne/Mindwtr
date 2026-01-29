@@ -4,7 +4,7 @@ import { getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getTaskUrgency
 import { cn } from '../../lib/utils';
 import { MetadataBadge } from '../ui/MetadataBadge';
 import { AttachmentProgressIndicator } from '../AttachmentProgressIndicator';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 
 interface TaskItemDisplayProps {
     task: Task;
@@ -41,6 +41,8 @@ interface TaskItemDisplayProps {
     readOnly: boolean;
     compactMetaEnabled?: boolean;
     dense?: boolean;
+    actionsOverlay?: boolean;
+    dragHandle?: ReactNode;
     t: (key: string) => string;
 }
 
@@ -90,6 +92,8 @@ export function TaskItemDisplay({
     readOnly,
     compactMetaEnabled = true,
     dense = false,
+    actionsOverlay = false,
+    dragHandle,
     t,
     onOpenProject,
 }: TaskItemDisplayProps) {
@@ -153,20 +157,25 @@ export function TaskItemDisplay({
         && task.status !== 'archived';
 
     return (
-        <div className="flex-1 min-w-0 flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-1 items-start gap-2">
-                {showQuickDoneButton && (
-                    <button
-                        type="button"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onStatusChange('done');
-                        }}
-                        aria-label={t('status.done')}
-                        className="mt-1 text-emerald-400 hover:text-emerald-300 p-1 rounded hover:bg-emerald-500/20 shrink-0"
-                    >
-                        <Check className="w-4 h-4" />
-                    </button>
+        <div className={cn("flex-1 min-w-0 flex items-start gap-3", actionsOverlay && "relative")}>
+            <div className={cn("flex min-w-0 flex-1 items-start gap-2", actionsOverlay && "pr-10")}>
+                {(showQuickDoneButton || dragHandle) && (
+                    <div className="flex flex-col items-center gap-1 mt-1 shrink-0">
+                        {showQuickDoneButton && (
+                            <button
+                                type="button"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onStatusChange('done');
+                                }}
+                                aria-label={t('status.done')}
+                                className="text-emerald-400 hover:text-emerald-300 p-1 rounded hover:bg-emerald-500/20"
+                            >
+                                <Check className="w-4 h-4" />
+                            </button>
+                        )}
+                        {dragHandle}
+                    </div>
                 )}
                 <div
                     className={cn(
@@ -429,7 +438,10 @@ export function TaskItemDisplay({
 
             {!selectionMode && (
                 <div
-                    className="relative flex items-center gap-2"
+                    className={cn(
+                        "relative flex items-center gap-2",
+                        actionsOverlay && "absolute top-1 right-1 z-10"
+                    )}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {showProjectBadgeInActions && project && (

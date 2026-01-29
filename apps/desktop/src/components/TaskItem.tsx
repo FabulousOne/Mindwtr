@@ -1,4 +1,4 @@
-import { useMemo, useState, memo, useEffect, useRef, useCallback } from 'react';
+import { useMemo, useState, memo, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import {
     shallow,
     useTaskStore,
@@ -51,6 +51,8 @@ interface TaskItemProps {
     showQuickDone?: boolean;
     showStatusSelect?: boolean;
     showProjectBadgeInActions?: boolean;
+    actionsOverlay?: boolean;
+    dragHandle?: ReactNode;
     focusToggle?: {
         isFocused: boolean;
         canToggle: boolean;
@@ -74,6 +76,8 @@ export const TaskItem = memo(function TaskItem({
     showQuickDone = true,
     showStatusSelect = true,
     showProjectBadgeInActions = true,
+    actionsOverlay = false,
+    dragHandle,
     focusToggle,
     readOnly = false,
     compactMetaEnabled = true,
@@ -894,6 +898,8 @@ export const TaskItem = memo(function TaskItem({
                             readOnly={effectiveReadOnly}
                             compactMetaEnabled={compactMetaEnabled}
                             dense={isCompact}
+                            actionsOverlay={actionsOverlay}
+                            dragHandle={dragHandle}
                             t={t}
                         />
                     )}
