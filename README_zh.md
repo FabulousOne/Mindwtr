@@ -43,103 +43,26 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 
 ## 功能
 
-### GTD 工作流
-- **收集** - 随时快速添加任务（全局快捷键、托盘、分享、语音）
-- **澄清** - 2 分钟法则引导的收件箱处理
-- **组织** - 项目、情境与状态清单
-- **回顾** - 带提醒的每周回顾向导
-- **执行** - 基于情境筛选的下一步行动
-- **AI 辅助（可选）** - 使用自带密钥的 AI 完成澄清、拆解与回顾（OpenAI、Gemini、Claude）
+最受欢迎的亮点：
+- 🎙️ **语音输入**（收集 + 转写）
+- 🔄 **跨平台同步**（文件 / WebDAV / 云 / 本地 API）
+- 📎 **附件**（文件 + 链接）
+- 🧭 **Copilot 建议**（可选，使用自带密钥的 AI）
+- 🗓️ **外部日历（ICS）**
+- ✅ **完整 GTD 工作流**（收件箱处理 + 回顾）
 
-### 视图
-- 📥 **收件箱** - 任务收集区与处理向导
-- 🎯 **聚焦** - 日程（时间维度）+ 下一步行动合并视图
-- 📁 **项目** - 多步骤结果与领域
-- 🏷️ **情境** - 层级情境（@work/meetings）
-- ⏳ **等待中** - 委派事项
-- 💭 **将来/也许** - 延后想法
-- 📅 **日历** - 基于时间的规划
-- 📋 **看板** - 看板式拖拽
-- 📝 **回顾** - 每日 + 每周回顾流程
-- 📦 **归档** - 历史记录，按需搜索
-
-### 生产力功能
-- 🔍 **全局搜索** - 语法搜索（status:, context:, due:<=7d）
-- 📦 **批量操作** - 多选、批量移动/打标签/删除
-- 🔗 **任务依赖** - 任务被前置事项阻塞
-- 📎 **附件** - 任务支持文件与链接
-- ✏️ **Markdown 备注** - 富文本描述 + 预览
-- 🗂️ **项目状态** - 进行中、等待中、将来/也许、归档
-- ♾️ **流动重复** - 固定日期或“完成后 X 天”
-- ♻️ **可复用清单** - 复制任务或重置清单
-- ✅ **清单模式** - 清单类任务的快速勾选
-- ✅ **语音收集** - 语音快速记录、自动转写并创建任务
-- 🧭 **Copilot 建议** - 可选的情境/标签/时间提示
-- 🧘 **专注 / 禅模式** - 减少干扰，突出重点
-- 🔔 **通知** - 截止提醒与稍后提醒
-- 📊 **每日摘要** - 早间简报 + 晚间回顾
-- 📅 **每周回顾** - 可定制的每周提醒
-
-### 数据与同步
-- 📁 **文件同步** - Dropbox、Google Drive、Syncthing 等
-- 🌐 **WebDAV 同步** - Nextcloud、ownCloud、自建
-- 🔀 **智能合并** - 最后写入优先，防止数据丢失
-- 📤 **导出/备份** - 导出 JSON 数据
-- 🗓️ **外部日历（ICS）** - 只读日历叠加
-
-### 自动化
-- 🔌 **CLI** - 终端添加/完成/搜索
-- 🌐 **REST API** - 本地 API 便于脚本化
-- 🌍 **Web 应用（PWA）** - 浏览器离线访问
-- 🧠 **MCP 服务器** - 本地 Model Context Protocol 服务用于 LLM 自动化
-
-### 跨平台
-- 🖥️ **桌面端** - Tauri v2（macOS、Linux、Windows）
-- 📱 **移动端** - React Native/Expo（~iOS~、Android）
-- 📲 **Android 小部件** - 桌面焦点/下一步小组件
-- ⌨️ **键盘快捷键** - Vim 与 Emacs 预设
-- 🎨 **主题** - 明/暗模式
-- 🌍 **国际化** - 英文、中文、西班牙语、印地语、阿拉伯语、德语、俄语、日语、法语、葡萄牙语、韩语、意大利语、土耳其语
-- 🐳 **Docker** - 使用 Docker 运行 PWA + 自托管同步服务
-
-### 平台说明
-- **桌面端**：全局快捷键、键盘导航，无滑动操作、无禅模式。
-- **移动端**：滑动操作、禅模式、Android 小部件支持；无全局快捷键。
+完整功能列表：
+- 📚 https://github.com/dongdongbh/Mindwtr/wiki
 
 ## 安装
-
-<p align="center">
-  <a href="https://play.google.com/store/apps/details?id=tech.dongdongbh.mindwtr">
-    <img src="https://img.shields.io/badge/Google_Play-Install-414141?logo=googleplay&logoColor=white" alt="Get it on Google Play">
-  </a>
-  <a href="https://winstall.app/apps/dongdongbh.Mindwtr">
-    <img src="https://img.shields.io/winget/v/dongdongbh.Mindwtr?label=Winget&logo=windows&logoColor=white&color=00D2FF" alt="Winget Version">
-  </a>
-
-  <a href="https://apps.microsoft.com/detail/9n0v5b0b6frx?ocid=webpdpshare">
-    <img src="https://img.shields.io/badge/Microsoft_Store-Install-0078D6?logo=microsoft&logoColor=white" alt="Microsoft Store">
-  </a>
-
-  <a href="https://github.com/dongdongbh/homebrew-mindwtr">
-    <img src="https://img.shields.io/scoop/v/mindwtr?bucket=https://github.com/dongdongbh/homebrew-mindwtr&label=Scoop&logo=scoop&logoColor=white&color=E6E6E6" alt="Scoop Version">
-  </a>
-
-  <a href="https://github.com/dongdongbh/homebrew-mindwtr">
-    <img src="https://img.shields.io/badge/Homebrew-Install-orange?logo=homebrew&logoColor=white" alt="Homebrew">
-  </a>
-
-  <a href="https://aur.archlinux.org/packages/mindwtr-bin">
-    <img src="https://img.shields.io/aur/version/mindwtr-bin?logo=arch-linux&logoColor=white&color=1793d1&label=AUR" alt="AUR Version">
-  </a>
-
-  <a href="https://snapcraft.io/mindwtr">
-    <img src="https://img.shields.io/badge/Snapcraft-Install-82BEA0?logo=snapcraft&logoColor=white" alt="Snapcraft">
-  </a>
-</p>
 
 ### 桌面端（Linux）
 
 **Arch Linux（AUR）：**
+<a href="https://aur.archlinux.org/packages/mindwtr-bin">
+  <img src="https://img.shields.io/aur/version/mindwtr-bin?logo=arch-linux&logoColor=white&color=1793d1&label=AUR" alt="AUR Version">
+</a>
+
 ```bash
 # 使用 yay
 yay -S mindwtr-bin
@@ -147,25 +70,16 @@ yay -S mindwtr-bin
 # 使用 paru
 paru -S mindwtr-bin
 ```
-📦 [AUR 包](https://aur.archlinux.org/packages/mindwtr-bin)
 
-**Debian/Ubuntu：**
+**Debian / Ubuntu（APT 仓库，推荐）：**
 ```bash
 curl -fsSL https://dongdongbh.github.io/Mindwtr/mindwtr.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/mindwtr-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/mindwtr-archive-keyring.gpg] https://dongdongbh.github.io/Mindwtr/deb ./" | sudo tee /etc/apt/sources.list.d/mindwtr.list
 sudo apt update
 sudo apt install mindwtr
 ```
-手动安装：从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 `.deb` 并运行 `sudo dpkg -i mindwtr_*.deb`。
 
-**AppImage（通用）：**
-从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 `.AppImage`：
-```bash
-chmod +x mindwtr_*.AppImage
-./mindwtr_*.AppImage
-```
-
-**Fedora/RHEL/openSUSE：**
+**Fedora / RHEL / openSUSE（DNF/YUM 仓库，推荐）：**
 ```bash
 cat <<'EOF' | sudo tee /etc/yum.repos.d/mindwtr.repo
 [mindwtr]
@@ -177,32 +91,55 @@ EOF
 
 sudo dnf install mindwtr
 ```
-手动安装：从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 `.rpm` 并运行 `sudo rpm -i mindwtr-*.rpm`。
+
+**Snapcraft：**
+<a href="https://snapcraft.io/mindwtr">
+  <img src="https://img.shields.io/badge/Snapcraft-Install-82BEA0?logo=snapcraft&logoColor=white" alt="Snapcraft">
+</a>
+```bash
+sudo snap install mindwtr
+```
+
+**其他方式：** 从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 获取 AppImage 或 `.deb` / `.rpm`。
 
 ### 桌面端（Windows）
-**Winget（推荐）：**
+
+**Microsoft Store（推荐）：**
+<a href="https://apps.microsoft.com/detail/9n0v5b0b6frx?ocid=webpdpshare">
+  <img src="https://img.shields.io/badge/Microsoft_Store-Install-0078D6?logo=microsoft&logoColor=white" alt="Microsoft Store">
+</a>
+
+**Winget：**
+<a href="https://winstall.app/apps/dongdongbh.Mindwtr">
+  <img src="https://img.shields.io/winget/v/dongdongbh.Mindwtr?label=Winget&logo=windows&logoColor=white&color=00D2FF" alt="Winget Version">
+</a>
 ```powershell
 winget install dongdongbh.Mindwtr
 ```
 
-**可选：Scoop**
+**Scoop：**
+<a href="https://github.com/dongdongbh/homebrew-mindwtr">
+  <img src="https://img.shields.io/scoop/v/mindwtr?bucket=https://github.com/dongdongbh/homebrew-mindwtr&label=Scoop&logo=scoop&logoColor=white&color=E6E6E6" alt="Scoop Version">
+</a>
 ```powershell
 scoop bucket add mindwtr https://github.com/dongdongbh/homebrew-mindwtr
 scoop install mindwtr
 ```
 
-**安装包：**
-从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载安装包（`.msi` 或 `.exe`）并运行。
+**其他方式：** 从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 获取 `.msi` / `.exe`。
 
 ### 桌面端（macOS）
+
 **Homebrew（推荐）：**
+<a href="https://github.com/dongdongbh/homebrew-mindwtr">
+  <img src="https://img.shields.io/badge/Homebrew-Install-orange?logo=homebrew&logoColor=white" alt="Homebrew">
+</a>
 ```bash
 brew tap dongdongbh/mindwtr
 brew install --cask mindwtr
 ```
 
-**DMG：**
-从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 `.dmg`，打开后拖拽到“应用程序”文件夹。
+**其他方式：** 从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 获取 `.dmg`。
 
 > **注意：** 如果 macOS 提示应用“已损坏”或“来自未知开发者”，请执行：
 > ```bash
@@ -217,44 +154,22 @@ brew install --cask mindwtr
   <img src="https://img.shields.io/badge/Google_Play-Install-414141?logo=googleplay&logoColor=white" alt="Get it on Google Play">
 </a>
 
-已上线 Google Play：
-https://play.google.com/store/apps/details?id=tech.dongdongbh.mindwtr
+其他方式：从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 APK。
 
-从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 APK。
-
-**iOS：**
-iOS 构建需要 Apple Developer 账号（$99/年），目前仅提供模拟器构建。如果你希望获得 iOS 构建，请考虑 [赞助开发者](https://github.com/sponsors/dongdongbh) 以资助 Apple Developer 账号。
+**iOS：** iOS 构建需要 Apple Developer 账号（$99/年），目前仅提供模拟器构建。
 
 ### Docker（PWA + 云同步）
+
 使用 Docker 运行 Web 应用（PWA）和自托管同步服务：
 - 指南：[`docker/README.md`](docker/README.md)
 
-## 数据存储
-
-任务和项目保存在本地设备：
-- **桌面端数据（Linux）**：`~/.local/share/mindwtr/mindwtr.db`（SQLite）+ `data.json`（同步/备份）
-- **桌面端配置（Linux）**：`~/.config/mindwtr/config.toml`
-- **移动端**：`mindwtr.db`（SQLite）+ `data.json`（同步/备份）
-
-可在设置中选择文件同步（Dropbox 等）或 WebDAV（Nextcloud 等）。
+安装指南：
+- 🚀 [快速开始](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started)
+- 📚 [全平台与包管理器](https://github.com/dongdongbh/Mindwtr/wiki)
 
 ## 文档
 
 - 📚 [Wiki](https://github.com/dongdongbh/Mindwtr/wiki) - 完整用户指南
 - 🚀 [快速开始](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started)
-- 💡 [GTD 最佳实践](https://github.com/dongdongbh/Mindwtr/wiki/GTD-Best-Practices)
+- ❓ [FAQ](https://github.com/dongdongbh/Mindwtr/wiki/FAQ)
 - 🔄 [数据与同步](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync)
-- 🤖 [AI 助手](https://github.com/dongdongbh/Mindwtr/wiki/AI-Assistant)
-- 🗓️ [日历集成](https://github.com/dongdongbh/Mindwtr/wiki/Calendar-Integration)
-- ☁️ [云同步（自托管）](https://github.com/dongdongbh/Mindwtr/wiki/Cloud-Sync)
-- 🔌 [本地 API 服务](https://github.com/dongdongbh/Mindwtr/wiki/Local-API)
-- 🌐 [Web / PWA](https://github.com/dongdongbh/Mindwtr/wiki/Web-App-PWA)
-
-## 路线图
-
-- ✅ 为 Mindwtr 构建 MCP 服务器（LLM 集成与自动化）。
-- ⏳ 添加邮件收集（通过转发邮件创建任务）。
-
-## 开发
-
-开发者请查看 [Development Guide](docs/CONTRIBUTING.md)。

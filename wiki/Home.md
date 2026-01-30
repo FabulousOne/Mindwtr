@@ -70,18 +70,17 @@ Mindwtr is **simple by default and powerful when needed**. We focus on reducing 
 | 🎯 **Focus**           | Combined daily agenda and next actions             |
 | 📁 **Projects**        | Multi-step outcomes with sequential/parallel modes |
 | 🧭 **Areas of Focus**  | Group projects by higher-level areas               |
-| 🏷️ **Project Tags**    | Tag and filter projects                            |
-| 🏷️ **Contexts**        | @home, @work, @errands, #focused, #lowenergy       |
-| ⏳ **Waiting For**     | Track delegated items                              |
-| 💭 **Someday/Maybe**   | Incubate future ideas                              |
-| 📅 **Calendar**        | Time-based task planning                           |
+| 🏷️ **Contexts & Tags** | @home, @work, #focused, #lowenergy                 |
+| 📋 **Board View**      | Kanban-style drag-and-drop                         |
+| 📅 **Calendar**        | Time-based planning + external calendars (ICS)     |
 | 📋 **Weekly Review**   | Guided GTD review wizard                           |
-| 🔁 **Recurring Tasks** | Daily/weekly/monthly + custom weekdays             |
-| 🔄 **File-based Sync** | Dropbox, Syncthing, Google Drive                   |
+| 🔁 **Recurring Tasks** | Daily/weekly/monthly + completion-based            |
+| 📎 **Attachments**     | Files, links, and audio notes                      |
 | 🎙️ **Audio Capture**   | Voice-to-text with local Whisper or Cloud AI       |
 | 🤖 **AI Assistant**    | Clarify, break down, review (optional)             |
 | 🧩 **Copilot**         | Context/tag/time suggestions while typing          |
-| ♻️ **Reusable Lists**  | Duplicate or reset checklists                      |
+| ♻️ **Reusable Lists**  | Duplicate projects or reset checklists             |
+| 🔄 **Sync Options**    | File, WebDAV, Cloud, Local API                     |
 | 📲 **Android Widget**  | Home screen focus/next widget                      |
 | 🌐 **Web App (PWA)**   | Offline-capable browser version                    |
 | 🌍 **i18n**            | EN, 中文, ES, HI, AR, DE, RU, JA, FR, PT, KO, IT, TR |
@@ -102,12 +101,13 @@ Mindwtr is **simple by default and powerful when needed**. We focus on reducing 
 | **Weekly Review** | ✅ | ✅ |
 | **Focus/Zen Mode** | ✅ (Sidebar toggle + Top 3) | ✅ (Zen toggle) |
 | **Notifications** | ✅ | ✅ |
-| **Widgets** | ❌ | ✅ (Android/iOS) |
+| **Widgets** | ❌ | ✅ (Android) |
 | **Global Hotkey** | ✅ | ❌ |
 | **Share Sheet** | ❌ | ✅ |
 | **Keyboard Shortcuts** | ✅ (Vim/Emacs) | ❌ |
 | **File Sync** | ✅ | ✅ |
 | **WebDAV Sync** | ✅ | ✅ |
+| **External Calendars (ICS)** | ✅ | ✅ |
 | **Audio Capture** | ✅ (Whisper/Cloud) | ✅ |
 | **AI Assistant** | ✅ | ✅ |
 
