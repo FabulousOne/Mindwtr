@@ -19,12 +19,14 @@
     "mobile:start": "bun run --filter mobile start",
     "mobile:android": "bun run --filter mobile android",
     "mobile:ios": "bun run --filter mobile ios",
+    "test:e2e": "playwright test",
     "mindwtr:cli": "bun run scripts/mindwtr-cli.ts --",
     "mindwtr:api": "bun run scripts/mindwtr-api.ts --",
     "mindwtr:mcp": "bun run --filter mindwtr-mcp-server dev --",
     "set-version": "bun run scripts/set-version.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "eslint": "^9.39.1"
   },
   "dependencies": {
