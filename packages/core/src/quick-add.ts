@@ -212,7 +212,8 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
             const rawProject = restoreEscapes((plusMatch[1] || '').replace(/\s+/g, ' ').trim());
             if (!rawProject) {
                 working = stripToken(working, plusMatch[0]);
-                return { title: working, props: {} };
+                const title = restoreEscapes(working.replace(/\s{2,}/g, ' ').trim());
+                return { title, props: {} };
             }
             if (projects && projects.length > 0) {
                 const found = projects.find((p) => p.title.toLowerCase() === rawProject.toLowerCase());
