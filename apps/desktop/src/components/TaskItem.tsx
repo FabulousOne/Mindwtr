@@ -16,6 +16,7 @@ import {
 } from '@mindwtr/core';
 import { cn } from '../lib/utils';
 import { PromptModal } from './PromptModal';
+import { ConfirmModal } from './ConfirmModal';
 import { useLanguage } from '../contexts/language-context';
 import { TaskItemEditor } from './Task/TaskItemEditor';
 import { TaskItemDisplay } from './Task/TaskItemDisplay';
@@ -211,6 +212,7 @@ export const TaskItem = memo(function TaskItem({
         editTextDirectionRef.current = editTextDirection;
     }, [editTextDirection]);
     const [isViewOpen, setIsViewOpen] = useState(false);
+    const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
     const prioritiesEnabled = settings?.features?.priorities === true;
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
     const isCompact = settings?.appearance?.density === 'compact';
@@ -677,6 +679,14 @@ export const TaskItem = memo(function TaskItem({
     }, [isEditing, lockEditing, unlockEditing]);
 
 
+    const handleDiscardChanges = useCallback(() => {
+        resetEditState();
+        setIsEditing(false);
+        if (editingTaskId === task.id) {
+            setEditingTaskId(null);
+        }
+    }, [editingTaskId, resetEditState, setEditingTaskId, task.id]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const { title: parsedTitle, props: parsedProps, projectTitle } = parseQuickAdd(editTitle, projects, new Date(), areas);
@@ -910,17 +920,10 @@ export const TaskItem = memo(function TaskItem({
                                 onDuplicateTask={() => duplicateTask(task.id, false)}
                                 onCancel={() => {
                                     if (hasPendingEdits()) {
-                                        const translated = t('taskEdit.discardChanges');
-                                        const message = translated === 'taskEdit.discardChanges'
-                                            ? 'Discard unsaved changes?'
-                                            : translated;
-                                        if (!window.confirm(message)) return;
+                                        setShowDiscardConfirm(true);
+                                        return;
                                     }
-                                    resetEditState();
-                                    setIsEditing(false);
-                                    if (editingTaskId === task.id) {
-                                        setEditingTaskId(null);
-                                    }
+                                    handleDiscardChanges();
                                 }}
                                 onSubmit={handleSubmit}
                             />
@@ -997,6 +1000,22 @@ export const TaskItem = memo(function TaskItem({
                     const added = handleAddLinkAttachment(value);
                     if (!added) return;
                     setShowLinkPrompt(false);
+                }}
+            />
+            <ConfirmModal
+                isOpen={showDiscardConfirm}
+                title={t('taskEdit.discardChanges') === 'taskEdit.discardChanges'
+                    ? 'Discard unsaved changes?'
+                    : t('taskEdit.discardChanges')}
+                description={t('taskEdit.discardChangesDesc') === 'taskEdit.discardChangesDesc'
+                    ? 'Your changes will be lost if you leave now.'
+                    : t('taskEdit.discardChangesDesc')}
+                confirmLabel={t('common.discard') === 'common.discard' ? 'Discard' : t('common.discard')}
+                cancelLabel={t('common.cancel')}
+                onCancel={() => setShowDiscardConfirm(false)}
+                onConfirm={() => {
+                    setShowDiscardConfirm(false);
+                    handleDiscardChanges();
                 }}
             />
             <AudioAttachmentModal
