@@ -18,6 +18,36 @@
 [![Sponsor](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/dongdongbh)
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/D1D01T20WK)
 
+<p align="center" style="text-align: center;">
+  <a href="https://snapcraft.io/mindwtr" target="_blank">
+    <img alt="Get it from the Snap Store"
+         src="https://snapcraft.io/static/images/badges/en/snap-store-black.svg"
+         align="center"
+         style="height: 50px"
+         height="50" />
+  </a>
+  <a href="https://apps.microsoft.com/detail/9n0v5b0b6frx?ocid=webpdpshare" target="_blank">
+    <img src="https://developer.microsoft.com/store/badges/images/English_get-it-from-MS.png"
+         align="center"
+         alt="Microsoft Store"
+         style="height: 50px"
+         height="50" />
+  </a>
+  <a href="https://play.google.com/store/apps/details?id=tech.dongdongbh.mindwtr" target="_blank">
+    <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
+         align="center"
+         alt="Google Play"
+         style="height: 50px"
+         height="50" />
+  </a>
+  <a href="https://aur.archlinux.org/packages/mindwtr-bin" target="_blank">
+    <img src="https://img.shields.io/aur/version/mindwtr-bin?logo=arch-linux&logoColor=white&color=1793d1&label=AUR"
+         align="center"
+         alt="AUR"
+         style="height: 50px"
+         height="50" />
+  </a>
+</p>
 
 </div>
 
@@ -43,16 +73,61 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 
 ## 功能
 
-最受欢迎的亮点：
-- 🎙️ **语音输入**（收集 + 转写）
-- 🔄 **跨平台同步**（文件 / WebDAV / 云 / 本地 API）
-- 📎 **附件**（文件 + 链接）
-- 🧭 **Copilot 建议**（可选，使用自带密钥的 AI）
-- 🗓️ **外部日历（ICS）**
-- ✅ **完整 GTD 工作流**（收件箱处理 + 回顾）
+### GTD 工作流
+- **收集** - 随时快速添加任务（全局快捷键、托盘、分享、语音）
+- **澄清** - 2 分钟法则引导的收件箱处理
+- **组织** - 项目、情境与状态清单
+- **回顾** - 带提醒的每周回顾向导
+- **执行** - 基于情境筛选的下一步行动
+- **AI 辅助（可选）** - 使用自带密钥的 AI 完成澄清、拆解与回顾（OpenAI、Gemini、Claude）
 
-完整功能列表：
-- 📚 https://github.com/dongdongbh/Mindwtr/wiki
+### 视图
+- 📥 **收件箱** - 任务收集区与处理向导
+- 🎯 **聚焦** - 日程（时间维度）+ 下一步行动合并视图
+- 📁 **项目** - 带领域的多步骤成果
+- 🏷️ **情境** - 层级情境（@work/meetings）
+- ⏳ **等待中** - 委派事项
+- 💭 **将来/也许** - 延后想法
+- 📅 **日历** - 基于时间的规划
+- 📋 **看板** - 看板式拖拽
+- 📝 **回顾** - 每日 + 每周回顾流程
+- 📦 **归档** - 隐藏历史，按需搜索
+
+### 生产力功能
+- 🔍 **全局搜索** - 搜索操作符（status:, context:, due:<=7d）
+- 📦 **批量操作** - 多选、批量移动/打标签/删除
+- 📎 **附件** - 任务支持文件与链接
+- ✏️ **Markdown 备注** - 富文本描述与预览
+- 🗂️ **项目状态** - 进行中、等待中、将来/也许、归档
+- ♾️ **流动重复** - 固定日期或“完成后 X 天”
+- ♻️ **可复用清单** - 复制任务或重置清单
+- ✅ **清单模式** - 清单任务快速勾选
+- ✅ **语音收集** - 语音快速记录、自动转写并创建任务
+- 🧭 **Copilot 建议** - 可选的情境/标签/时间提示
+- 🔔 **通知** - 截止提醒与稍后提醒
+- 📊 **每日摘要** - 早间简报 + 晚间回顾
+- 📅 **每周回顾** - 可定制的每周提醒
+
+### 数据与同步
+- 📁 **文件同步** - Dropbox、Google Drive、Syncthing 等
+- 🌐 **WebDAV 同步** - Nextcloud、ownCloud、自建
+- 📤 **导出/备份** - 导出 JSON 数据
+- 🗓️ **外部日历（ICS）** - 只读日历叠加
+
+### 自动化
+- 🔌 **CLI** - 终端添加/列出/完成/搜索
+- 🌐 **REST API** - 本地 API 便于脚本化
+- 🌍 **Web 应用（PWA）** - 浏览器离线访问
+- 🧠 **MCP 服务器** - 本地 Model Context Protocol 服务用于 LLM 自动化
+
+### 跨平台
+- 🖥️ **桌面端** - Tauri v2（macOS、Linux、Windows）
+- 📱 **移动端** - React Native/Expo（~iOS~、Android）
+- 📲 **Android 小部件** - 桌面焦点/下一步小组件
+- ⌨️ **键盘快捷键** - Vim 与 Emacs 预设
+- 🎨 **主题** - 明/暗模式
+- 🌍 **国际化** - 英文、中文、西班牙语、印地语、阿拉伯语、德语、俄语、日语、法语、葡萄牙语、韩语、意大利语、土耳其语
+- 🐳 **Docker** - 使用 Docker 运行 PWA + 自托管同步服务
 
 ## 安装
 
@@ -156,7 +231,8 @@ brew install --cask mindwtr
 
 其他方式：从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 APK。
 
-**iOS：** iOS 构建需要 Apple Developer 账号（$99/年），目前仅提供模拟器构建。
+**iOS：**
+iOS 构建需要 Apple Developer 账号（$99/年），目前仅提供模拟器构建。如果你希望获得 iOS 构建，请考虑 [赞助开发者](https://github.com/sponsors/dongdongbh) 或 [在 Ko-fi 支持](https://ko-fi.com/D1D01T20WK)，以资助 Apple Developer 账号。
 
 ### Docker（PWA + 云同步）
 

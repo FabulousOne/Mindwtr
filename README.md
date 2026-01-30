@@ -18,6 +18,36 @@ A complete Getting Things Done (GTD) productivity system for desktop and mobile.
 [![Sponsor](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/dongdongbh)
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/D1D01T20WK)
 
+<p align="center" style="text-align: center;">
+  <a href="https://snapcraft.io/mindwtr" target="_blank">
+    <img alt="Get it from the Snap Store"
+         src="https://snapcraft.io/static/images/badges/en/snap-store-black.svg"
+         align="center"
+         style="height: 50px"
+         height="50" />
+  </a>
+  <a href="https://apps.microsoft.com/detail/9n0v5b0b6frx?ocid=webpdpshare" target="_blank">
+    <img src="https://developer.microsoft.com/store/badges/images/English_get-it-from-MS.png"
+         align="center"
+         alt="Microsoft Store"
+         style="height: 50px"
+         height="50" />
+  </a>
+  <a href="https://play.google.com/store/apps/details?id=tech.dongdongbh.mindwtr" target="_blank">
+    <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
+         align="center"
+         alt="Google Play"
+         style="height: 50px"
+         height="50" />
+  </a>
+  <a href="https://aur.archlinux.org/packages/mindwtr-bin" target="_blank">
+    <img src="https://img.shields.io/aur/version/mindwtr-bin?logo=arch-linux&logoColor=white&color=1793d1&label=AUR"
+         align="center"
+         alt="AUR"
+         style="height: 50px"
+         height="50" />
+  </a>
+</p>
 
 </div>
 
@@ -43,16 +73,61 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 
 ## Features
 
-Most-loved highlights:
-- 🎙️ **Voice input** (capture + transcription)
-- 🔄 **Sync** across platforms (File, WebDAV, Cloud, Local API)
-- 📎 **Attachments** (files + links)
-- 🧭 **Copilot Suggestions** (optional, BYOK AI)
-- 🗓️ **External Calendars (ICS)**
-- ✅ **Full GTD workflow** with inbox processing + reviews
+### GTD Workflow
+- **Capture** - Quick add tasks from anywhere (global hotkey, tray, share sheet, voice)
+- **Clarify** - Guided inbox processing with 2-minute rule
+- **Organize** - Projects, contexts, and status lists
+- **Reflect** - Weekly review wizard with reminders
+- **Engage** - Context-filtered next actions
+- **AI Assist (Optional)** - Clarify, break down, and review with BYOK AI (OpenAI, Gemini, Claude)
 
-Full feature list:
-- 📚 https://github.com/dongdongbh/Mindwtr/wiki
+### Views
+- 📥 **Inbox** - Capture zone with processing wizard
+- 🎯 **Focus** - Agenda (time-based) + Next Actions in one view
+- 📁 **Projects** - Multi-step outcomes with areas
+- 🏷️ **Contexts** - Hierarchical contexts (@work/meetings)
+- ⏳ **Waiting For** - Delegated items
+- 💭 **Someday/Maybe** - Deferred ideas
+- 📅 **Calendar** - Time-based planning
+- 📋 **Board** - Kanban-style drag-and-drop
+- 📝 **Review** - Daily + weekly review workflows
+- 📦 **Archived** - Hidden history, searchable when needed
+
+### Productivity Features
+- 🔍 **Global Search** - Search operators (status:, context:, due:<=7d)
+- 📦 **Bulk Actions** - Multi-select, batch move/tag/delete
+- 📎 **Attachments** - Files and links on tasks
+- ✏️ **Markdown Notes** - Rich text descriptions with preview
+- 🗂️ **Project States** - Active, Waiting, Someday, Archived
+- ♾️ **Fluid Recurrence** - Strict dates or “X days after completion”
+- ♻️ **Reusable Lists** - Duplicate tasks or reset checklists
+- ✅ **Checklist Mode** - Fast list-style checking for checklist tasks
+- ✅ **Audio Capture** - Quick voice capture with automatic transcription and task creation
+- 🧭 **Copilot Suggestions** - Optional context/tag/time hints while typing
+- 🔔 **Notifications** - Due date reminders with snooze
+- 📊 **Daily Digest** - Morning briefing + evening review
+- 📅 **Weekly Review** - Customizable weekly reminder
+
+### Data & Sync
+- 📁 **File Sync** - Dropbox, Google Drive, Syncthing, etc.
+- 🌐 **WebDAV Sync** - Nextcloud, ownCloud, self-hosted
+- 📤 **Export/Backup** - Export data to JSON
+- 🗓️ **External Calendars (ICS)** - View-only calendar overlay
+
+### Automation
+- 🔌 **CLI** - Add, list, complete, search from terminal
+- 🌐 **REST API** - Local API server for scripting
+- 🌍 **Web App (PWA)** - Browser access with offline support
+- 🧠 **MCP Server** - Local Model Context Protocol server for LLM automation
+
+### Cross-Platform
+- 🖥️ **Desktop** - Tauri v2 (macOS, Linux, Windows)
+- 📱 **Mobile** - React Native/Expo (~iOS~, Android)
+- 📲 **Android Widget** - Home screen focus/next widget
+- ⌨️ **Keyboard Shortcuts** - Vim and Emacs presets
+- 🎨 **Themes** - Light/Dark
+- 🌍 **i18n** - English, Chinese, Spanish, Hindi, Arabic, German, Russian, Japanese, French, Portuguese, Korean, Italian, Turkish
+- 🐳 **Docker** - Run the PWA + self-hosted sync server with Docker
 
 ## Installation
 
@@ -156,7 +231,8 @@ brew install --cask mindwtr
 
 Other methods: APK from [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases).
 
-**iOS:** iOS builds require an Apple Developer account ($99/year). Currently available as simulator builds only.
+**iOS:**
+iOS builds require an Apple Developer account ($99/year). Currently available as simulator builds only. If you want iOS builds, please consider [sponsoring the developer](https://github.com/sponsors/dongdongbh) or [supporting on Ko-fi](https://ko-fi.com/D1D01T20WK) so we can fund the Apple Developer account.
 
 ### Docker (PWA + Cloud Sync)
 
