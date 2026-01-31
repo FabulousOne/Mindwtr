@@ -86,4 +86,14 @@ describe('quick-add', () => {
         expect(result.title).toBe('Draft report');
         expect(result.props.areaId).toBe('a1');
     });
+
+    it('supports unicode tags and contexts', () => {
+        const now = new Date('2025-01-01T10:00:00Z');
+        const result = parseQuickAdd('计划 @工作 #项目 /next', undefined, now);
+
+        expect(result.title).toBe('计划');
+        expect(result.props.contexts).toEqual(['@工作']);
+        expect(result.props.tags).toEqual(['#项目']);
+        expect(result.props.status).toBe('next');
+    });
 });
