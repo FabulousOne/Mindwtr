@@ -193,7 +193,7 @@ export default function SettingsPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
     const [syncPath, setSyncPath] = useState<string | null>(null);
-    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav' | 'cloud' | 'off'>('file');
+    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav' | 'cloud' | 'off'>('off');
     const [webdavUrl, setWebdavUrl] = useState('');
     const [webdavUsername, setWebdavUsername] = useState('');
     const [webdavPassword, setWebdavPassword] = useState('');
@@ -206,6 +206,7 @@ export default function SettingsPage() {
     const [weeklyReviewDayPickerOpen, setWeeklyReviewDayPickerOpen] = useState(false);
     const [modelPicker, setModelPicker] = useState<null | 'model' | 'copilot' | 'speech'>(null);
     const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+    const [syncOptionsOpen, setSyncOptionsOpen] = useState(false);
     const [externalCalendars, setExternalCalendars] = useState<ExternalCalendarSubscription[]>([]);
     const [newCalendarName, setNewCalendarName] = useState('');
     const [newCalendarUrl, setNewCalendarUrl] = useState('');
@@ -237,6 +238,11 @@ export default function SettingsPage() {
         ...(lastSyncStats?.tasks.conflictIds ?? []),
         ...(lastSyncStats?.projects.conflictIds ?? []),
     ].slice(0, 6);
+    const syncPreferences = settings.syncPreferences ?? {};
+    const syncAppearanceEnabled = syncPreferences.appearance === true;
+    const syncLanguageEnabled = syncPreferences.language === true;
+    const syncExternalCalendarsEnabled = syncPreferences.externalCalendars === true;
+    const syncAiEnabled = syncPreferences.ai === true;
     const syncHistory = settings.lastSyncHistory ?? [];
     const syncHistoryEntries = syncHistory.slice(0, 5);
     const webdavUrlError = webdavUrl.trim() ? !isValidHttpUrl(webdavUrl.trim()) : false;
@@ -284,6 +290,10 @@ export default function SettingsPage() {
         : 7;
     const prioritiesEnabled = settings.features?.priorities === true;
     const timeEstimatesEnabled = settings.features?.timeEstimates === true;
+
+    const updateSyncPreferences = (partial: Partial<NonNullable<AppData['settings']['syncPreferences']>>) => {
+        updateSettings({ syncPreferences: { ...syncPreferences, ...partial } }).catch(logSettingsError);
+    };
 
     const scrollContentStyle = useMemo(
         () => [styles.scrollContent, { paddingBottom: 16 + insets.bottom }],
@@ -394,7 +404,10 @@ export default function SettingsPage() {
             const cloudSyncToken = entryMap.get(CLOUD_TOKEN_KEY);
 
             if (path) setSyncPath(path);
-            setSyncBackend(backend === 'webdav' || backend === 'cloud' || backend === 'off' ? backend : 'file');
+            const resolvedBackend = backend === 'webdav' || backend === 'cloud' || backend === 'off' || backend === 'file'
+                ? backend
+                : 'off';
+            setSyncBackend(resolvedBackend);
             if (url) setWebdavUrl(url);
             if (username) setWebdavUsername(username);
             if (password) setWebdavPassword(password);
@@ -404,8 +417,28 @@ export default function SettingsPage() {
     }, []);
 
     useEffect(() => {
-        getExternalCalendars().then(setExternalCalendars).catch(logSettingsError);
-    }, []);
+        let cancelled = false;
+        const load = async () => {
+            try {
+                const stored = await getExternalCalendars();
+                if (cancelled) return;
+                if (Array.isArray(settings.externalCalendars)) {
+                    setExternalCalendars(settings.externalCalendars);
+                    if (settings.externalCalendars.length || stored.length) {
+                        await saveExternalCalendars(settings.externalCalendars);
+                    }
+                    return;
+                }
+                setExternalCalendars(stored);
+            } catch (error) {
+                logSettingsError(error);
+            }
+        };
+        void load();
+        return () => {
+            cancelled = true;
+        };
+    }, [settings.externalCalendars]);
 
     useEffect(() => {
         loadAIKey(aiProvider).then(setAiApiKey).catch(logSettingsError);
@@ -2754,18 +2787,21 @@ export default function SettingsPage() {
             setNewCalendarName('');
             setNewCalendarUrl('');
             await saveExternalCalendars(next);
+            await updateSettings({ externalCalendars: next });
         };
 
         const handleToggleCalendar = async (id: string, enabled: boolean) => {
             const next = externalCalendars.map((c) => (c.id === id ? { ...c, enabled } : c));
             setExternalCalendars(next);
             await saveExternalCalendars(next);
+            await updateSettings({ externalCalendars: next });
         };
 
         const handleRemoveCalendar = async (id: string) => {
             const next = externalCalendars.filter((c) => c.id !== id);
             setExternalCalendars(next);
             await saveExternalCalendars(next);
+            await updateSettings({ externalCalendars: next });
         };
 
         const handleTestFetch = async () => {
@@ -3364,7 +3400,92 @@ export default function SettingsPage() {
                     )}
 
 
-                    <Text style={[styles.sectionTitle, { color: tc.text, marginTop: 16 }]}>
+                    {/* Backup Section */}
+                    <Text style={[styles.sectionTitle, { color: tc.text, marginTop: 24 }]}>
+                        {localize('Backup', '备份')}
+                    </Text>
+                    <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
+                        <TouchableOpacity
+                            style={styles.settingRow}
+                            onPress={handleBackup}
+                            disabled={isSyncing}
+                        >
+                            <View style={styles.settingInfo}>
+                                <Text style={[styles.settingLabel, { color: '#3B82F6' }]}>
+                                    {localize('Export Backup', '导出备份')}
+                                </Text>
+                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                    {localize('Save to sync folder', '保存到同步文件夹')}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginTop: 16 }]}>
+                        <TouchableOpacity
+                            style={styles.settingRow}
+                            onPress={() => setSyncOptionsOpen((prev) => !prev)}
+                        >
+                            <View style={styles.settingInfo}>
+                                <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.syncPreferences')}</Text>
+                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                    {t('settings.syncPreferencesDesc')}
+                                </Text>
+                            </View>
+                            <Text style={[styles.chevron, { color: tc.secondaryText }]}>
+                                {syncOptionsOpen ? '▾' : '▸'}
+                            </Text>
+                        </TouchableOpacity>
+                        {syncOptionsOpen && (
+                            <>
+                                <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.syncPreferenceAppearance')}</Text>
+                                    </View>
+                                    <Switch
+                                        value={syncAppearanceEnabled}
+                                        onValueChange={(value) => updateSyncPreferences({ appearance: value })}
+                                        trackColor={{ false: '#767577', true: '#3B82F6' }}
+                                    />
+                                </View>
+                                <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.syncPreferenceLanguage')}</Text>
+                                    </View>
+                                    <Switch
+                                        value={syncLanguageEnabled}
+                                        onValueChange={(value) => updateSyncPreferences({ language: value })}
+                                        trackColor={{ false: '#767577', true: '#3B82F6' }}
+                                    />
+                                </View>
+                                <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.syncPreferenceExternalCalendars')}</Text>
+                                    </View>
+                                    <Switch
+                                        value={syncExternalCalendarsEnabled}
+                                        onValueChange={(value) => updateSyncPreferences({ externalCalendars: value })}
+                                        trackColor={{ false: '#767577', true: '#3B82F6' }}
+                                    />
+                                </View>
+                                <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.syncPreferenceAi')}</Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {t('settings.syncPreferenceAiHint')}
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={syncAiEnabled}
+                                        onValueChange={(value) => updateSyncPreferences({ ai: value })}
+                                        trackColor={{ false: '#767577', true: '#3B82F6' }}
+                                    />
+                                </View>
+                            </>
+                        )}
+                    </View>
+
+                    <Text style={[styles.sectionTitle, { color: tc.text, marginTop: 24 }]}>
                         {t('settings.diagnostics')}
                     </Text>
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
@@ -3405,27 +3526,6 @@ export default function SettingsPage() {
                             </>
                         )}
                     </View>
-
-                    {/* Backup Section */}
-                    <Text style={[styles.sectionTitle, { color: tc.text, marginTop: 24 }]}>
-                        {localize('Backup', '备份')}
-                    </Text>
-                    <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
-                        <TouchableOpacity
-                            style={styles.settingRow}
-                            onPress={handleBackup}
-                            disabled={isSyncing}
-                        >
-                            <View style={styles.settingInfo}>
-                                <Text style={[styles.settingLabel, { color: '#3B82F6' }]}>
-                                    {localize('Export Backup', '导出备份')}
-                                </Text>
-                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                    {localize('Save to sync folder', '保存到同步文件夹')}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    </View>
                 </ScrollView>
             </SafeAreaView>
         );
@@ -3444,22 +3544,6 @@ export default function SettingsPage() {
                                 {Constants.expoConfig?.version ?? '0.1.0'}
                             </Text>
                         </View>
-                        <TouchableOpacity
-                            style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
-                            onPress={handleCheckUpdates}
-                            disabled={isCheckingUpdate}
-                        >
-                            <Text style={[styles.settingLabel, { color: tc.text }]}>
-                                {localize('Check for Updates', '检查更新')}
-                            </Text>
-                            {isCheckingUpdate ? (
-                                <ActivityIndicator size="small" color="#3B82F6" />
-                            ) : (
-                                <Text style={styles.linkText}>
-                                    {localize('Tap to check', '点击检查')}
-                                </Text>
-                            )}
-                        </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
                             onPress={() => openLink('https://github.com/dongdongbh/Mindwtr/wiki')}
@@ -3496,6 +3580,22 @@ export default function SettingsPage() {
                             <Text style={[styles.settingLabel, { color: tc.text }]}>{localize('License', '许可证')}</Text>
                             <Text style={[styles.settingValue, { color: tc.secondaryText }]}>AGPL-3.0</Text>
                         </View>
+                        <TouchableOpacity
+                            style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+                            onPress={handleCheckUpdates}
+                            disabled={isCheckingUpdate}
+                        >
+                            <Text style={[styles.settingLabel, { color: tc.text }]}>
+                                {localize('Check for Updates', '检查更新')}
+                            </Text>
+                            {isCheckingUpdate ? (
+                                <ActivityIndicator size="small" color="#3B82F6" />
+                            ) : (
+                                <Text style={styles.linkText}>
+                                    {localize('Tap to check', '点击检查')}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </ScrollView>
             </SafeAreaView>

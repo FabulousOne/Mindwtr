@@ -30,6 +30,7 @@ import {
 import { isTauriRuntime } from './runtime';
 import { reportError } from './report-error';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
+import { ExternalCalendarService } from './external-calendar-service';
 import { webStorage } from './storage-adapter-web';
 
 type SyncBackend = 'off' | 'file' | 'webdav' | 'cloud';
@@ -77,6 +78,36 @@ const logSyncWarning = (message: string, error?: unknown) => {
         ? { error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)) }
         : undefined;
     void logWarn(message, { scope: 'sync', extra });
+};
+
+const injectExternalCalendars = async (data: AppData): Promise<AppData> => {
+    if (data.settings.syncPreferences?.externalCalendars !== true) return data;
+    try {
+        const stored = await ExternalCalendarService.getCalendars();
+        if (!stored.length) return data;
+        if (data.settings.externalCalendars && data.settings.externalCalendars.length > 0) {
+            return data;
+        }
+        return {
+            ...data,
+            settings: {
+                ...data.settings,
+                externalCalendars: stored,
+            },
+        };
+    } catch (error) {
+        logSyncWarning('Failed to load external calendars for sync', error);
+        return data;
+    }
+};
+
+const persistExternalCalendars = async (data: AppData): Promise<void> => {
+    if (data.settings.syncPreferences?.externalCalendars !== true) return;
+    try {
+        await ExternalCalendarService.setCalendars(data.settings.externalCalendars ?? []);
+    } catch (error) {
+        logSyncWarning('Failed to save external calendars from sync', error);
+    }
 };
 
 class LocalSyncAbort extends Error {
@@ -390,6 +421,43 @@ const sanitizeAppDataForRemote = (data: AppData): AppData => {
         });
     };
 
+    const sanitizeSettingsForRemote = (settings: AppData['settings']): AppData['settings'] => {
+        const prefs = settings.syncPreferences ?? {};
+        const next: AppData['settings'] = { ...settings };
+
+        if (prefs.appearance !== true) {
+            next.theme = undefined;
+            next.appearance = undefined;
+        }
+
+        if (prefs.language !== true) {
+            next.language = undefined;
+            next.weekStart = undefined;
+            next.dateFormat = undefined;
+        }
+
+        if (prefs.externalCalendars !== true) {
+            next.externalCalendars = undefined;
+        }
+
+        if (prefs.ai !== true) {
+            next.ai = undefined;
+        } else if (next.ai) {
+            next.ai = {
+                ...next.ai,
+                apiKey: undefined,
+                speechToText: next.ai.speechToText
+                    ? {
+                        ...next.ai.speechToText,
+                        offlineModelPath: undefined,
+                    }
+                    : next.ai.speechToText,
+            };
+        }
+
+        return next;
+    };
+
     return {
         ...data,
         tasks: data.tasks.map((task) => ({
@@ -400,6 +468,7 @@ const sanitizeAppDataForRemote = (data: AppData): AppData => {
             ...project,
             attachments: sanitizeAttachments(project.attachments),
         })),
+        settings: sanitizeSettingsForRemote(data.settings),
     };
 };
 
@@ -1264,9 +1333,10 @@ export class SyncService {
             }
             const syncResult = await performSyncCycle({
                 readLocal: async () => {
-                    const data = isTauriRuntime()
+                    const baseData = isTauriRuntime()
                         ? await tauriInvoke<AppData>('get_data')
                         : await webStorage.getData();
+                    const data = await injectExternalCalendars(baseData);
                     localSnapshotChangeAt = useTaskStore.getState().lastDataChangeAt;
                     return data;
                 },
@@ -1343,6 +1413,7 @@ export class SyncService {
             });
             const stats = syncResult.stats;
             let mergedData = syncResult.data;
+            await persistExternalCalendars(mergedData);
             const conflictCount = (stats.tasks.conflicts || 0) + (stats.projects.conflicts || 0);
             const maxClockSkewMs = Math.max(stats.tasks.maxClockSkewMs || 0, stats.projects.maxClockSkewMs || 0);
             const timestampAdjustments = (stats.tasks.timestampAdjustments || 0) + (stats.projects.timestampAdjustments || 0);

@@ -42,35 +42,6 @@ export function SettingsAboutPage({
             </div>
             <div className="border-t border-border/50"></div>
             <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">{t.checkForUpdates}</span>
-                <button
-                    onClick={onCheckUpdates}
-                    disabled={isCheckingUpdate}
-                    className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                        isCheckingUpdate
-                            ? "bg-muted text-muted-foreground cursor-not-allowed"
-                            : "bg-primary text-primary-foreground hover:bg-primary/90",
-                    )}
-                >
-                    <RefreshCw className={cn("w-4 h-4", isCheckingUpdate && "animate-spin")} />
-                    {isCheckingUpdate ? t.checking : t.checkForUpdates}
-                </button>
-            </div>
-            {updateError && (
-                <>
-                    <div className="border-t border-border/50"></div>
-                    <div className="text-red-500 text-sm">{t.checkFailed}</div>
-                </>
-            )}
-            {updateNotice && !updateError && (
-                <>
-                    <div className="border-t border-border/50"></div>
-                    <div className="text-sm text-muted-foreground">{updateNotice}</div>
-                </>
-            )}
-            <div className="border-t border-border/50"></div>
-            <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">{t.documentation}</span>
                 <button
                     onClick={() => onOpenLink('https://github.com/dongdongbh/Mindwtr/wiki')}
@@ -123,6 +94,29 @@ export function SettingsAboutPage({
                 <span className="text-muted-foreground">{t.license}</span>
                 <span className="font-medium">AGPL-3.0</span>
             </div>
+            <div className="border-t border-border/50"></div>
+            <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">{t.checkForUpdates}</span>
+                <button
+                    onClick={onCheckUpdates}
+                    disabled={isCheckingUpdate}
+                    className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                        isCheckingUpdate
+                            ? "bg-muted text-muted-foreground cursor-not-allowed"
+                            : "bg-primary text-primary-foreground hover:bg-primary/90",
+                    )}
+                >
+                    <RefreshCw className={cn("w-4 h-4", isCheckingUpdate && "animate-spin")} />
+                    {isCheckingUpdate ? t.checking : t.checkForUpdates}
+                </button>
+            </div>
+            {updateError && (
+                <div className="text-red-500 text-sm">{t.checkFailed}</div>
+            )}
+            {updateNotice && !updateError && (
+                <div className="text-sm text-muted-foreground">{updateNotice}</div>
+            )}
         </div>
     );
 }

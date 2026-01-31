@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { AppData } from '@mindwtr/core';
 import { safeFormatDate } from '@mindwtr/core';
 import { ExternalLink, Info, RefreshCw, Trash2 } from 'lucide-react';
@@ -18,6 +19,13 @@ type Labels = {
     syncBackendFile: string;
     syncBackendWebdav: string;
     syncBackendCloud: string;
+    syncPreferences: string;
+    syncPreferencesDesc: string;
+    syncPreferenceAppearance: string;
+    syncPreferenceLanguage: string;
+    syncPreferenceExternalCalendars: string;
+    syncPreferenceAi: string;
+    syncPreferenceAiHint: string;
     syncFolderLocation: string;
     savePath: string;
     browse: string;
@@ -61,6 +69,8 @@ type SettingsSyncPageProps = {
     onClearLog: () => void;
     syncBackend: SyncBackend;
     onSetSyncBackend: (backend: SyncBackend) => void;
+    syncPreferences: AppData['settings']['syncPreferences'] | undefined;
+    onUpdateSyncPreferences: (updates: Partial<NonNullable<AppData['settings']['syncPreferences']>>) => Promise<void> | void;
     syncPath: string;
     onSyncPathChange: (value: string) => void;
     onSaveSyncPath: () => Promise<void> | void;
@@ -120,6 +130,8 @@ export function SettingsSyncPage({
     onClearLog,
     syncBackend,
     onSetSyncBackend,
+    syncPreferences,
+    onUpdateSyncPreferences,
     syncPath,
     onSyncPathChange,
     onSaveSyncPath,
@@ -167,90 +179,49 @@ export function SettingsSyncPage({
         ...(lastSyncStats?.projects.conflictIds ?? []),
     ].slice(0, 6);
     const historyEntries = (lastSyncHistory ?? []).slice(0, 6);
+    const syncPrefs = syncPreferences ?? {};
     const formatHistoryStatus = (status: 'success' | 'conflict' | 'error') => {
         if (status === 'success') return t.lastSyncSuccess;
         if (status === 'conflict') return t.lastSyncConflict;
         return t.lastSyncError;
     };
+    const [syncOptionsOpen, setSyncOptionsOpen] = useState(false);
+
+    const renderSyncToggle = (
+        key: keyof NonNullable<AppData['settings']['syncPreferences']>,
+        label: string,
+        hint?: string
+    ) => {
+        const checked = syncPrefs?.[key] === true;
+        return (
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <p className="text-sm font-medium">{label}</p>
+                    {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+                </div>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={checked}
+                    onClick={() => onUpdateSyncPreferences({ [key]: !checked } as Partial<NonNullable<AppData['settings']['syncPreferences']>>)}
+                    className={cn(
+                        "relative inline-flex h-5 w-9 items-center rounded-full border transition-colors",
+                        checked ? "bg-primary border-primary" : "bg-muted/50 border-border",
+                    )}
+                >
+                    <span
+                        className={cn(
+                            "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                            checked ? "translate-x-4" : "translate-x-1",
+                        )}
+                    />
+                </button>
+            </div>
+        );
+    };
 
     return (
         <div className="space-y-8">
-            {isTauri && (
-                <section className="space-y-3">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
-                        <Info className="w-5 h-5" />
-                        {t.diagnostics}
-                    </h2>
-                    <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-                        <p className="text-sm text-muted-foreground">{t.diagnosticsDesc}</p>
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <p className="text-sm font-medium">{t.debugLogging}</p>
-                                <p className="text-xs text-muted-foreground">{t.debugLoggingDesc}</p>
-                            </div>
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={loggingEnabled}
-                                onClick={onToggleLogging}
-                                className={cn(
-                                    "relative inline-flex h-5 w-9 items-center rounded-full border transition-colors",
-                                    loggingEnabled ? "bg-primary border-primary" : "bg-muted/50 border-border"
-                                )}
-                            >
-                                <span
-                                    className={cn(
-                                        "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
-                                        loggingEnabled ? "translate-x-4" : "translate-x-1"
-                                    )}
-                                />
-                            </button>
-                        </div>
-                        {loggingEnabled && logPath && (
-                            <div className="text-xs text-muted-foreground">
-                                <span className="font-medium">{t.logFile}:</span>{' '}
-                                <span className="font-mono break-all">{logPath}</span>
-                            </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={onClearLog}
-                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors"
-                            >
-                                {t.clearLog}
-                            </button>
-                        </div>
-                    </div>
-                </section>
-            )}
-
-            <section className="space-y-3">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Trash2 className="w-5 h-5" />
-                    {t.attachmentsCleanup}
-                </h2>
-                <div className="bg-card border border-border rounded-lg p-6 space-y-3">
-                    <p className="text-sm text-muted-foreground">{t.attachmentsCleanupDesc}</p>
-                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-                        <div className="text-muted-foreground">
-                            {t.attachmentsCleanupLastRun}:{' '}
-                            <span className="font-medium text-foreground">
-                                {attachmentsLastCleanupDisplay || t.attachmentsCleanupNever}
-                            </span>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={onRunAttachmentsCleanup}
-                            className="px-3 py-1.5 rounded-md text-xs font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors"
-                            disabled={!isTauri || isCleaningAttachments}
-                        >
-                            {isCleaningAttachments ? t.attachmentsCleanupRunning : t.attachmentsCleanupRun}
-                        </button>
-                    </div>
-                </div>
-            </section>
-
             <section className="space-y-3">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                     <RefreshCw className="w-5 h-5" />
@@ -436,6 +407,28 @@ export function SettingsSyncPage({
                         </div>
                     )}
 
+                    <div className="border-t border-border/60 pt-4 space-y-3">
+                        <button
+                            type="button"
+                            onClick={() => setSyncOptionsOpen((prev) => !prev)}
+                            className="w-full flex items-start justify-between gap-4 text-left"
+                        >
+                            <div>
+                                <div className="text-sm font-medium">{t.syncPreferences}</div>
+                                <p className="text-xs text-muted-foreground">{t.syncPreferencesDesc}</p>
+                            </div>
+                            <span className="text-muted-foreground">{syncOptionsOpen ? '▾' : '▸'}</span>
+                        </button>
+                        {syncOptionsOpen && (
+                            <div className="space-y-3">
+                                {renderSyncToggle('appearance', t.syncPreferenceAppearance)}
+                                {renderSyncToggle('language', t.syncPreferenceLanguage)}
+                                {renderSyncToggle('externalCalendars', t.syncPreferenceExternalCalendars)}
+                                {renderSyncToggle('ai', t.syncPreferenceAi, t.syncPreferenceAiHint)}
+                            </div>
+                        )}
+                    </div>
+
                     {isSyncTargetValid && (
                         <div className="pt-2 flex items-center gap-3">
                             <button
@@ -508,6 +501,82 @@ export function SettingsSyncPage({
                     </div>
                 </div>
             </section>
+
+            <section className="space-y-3">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <Trash2 className="w-5 h-5" />
+                    {t.attachmentsCleanup}
+                </h2>
+                <div className="bg-card border border-border rounded-lg p-6 space-y-3">
+                    <p className="text-sm text-muted-foreground">{t.attachmentsCleanupDesc}</p>
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                        <div className="text-muted-foreground">
+                            {t.attachmentsCleanupLastRun}:{' '}
+                            <span className="font-medium text-foreground">
+                                {attachmentsLastCleanupDisplay || t.attachmentsCleanupNever}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onRunAttachmentsCleanup}
+                            className="px-3 py-1.5 rounded-md text-xs font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                            disabled={!isTauri || isCleaningAttachments}
+                        >
+                            {isCleaningAttachments ? t.attachmentsCleanupRunning : t.attachmentsCleanupRun}
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            {isTauri && (
+                <section className="space-y-3">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <Info className="w-5 h-5" />
+                        {t.diagnostics}
+                    </h2>
+                    <div className="bg-card border border-border rounded-lg p-6 space-y-4">
+                        <p className="text-sm text-muted-foreground">{t.diagnosticsDesc}</p>
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <p className="text-sm font-medium">{t.debugLogging}</p>
+                                <p className="text-xs text-muted-foreground">{t.debugLoggingDesc}</p>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={loggingEnabled}
+                                onClick={onToggleLogging}
+                                className={cn(
+                                    "relative inline-flex h-5 w-9 items-center rounded-full border transition-colors",
+                                    loggingEnabled ? "bg-primary border-primary" : "bg-muted/50 border-border"
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                                        loggingEnabled ? "translate-x-4" : "translate-x-1"
+                                    )}
+                                />
+                            </button>
+                        </div>
+                        {loggingEnabled && logPath && (
+                            <div className="text-xs text-muted-foreground">
+                                <span className="font-medium">{t.logFile}:</span>{' '}
+                                <span className="font-mono break-all">{logPath}</span>
+                            </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={onClearLog}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                            >
+                                {t.clearLog}
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            )}
         </div>
     );
 }

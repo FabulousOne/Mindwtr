@@ -4,6 +4,7 @@ import { mobileStorage } from './storage-adapter';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { readSyncFile, writeSyncFile } from './storage-file';
 import { getBaseSyncUrl, getCloudBaseUrl, sanitizeAppDataForRemote, syncCloudAttachments, syncFileAttachments, syncWebdavAttachments, cleanupAttachmentTempFiles } from './attachment-sync';
+import { getExternalCalendars, saveExternalCalendars } from './external-calendar';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
   SYNC_PATH_KEY,
@@ -23,6 +24,36 @@ const LEGACY_SYNC_FILE_NAME = 'mindwtr-sync.json';
 const logSyncWarning = (message: string, error?: unknown) => {
   const extra = error ? { error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)) } : undefined;
   void logWarn(message, { scope: 'sync', extra });
+};
+
+const injectExternalCalendars = async (data: AppData): Promise<AppData> => {
+  if (data.settings.syncPreferences?.externalCalendars !== true) return data;
+  try {
+    const stored = await getExternalCalendars();
+    if (!stored.length) return data;
+    if (data.settings.externalCalendars && data.settings.externalCalendars.length > 0) {
+      return data;
+    }
+    return {
+      ...data,
+      settings: {
+        ...data.settings,
+        externalCalendars: stored,
+      },
+    };
+  } catch (error) {
+    logSyncWarning('Failed to load external calendars for sync', error);
+    return data;
+  }
+};
+
+const persistExternalCalendars = async (data: AppData): Promise<void> => {
+  if (data.settings.syncPreferences?.externalCalendars !== true) return;
+  try {
+    await saveExternalCalendars(data.settings.externalCalendars ?? []);
+  } catch (error) {
+    logSyncWarning('Failed to save external calendars from sync', error);
+  }
 };
 
 const normalizeWebdavUrl = (rawUrl: string): string => {
@@ -150,7 +181,10 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         logSyncWarning('Attachment pre-sync warning', error);
       }
       const syncResult = await performSyncCycle({
-        readLocal: async () => await mobileStorage.getData(),
+        readLocal: async () => {
+          const baseData = await mobileStorage.getData();
+          return await injectExternalCalendars(baseData);
+        },
         readRemote: async () => {
           if (backend === 'webdav' && webdavConfig?.url) {
             return await webdavGetJson<AppData>(webdavConfig.url, {
@@ -218,6 +252,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
       }
 
       let mergedData = syncResult.data;
+      await persistExternalCalendars(mergedData);
 
       const webdavConfigValue = webdavConfig as { url: string; username: string; password: string } | null;
       const cloudConfigValue = cloudConfig as { url: string; token: string } | null;

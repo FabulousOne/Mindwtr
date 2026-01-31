@@ -1,35 +1,52 @@
 import { useCallback, useEffect, useState } from 'react';
-import { generateUUID, type ExternalCalendarSubscription } from '@mindwtr/core';
+import { generateUUID, type AppData, type ExternalCalendarSubscription } from '@mindwtr/core';
 import { ExternalCalendarService } from '../../../lib/external-calendar-service';
 import { reportError } from '../../../lib/report-error';
 
 type UseCalendarSettingsOptions = {
     showSaved: () => void;
+    settings: AppData['settings'] | undefined;
+    updateSettings: (updates: Partial<AppData['settings']>) => Promise<void>;
 };
 
-export function useCalendarSettings({ showSaved }: UseCalendarSettingsOptions) {
+export function useCalendarSettings({ showSaved, settings, updateSettings }: UseCalendarSettingsOptions) {
     const [externalCalendars, setExternalCalendars] = useState<ExternalCalendarSubscription[]>([]);
     const [newCalendarName, setNewCalendarName] = useState('');
     const [newCalendarUrl, setNewCalendarUrl] = useState('');
     const [calendarError, setCalendarError] = useState<string | null>(null);
 
     useEffect(() => {
+        let cancelled = false;
         ExternalCalendarService.getCalendars()
-            .then(setExternalCalendars)
+            .then(async (stored) => {
+                if (cancelled) return;
+                if (Array.isArray(settings?.externalCalendars)) {
+                    setExternalCalendars(settings.externalCalendars);
+                    if (settings.externalCalendars.length || stored.length) {
+                        await ExternalCalendarService.setCalendars(settings.externalCalendars);
+                    }
+                    return;
+                }
+                setExternalCalendars(stored);
+            })
             .catch((error) => reportError('Failed to load calendars', error));
-    }, []);
+        return () => {
+            cancelled = true;
+        };
+    }, [settings?.externalCalendars]);
 
     const persistCalendars = useCallback(async (next: ExternalCalendarSubscription[]) => {
         setCalendarError(null);
         setExternalCalendars(next);
         try {
             await ExternalCalendarService.setCalendars(next);
+            await updateSettings({ externalCalendars: next });
             showSaved();
         } catch (error) {
             reportError('Failed to save calendars', error);
             setCalendarError(String(error));
         }
-    }, [showSaved]);
+    }, [showSaved, updateSettings]);
 
     const handleAddCalendar = useCallback(() => {
         const url = newCalendarUrl.trim();

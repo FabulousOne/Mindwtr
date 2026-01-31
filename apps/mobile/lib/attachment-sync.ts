@@ -208,6 +208,43 @@ export const sanitizeAppDataForRemote = (data: AppData): AppData => {
     });
   };
 
+  const sanitizeSettingsForRemote = (settings: AppData['settings']): AppData['settings'] => {
+    const prefs = settings.syncPreferences ?? {};
+    const next: AppData['settings'] = { ...settings };
+
+    if (prefs.appearance !== true) {
+      next.theme = undefined;
+      next.appearance = undefined;
+    }
+
+    if (prefs.language !== true) {
+      next.language = undefined;
+      next.weekStart = undefined;
+      next.dateFormat = undefined;
+    }
+
+    if (prefs.externalCalendars !== true) {
+      next.externalCalendars = undefined;
+    }
+
+    if (prefs.ai !== true) {
+      next.ai = undefined;
+    } else if (next.ai) {
+      next.ai = {
+        ...next.ai,
+        apiKey: undefined,
+        speechToText: next.ai.speechToText
+          ? {
+              ...next.ai.speechToText,
+              offlineModelPath: undefined,
+            }
+          : next.ai.speechToText,
+      };
+    }
+
+    return next;
+  };
+
   return {
     ...data,
     tasks: data.tasks.map((task) => ({
@@ -218,6 +255,7 @@ export const sanitizeAppDataForRemote = (data: AppData): AppData => {
       ...project,
       attachments: sanitizeAttachments(project.attachments),
     })),
+    settings: sanitizeSettingsForRemote(data.settings),
   };
 };
 

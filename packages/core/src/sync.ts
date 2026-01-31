@@ -1,5 +1,5 @@
 
-import type { AppData, Attachment, Project, Task, Area } from './types';
+import type { AppData, Attachment, Project, Task, Area, SettingsSyncGroup } from './types';
 import { normalizeTaskForLoad } from './task-status';
 import { logWarn } from './logger';
 
@@ -75,6 +75,118 @@ export const normalizeAppData = (data: AppData): AppData => ({
     areas: Array.isArray(data.areas) ? data.areas : [],
     settings: data.settings ?? {},
 });
+
+const parseSyncTimestamp = (value?: string): number => {
+    if (!value) return NaN;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : NaN;
+};
+
+const isIncomingNewer = (localAt?: string, incomingAt?: string): boolean => {
+    const localTime = parseSyncTimestamp(localAt);
+    const incomingTime = parseSyncTimestamp(incomingAt);
+    if (!Number.isFinite(incomingTime)) return false;
+    if (!Number.isFinite(localTime)) return true;
+    return incomingTime > localTime;
+};
+
+const sanitizeAiForSync = (
+    ai: AppData['settings']['ai'] | undefined,
+    localAi?: AppData['settings']['ai']
+): AppData['settings']['ai'] | undefined => {
+    if (!ai) return ai;
+    const sanitized: AppData['settings']['ai'] = {
+        ...ai,
+        apiKey: undefined,
+    };
+    if (sanitized.speechToText) {
+        sanitized.speechToText = {
+            ...sanitized.speechToText,
+            offlineModelPath: localAi?.speechToText?.offlineModelPath,
+        };
+    }
+    return sanitized;
+};
+
+const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettings: AppData['settings']): AppData['settings'] => {
+    const merged: AppData['settings'] = { ...localSettings };
+    const nextSyncUpdatedAt: NonNullable<AppData['settings']['syncPreferencesUpdatedAt']> = {
+        ...(localSettings.syncPreferencesUpdatedAt ?? {}),
+        ...(incomingSettings.syncPreferencesUpdatedAt ?? {}),
+    };
+
+    const localPrefs = localSettings.syncPreferences ?? {};
+    const incomingPrefs = incomingSettings.syncPreferences ?? {};
+    const localPrefsAt = localSettings.syncPreferencesUpdatedAt?.preferences;
+    const incomingPrefsAt = incomingSettings.syncPreferencesUpdatedAt?.preferences;
+    const incomingPrefsWins = isIncomingNewer(localPrefsAt, incomingPrefsAt);
+    const mergedPrefs = incomingPrefsWins ? incomingPrefs : localPrefs;
+
+    merged.syncPreferences = mergedPrefs;
+    if (incomingPrefsWins) {
+        if (incomingPrefsAt) nextSyncUpdatedAt.preferences = incomingPrefsAt;
+    } else if (localPrefsAt) {
+        nextSyncUpdatedAt.preferences = localPrefsAt;
+    }
+
+    const shouldSync = (key: SettingsSyncGroup): boolean => mergedPrefs?.[key] === true;
+    const mergeGroup = <T>(
+        key: SettingsSyncGroup,
+        localValue: T,
+        incomingValue: T,
+        apply: (value: T, incomingWins: boolean) => void
+    ) => {
+        if (!shouldSync(key)) return;
+        const localAt = localSettings.syncPreferencesUpdatedAt?.[key];
+        const incomingAt = incomingSettings.syncPreferencesUpdatedAt?.[key];
+        const incomingWins = isIncomingNewer(localAt, incomingAt);
+        apply(incomingWins ? incomingValue : localValue, incomingWins);
+        const winnerAt = incomingWins ? incomingAt : localAt;
+        if (winnerAt) nextSyncUpdatedAt[key] = winnerAt;
+    };
+
+    mergeGroup(
+        'appearance',
+        { theme: localSettings.theme, appearance: localSettings.appearance },
+        { theme: incomingSettings.theme, appearance: incomingSettings.appearance },
+        (value) => {
+            merged.theme = value.theme;
+            merged.appearance = value.appearance;
+        }
+    );
+
+    mergeGroup(
+        'language',
+        { language: localSettings.language, weekStart: localSettings.weekStart, dateFormat: localSettings.dateFormat },
+        { language: incomingSettings.language, weekStart: incomingSettings.weekStart, dateFormat: incomingSettings.dateFormat },
+        (value) => {
+            merged.language = value.language;
+            merged.weekStart = value.weekStart;
+            merged.dateFormat = value.dateFormat;
+        }
+    );
+
+    mergeGroup(
+        'externalCalendars',
+        localSettings.externalCalendars,
+        incomingSettings.externalCalendars,
+        (value) => {
+            merged.externalCalendars = value;
+        }
+    );
+
+    mergeGroup(
+        'ai',
+        localSettings.ai,
+        incomingSettings.ai,
+        (value) => {
+            merged.ai = sanitizeAiForSync(value, localSettings.ai);
+        }
+    );
+
+    merged.syncPreferencesUpdatedAt = Object.keys(nextSyncUpdatedAt).length > 0 ? nextSyncUpdatedAt : merged.syncPreferencesUpdatedAt;
+    return merged;
+};
 
 /**
  * Merge entities with soft-delete support using Last-Write-Wins (LWW) strategy.
@@ -371,7 +483,7 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
             projects: projectsResult.merged,
             sections: sectionsMerged,
             areas: mergeAreas(localNormalized.areas, incomingNormalized.areas),
-            settings: localNormalized.settings,
+            settings: mergeSettingsForSync(localNormalized.settings, incomingNormalized.settings),
         },
         stats: {
             tasks: tasksResult.stats,

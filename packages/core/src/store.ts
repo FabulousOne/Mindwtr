@@ -337,6 +337,19 @@ const stripSensitiveSettings = (settings: AppData['settings']): AppData['setting
     };
 };
 
+const normalizeAiSettingsForSync = (ai?: AppData['settings']['ai']): AppData['settings']['ai'] | undefined => {
+    if (!ai) return ai;
+    const { apiKey, ...rest } = ai;
+    if (!rest.speechToText) return rest;
+    return {
+        ...rest,
+        speechToText: {
+            ...rest.speechToText,
+            offlineModelPath: undefined,
+        },
+    };
+};
+
 const cloneSettings = (settings: AppData['settings']): AppData['settings'] => {
     try {
         if (typeof structuredClone === 'function') {
@@ -2336,7 +2349,41 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         let snapshot: AppData | null = null;
         set((state) => {
             const deviceState = ensureDeviceId(state.settings);
-            const newSettings = { ...deviceState.settings, ...updates };
+            const nowIso = new Date().toISOString();
+            const nextSettings = { ...deviceState.settings, ...updates };
+            const nextSyncUpdatedAt = { ...(deviceState.settings.syncPreferencesUpdatedAt ?? {}) };
+            let syncUpdated = false;
+
+            const markSyncUpdated = (key: keyof NonNullable<AppData['settings']['syncPreferencesUpdatedAt']>) => {
+                nextSyncUpdatedAt[key] = nowIso;
+                syncUpdated = true;
+            };
+
+            if ('syncPreferences' in updates) {
+                markSyncUpdated('preferences');
+            }
+
+            if ('theme' in updates || 'appearance' in updates) {
+                markSyncUpdated('appearance');
+            }
+
+            if ('language' in updates || 'weekStart' in updates || 'dateFormat' in updates) {
+                markSyncUpdated('language');
+            }
+
+            if ('externalCalendars' in updates) {
+                markSyncUpdated('externalCalendars');
+            }
+
+            if ('ai' in updates) {
+                const prevAi = normalizeAiSettingsForSync(deviceState.settings.ai);
+                const nextAi = normalizeAiSettingsForSync(nextSettings.ai);
+                if (JSON.stringify(prevAi ?? null) !== JSON.stringify(nextAi ?? null)) {
+                    markSyncUpdated('ai');
+                }
+            }
+
+            const newSettings = syncUpdated ? { ...nextSettings, syncPreferencesUpdatedAt: nextSyncUpdatedAt } : nextSettings;
             if (archiveDaysUpdate) {
                 const configuredArchiveDays = newSettings.gtd?.autoArchiveDays;
                 const archiveDays = Number.isFinite(configuredArchiveDays)
@@ -2344,7 +2391,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                     : 7;
                 const shouldAutoArchive = archiveDays > 0;
                 const cutoffMs = shouldAutoArchive ? Date.now() - archiveDays * 24 * 60 * 60 * 1000 : 0;
-                const nowIso = new Date().toISOString();
                 let didAutoArchive = false;
 
                 let newAllTasks = state._allTasks;

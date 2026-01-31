@@ -1,3 +1,5 @@
+import type { ExternalCalendarSubscription } from './ics';
+
 export type TaskStatus = 'inbox' | 'next' | 'waiting' | 'someday' | 'reference' | 'done' | 'archived';
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -19,6 +21,12 @@ export type RecurrenceWeekday = 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU';
 export type RecurrenceByDay =
     | RecurrenceWeekday
     | `${'1' | '2' | '3' | '4' | '-1'}${RecurrenceWeekday}`;
+
+export type SettingsSyncGroup = 'appearance' | 'language' | 'externalCalendars' | 'ai';
+
+export type SettingsSyncPreferences = Partial<Record<SettingsSyncGroup, boolean>>;
+
+export type SettingsSyncUpdatedAt = Partial<Record<SettingsSyncGroup | 'preferences', string>>;
 
 export interface Recurrence {
     rule: RecurrenceRule;
@@ -205,6 +213,9 @@ export interface AppData {
         language?: 'en' | 'zh' | 'es' | 'hi' | 'ar' | 'de' | 'ru' | 'ja' | 'fr' | 'pt' | 'ko' | 'it' | 'tr' | 'system';
         weekStart?: 'monday' | 'sunday';
         dateFormat?: string;
+        syncPreferences?: SettingsSyncPreferences;
+        syncPreferencesUpdatedAt?: SettingsSyncUpdatedAt;
+        externalCalendars?: ExternalCalendarSubscription[];
         keybindingStyle?: 'vim' | 'emacs';
         window?: {
             decorations?: boolean;

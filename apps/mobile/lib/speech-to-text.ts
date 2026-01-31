@@ -1,7 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import RNFS from 'react-native-fs';
 import { AudioPcmStreamAdapter } from 'whisper.rn/realtime-transcription/adapters/AudioPcmStreamAdapter.js';
 import { RealtimeTranscriber, type RealtimeTranscriberEvent } from 'whisper.rn/realtime-transcription/index.js';
 import type { AudioCaptureMode, AudioFieldStrategy } from '@mindwtr/core';
@@ -63,6 +62,26 @@ let whisperContextCache: { modelPath: string; context: WhisperContextLike } | nu
 let whisperNativeLogEnabled = false;
 type WhisperModule = typeof import('whisper.rn');
 let whisperModuleCache: WhisperModule | null = null;
+
+type RNFSModule = typeof import('react-native-fs');
+let rnfsModuleCache: RNFSModule | null | undefined;
+
+const getRNFSModule = (): RNFSModule | null => {
+  if (rnfsModuleCache !== undefined) return rnfsModuleCache;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('react-native-fs') as RNFSModule;
+    if (!mod || !mod.RNFSFileTypeRegular) {
+      rnfsModuleCache = null;
+      return null;
+    }
+    rnfsModuleCache = mod;
+    return mod;
+  } catch {
+    rnfsModuleCache = null;
+    return null;
+  }
+};
 
 const getWhisperModule = () => {
   if (whisperModuleCache) return whisperModuleCache;
@@ -843,6 +862,10 @@ export const startWhisperRealtimeCapture = async (
 ): Promise<WhisperRealtimeHandle> => {
   if (IS_EXPO_GO) {
     throw new Error('On-device Whisper requires a dev build or production build (not Expo Go).');
+  }
+  const RNFS = getRNFSModule();
+  if (!RNFS) {
+    throw new Error('react-native-fs is unavailable. Use a dev build or production build with native modules.');
   }
   const resolved = ensureWhisperModelPathForConfig(config.model, config.modelPath);
   if (!resolved.exists) {

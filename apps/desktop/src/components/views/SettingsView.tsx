@@ -742,6 +742,12 @@ export function SettingsView() {
             showSaved,
             selectSyncFolderTitle,
         });
+        const syncPreferences = settings?.syncPreferences ?? {};
+        const handleUpdateSyncPreferences = useCallback((updates: Partial<NonNullable<AppData['settings']['syncPreferences']>>) => {
+            updateSettings({ syncPreferences: { ...syncPreferences, ...updates } })
+                .then(showSaved)
+                .catch((error) => reportError('Failed to update sync preferences', error));
+        }, [syncPreferences, showSaved, updateSettings]);
 
         return (
             <SettingsSyncPage
@@ -773,6 +779,8 @@ export function SettingsView() {
                 onSyncNow={handleSync}
                 isSyncing={isSyncing}
                 syncError={syncError}
+                syncPreferences={syncPreferences}
+                onUpdateSyncPreferences={handleUpdateSyncPreferences}
                 lastSyncDisplay={lastSyncDisplay}
                 lastSyncStatus={lastSyncStatus}
                 lastSyncStats={lastSyncStats}
@@ -797,7 +805,7 @@ export function SettingsView() {
             handleAddCalendar,
             handleToggleCalendar,
             handleRemoveCalendar,
-        } = useCalendarSettings({ showSaved });
+        } = useCalendarSettings({ showSaved, settings, updateSettings });
 
         return (
             <SettingsCalendarPage
