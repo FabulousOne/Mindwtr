@@ -226,7 +226,7 @@ interface TaskStore {
     /** Highlight a task in UI lists (non-persistent) */
     setHighlightTask: (id: string | null) => void;
 
-    /** Derived state selector (cached by lastDataChangeAt) */
+    /** Derived state selector (cached by data references) */
     getDerivedState: () => DerivedState;
 }
 
@@ -240,7 +240,6 @@ type DerivedState = {
 };
 
 type DerivedCache = {
-    key: number;
     tasksRef: Task[];
     projectsRef: Project[];
     areasRef: Area[];
@@ -2440,7 +2439,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const state = get();
         if (
             derivedCache
-            && derivedCache.key === state.lastDataChangeAt
             && derivedCache.tasksRef === state.tasks
             && derivedCache.projectsRef === state.projects
             && derivedCache.areasRef === state.areas
@@ -2449,7 +2447,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         }
         const derived = computeDerivedState(state.tasks, state.projects);
         derivedCache = {
-            key: state.lastDataChangeAt,
             tasksRef: state.tasks,
             projectsRef: state.projects,
             areasRef: state.areas,
