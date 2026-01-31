@@ -856,7 +856,7 @@ export function ProjectsView() {
     return (
         <ErrorBoundary>
             <div className="h-full">
-                <div className="flex h-full gap-6">
+                <div className="flex h-full gap-6 w-full max-w-[calc(72rem+16rem+1.5rem)] mx-auto">
                     <ProjectsSidebar
                         t={t}
                         areaFilterLabel={areaFilterLabel ?? undefined}
@@ -891,14 +891,15 @@ export function ProjectsView() {
                     />
 
                     {/* Project Details & Tasks */}
-                    <div className="flex-1 flex flex-col h-full min-h-0">
-                        {selectedProject ? (
-                            <>
-                                <div className="flex-1 min-h-0 overflow-y-auto pr-2 space-y-4">
-                                    <ProjectDetailsHeader
-                                        project={selectedProject}
-                                        projectColor={getProjectColorForTask(selectedProject)}
-                                        editTitle={editProjectTitle}
+                    <div className="flex-1 min-w-0 h-full">
+                        <div className="flex flex-col h-full min-h-0 w-full">
+                            {selectedProject ? (
+                                <>
+                                    <div className="flex-1 min-h-0 overflow-y-auto pr-2 space-y-4">
+                                        <ProjectDetailsHeader
+                                            project={selectedProject}
+                                            projectColor={getProjectColorForTask(selectedProject)}
+                                            editTitle={editProjectTitle}
                                         onEditTitleChange={setEditProjectTitle}
                                         onCommitTitle={handleCommitProjectTitle}
                                         onResetTitle={handleResetProjectTitle}
@@ -991,17 +992,18 @@ export function ProjectsView() {
                                             </button>
                                         </div>
                                         {tasksContent}
+                                    </div>
                                 </div>
+                                </>
+                            ) : (
+                                <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                                    <div className="text-center">
+                                        <Folder className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                                        <p>{t('projects.selectProject')}</p>
+                                    </div>
                                 </div>
-                            </>
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                                <div className="text-center">
-                                    <Folder className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                                    <p>{t('projects.selectProject')}</p>
-                                </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
 

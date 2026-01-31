@@ -66,6 +66,11 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
         'agenda',
     ]);
     const isWideView = wideViews.has(currentView);
+    const fullWidthViews = new Set([
+        'board',
+        'projects',
+    ]);
+    const isFullWidthView = fullWidthViews.has(currentView);
 
     const navItems = useMemo(() => ([
         { id: 'inbox', labelKey: 'nav.inbox', icon: Inbox, count: inboxCount },
@@ -284,7 +289,7 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                     "mx-auto p-8 h-full",
                     isFocusMode
                         ? "max-w-[800px]"
-                        : currentView === 'board'
+                        : isFullWidthView
                             ? "w-full max-w-none"
                             : (isWideView || currentView === 'calendar')
                             ? "w-full max-w-6xl"
