@@ -136,11 +136,11 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
     const contexts = new Set<string>();
     const tags = new Set<string>();
 
-    const contextMatches = working.match(/@[\w\-]+/g) || [];
+    const contextMatches = working.match(/@[\p{L}\p{N}_-]+/gu) || [];
     contextMatches.forEach((ctx) => contexts.add(ctx));
     contextMatches.forEach((ctx) => (working = stripToken(working, ctx)));
 
-    const tagMatches = working.match(/#[\w\-]+/g) || [];
+    const tagMatches = working.match(/#[\p{L}\p{N}_-]+/gu) || [];
     tagMatches.forEach((tag) => tags.add(tag));
     tagMatches.forEach((tag) => (working = stripToken(working, tag)));
 
