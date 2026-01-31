@@ -166,9 +166,10 @@ function App() {
             syncInFlightRef.current = performSync()
                 .catch((error) => reportError('Sync failed', error))
                 .finally(() => {
+                    const shouldQueue = syncQueuedRef.current;
+                    syncQueuedRef.current = false;
                     syncInFlightRef.current = null;
-                    if (syncQueuedRef.current && isActiveRef.current) {
-                        syncQueuedRef.current = false;
+                    if (shouldQueue && isActiveRef.current) {
                         void queueSync();
                     }
                 });
