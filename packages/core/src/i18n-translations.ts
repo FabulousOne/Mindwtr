@@ -26,7 +26,7 @@ const en: Record<string, string> = {
         'nav.addTask': 'Add Task',
 
         // Quick Add
-        'quickAdd.help': 'Quick add supports /due:<when>, /note:<text>, /next|/todo, @context, #tag, +Project.',
+        'quickAdd.help': 'Quick add supports /due:<when>, /note:<text>, /next, /area:<name> or !Area, @context, #tag, +Project.',
         'quickAdd.example': 'Example: Call mom /due:tomorrow 5pm @phone #family',
         'quickAdd.placeholder': 'Add a task… use @context +Project #tag /due:tomorrow',
         'quickAdd.addAnother': 'Add another',
@@ -588,6 +588,9 @@ const en: Record<string, string> = {
         'settings.material3Light': 'Material 3 (Light)',
         'settings.material3Dark': 'Material 3 (Dark)',
         'settings.language': 'Language',
+        'settings.weekStart': 'Week starts on',
+        'settings.weekStartSunday': 'Sunday',
+        'settings.weekStartMonday': 'Monday',
         'settings.keybindingsDesc': 'Choose your preferred desktop keybinding style.',
         'settings.closeBehavior': 'Close window behavior',
         'settings.closeBehaviorDesc': 'Choose what happens when you close the window.',
@@ -976,7 +979,7 @@ const zh: Record<string, string> = {
         'nav.addTask': '添加任务',
 
         // Quick Add
-        'quickAdd.help': '快速添加支持 /due:<when>、/note:<text>、/next|/todo、@context、#tag、+Project。',
+        'quickAdd.help': '快速添加支持 /due:<when>、/note:<text>、/next、/area:<name> 或 !Area、@context、#tag、+Project。',
         'quickAdd.example': '示例：给妈妈打电话 /due:tomorrow 5pm @phone #family',
         'quickAdd.placeholder': '添加任务… 支持 @情境 +项目 #标签 /due:tomorrow',
         'quickAdd.addAnother': '连续添加',
@@ -1520,6 +1523,9 @@ const zh: Record<string, string> = {
         'settings.material3Light': 'Material 3（浅色）',
         'settings.material3Dark': 'Material 3（深色）',
         'settings.language': '语言',
+        'settings.weekStart': '每周开始于',
+        'settings.weekStartSunday': '周日',
+        'settings.weekStartMonday': '周一',
         'settings.keybindingsDesc': '选择桌面端偏好的快捷键风格。',
         'settings.closeBehavior': '关闭窗口行为',
         'settings.closeBehaviorDesc': '选择关闭窗口时的操作。',
@@ -1900,7 +1906,7 @@ const esOverrides: Record<string, string> = {
         'nav.addTask': 'Añadir tarea',
 
         // Quick Add
-        'quickAdd.help': 'Al capturar de forma rápida puedes usar los comandos /due:<fecha de vencimiento>, /note:<texto de la nota>, /next|/todo, @context, #tag, +Project.',
+        'quickAdd.help': 'Al capturar de forma rápida puedes usar los comandos /due:<fecha de vencimiento>, /note:<texto de la nota>, /next, /area:<name> o !Area, @context, #tag, +Project.',
         'quickAdd.example': 'Ejemplo: Llamar a mamá /due:tomorrow 5pm @movil #familia',
 
         // Checklist

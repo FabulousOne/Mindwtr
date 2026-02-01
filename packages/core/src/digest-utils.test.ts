@@ -21,7 +21,7 @@ describe('getDailyDigestSummary', () => {
             {
                 id: '2',
                 title: 'Overdue',
-                status: 'todo',
+                status: 'next',
                 tags: [],
                 contexts: [],
                 dueDate: '2025-01-09T09:00:00.000Z',

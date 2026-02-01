@@ -42,6 +42,7 @@ export function CalendarView() {
         () => resolveAreaFilter(settings?.filters?.areaId, areas),
         [settings?.filters?.areaId, areas],
     );
+    const weekStartsOn = settings?.weekStart === 'monday' ? 1 : 0;
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -63,8 +64,8 @@ export function CalendarView() {
         return () => window.clearTimeout(timer);
     }, [perf.enabled]);
 
-    const calendarStart = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 });
-    const calendarEnd = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 0 });
+    const calendarStart = startOfWeek(startOfMonth(currentMonth), { weekStartsOn });
+    const calendarEnd = endOfWeek(endOfMonth(currentMonth), { weekStartsOn });
     const days = eachDayOfInterval({
         start: calendarStart,
         end: calendarEnd,
@@ -506,7 +507,10 @@ export function CalendarView() {
 
             <div ref={calendarBodyRef} className="space-y-6">
                 <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden shadow-sm">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    {(weekStartsOn === 1
+                        ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                        : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                    ).map((day) => (
                         <div key={day} className="bg-card p-2 text-center text-sm font-medium text-muted-foreground">
                             {day}
                         </div>

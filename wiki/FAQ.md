@@ -156,8 +156,10 @@ Logs are local-only and redact common credentials (passwords/tokens) before writ
 Yes! Mindwtr supports quick-add syntax:
 - `@context` — Add a context
 - `#tag` — Add a tag
+- `!Area` or `/area:<name>` — Assign to an area
 - `/due:date` — Set due date (today, tomorrow, friday, next week, etc.)
 - `/note:text` — Add description
+- `/status` — Set status (`/next`, `/waiting`, `/someday`, `/done`, `/archived`, `/inbox`)
 - `+ProjectName` — Assign to project
 
 Example: `Call client /due:friday @phone`

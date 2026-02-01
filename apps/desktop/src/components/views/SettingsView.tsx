@@ -431,6 +431,12 @@ export function SettingsView() {
             .catch((error) => reportError('Failed to update language', error));
     };
 
+    const saveWeekStartPreference = (value: 'sunday' | 'monday') => {
+        updateSettings({ weekStart: value })
+            .then(showSaved)
+            .catch((error) => reportError('Failed to update week start', error));
+    };
+
     const handleWindowDecorationsChange = useCallback((enabled: boolean) => {
         updateSettings({
             window: {
@@ -707,6 +713,7 @@ export function SettingsView() {
     const weeklyReviewEnabled = settings?.weeklyReviewEnabled === true;
     const weeklyReviewTime = settings?.weeklyReviewTime || '18:00';
     const weeklyReviewDay = Number.isFinite(settings?.weeklyReviewDay) ? settings?.weeklyReviewDay as number : 0;
+    const weekStart = settings?.weekStart === 'monday' ? 'monday' : 'sunday';
     const localeMap: Record<Language, string> = {
         en: 'en-US',
         zh: 'zh-CN',
@@ -888,6 +895,8 @@ export function SettingsView() {
                     onDensityChange={saveDensityPreference}
                     language={language}
                     onLanguageChange={saveLanguagePreference}
+                    weekStart={weekStart}
+                    onWeekStartChange={saveWeekStartPreference}
                     keybindingStyle={keybindingStyle}
                     onKeybindingStyleChange={handleKeybindingStyleChange}
                     onOpenHelp={openHelp}

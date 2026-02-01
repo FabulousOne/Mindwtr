@@ -195,10 +195,11 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
     };
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = settings?.weekStart === 'monday' ? 1 : 0;
     const startOfWeek = new Date(startOfToday);
     const weekday = startOfWeek.getDay();
-    const diffToMonday = (weekday + 6) % 7;
-    startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+    const diffToWeekStart = weekStart === 1 ? (weekday + 6) % 7 : weekday;
+    startOfWeek.setDate(startOfWeek.getDate() - diffToWeekStart);
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(endOfWeek.getDate() + 7);
     const nextWeekStart = new Date(endOfWeek);
@@ -310,7 +311,6 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
             const statusViewMap: Record<string, string> = {
                 'inbox': 'inbox',
                 'next': 'next',
-                'todo': 'next', // todo tasks shown in next actions
                 'in-progress': 'next',
                 'waiting': 'waiting',
                 'someday': 'someday',

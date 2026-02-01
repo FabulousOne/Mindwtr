@@ -85,6 +85,10 @@ describe('quick-add', () => {
         const result = parseQuickAdd('Draft report !Work /next', undefined, now, areas as any);
         expect(result.title).toBe('Draft report');
         expect(result.props.areaId).toBe('a1');
+
+        const explicitResult = parseQuickAdd('Plan budget /area:Personal /next', undefined, now, areas as any);
+        expect(explicitResult.title).toBe('Plan budget');
+        expect(explicitResult.props.areaId).toBe('a2');
     });
 
     it('supports unicode tags and contexts', () => {

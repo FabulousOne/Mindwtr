@@ -24,8 +24,9 @@ function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
-function getFirstDayOfMonth(year: number, month: number): number {
-  return new Date(year, month, 1).getDay();
+function getFirstDayOfMonth(year: number, month: number, weekStartIndex: number): number {
+  const day = new Date(year, month, 1).getDay();
+  return (day - weekStartIndex + 7) % 7;
 }
 
 function isSameDay(date1: Date, date2: Date): boolean {
@@ -46,7 +47,7 @@ const PIXELS_PER_MINUTE = 1.4;
 const SNAP_MINUTES = 5;
 
 export function CalendarView() {
-  const { tasks, updateTask, deleteTask } = useTaskStore();
+  const { tasks, updateTask, deleteTask, settings } = useTaskStore();
   const { isDark } = useTheme();
   const tc = useThemeColors();
   const toRgba = (hex: string, alpha: number) => {
@@ -83,8 +84,9 @@ export function CalendarView() {
   };
 
   // Theme colors
+  const weekStartIndex = settings?.weekStart === 'monday' ? 1 : 0;
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
-  const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
+  const firstDay = getFirstDayOfMonth(currentYear, currentMonth, weekStartIndex);
   const localeMap: Record<typeof language, string> = {
     en: 'en-US',
     zh: 'zh-CN',
@@ -106,7 +108,7 @@ export function CalendarView() {
     month: 'long',
   });
   const dayNames = Array.from({ length: 7 }, (_, i) => {
-    const base = new Date(2021, 7, 1 + i); // Aug 1, 2021 is a Sunday
+    const base = new Date(2021, 7, 1 + ((i + weekStartIndex) % 7)); // Aug 1, 2021 is a Sunday
     return base.toLocaleDateString(locale, { weekday: 'short' });
   });
 

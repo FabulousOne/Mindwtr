@@ -29,7 +29,7 @@ describe('task-utils', () => {
 
     describe('getStatusColor', () => {
         it('should return valid color object', () => {
-            const color = getStatusColor('todo');
+            const color = getStatusColor('next');
             expect(color).toHaveProperty('bg');
             expect(color).toHaveProperty('text');
             expect(color).toHaveProperty('border');

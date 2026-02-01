@@ -12,26 +12,31 @@ Change presets in **Settings → Keyboard Shortcuts**.
 
 | Key | Action                       |
 | --- | ---------------------------- |
-| `/` or `Ctrl+K` | Open global search           |
+| `/` or `Ctrl+K / Cmd+K` | Open global search           |
 | `?` | Show keyboard shortcuts help |
 | `Ctrl+\\` / `Cmd+\\` | Toggle Focus Mode |
 | `Ctrl+B` / `Cmd+B` | Toggle Sidebar |
+| `Ctrl+Shift+A / Cmd+Shift+A` | Open Quick Add |
+| `Ctrl+Shift+D / Cmd+Shift+D` | Toggle list details |
+| `Ctrl+Shift+C / Cmd+Shift+C` | Toggle list density |
 
 **Go to views** (press `g` then the key):
 
 | Key Sequence | Destination   |
 | ------------ | ------------- |
 | `gi`         | Inbox         |
-| `ga`         | Focus         |
+| `gn`         | Next          |
+| `gf`         | Focus         |
 | `gp`         | Projects      |
 | `gc`         | Contexts      |
 | `gr`         | Weekly Review |
+| `ge`         | Reference     |
 | `gw`         | Waiting For   |
 | `gs`         | Someday/Maybe |
 | `gl`         | Calendar      |
 | `gb`         | Board View    |
 | `gd`         | Done          |
-| `gA`         | Archived      |
+| `ga`         | Archived      |
 
 ### Task List Navigation
 
@@ -57,20 +62,25 @@ When a task list is visible:
 
 | Key      | Action                       |
 | -------- | ---------------------------- |
-| `Ctrl-s` or `Ctrl+K` | Open global search           |
+| `Ctrl-s` or `Ctrl+K / Cmd+K` | Open global search           |
 | `Ctrl-h` | Show keyboard shortcuts help |
 | `Ctrl+\\` / `Cmd+\\` | Toggle Focus Mode |
 | `Ctrl+B` / `Cmd+B` | Toggle Sidebar |
+| `Ctrl+Shift+A / Cmd+Shift+A` | Open Quick Add |
+| `Ctrl+Shift+D / Cmd+Shift+D` | Toggle list details |
+| `Ctrl+Shift+C / Cmd+Shift+C` | Toggle list density |
 
 **Go to views** (use Alt + key):
 
 | Key     | Destination   |
 | ------- | ------------- |
 | `Alt-i` | Inbox         |
+| `Alt-n` | Next          |
 | `Alt-a` | Focus         |
 | `Alt-p` | Projects      |
 | `Alt-c` | Contexts      |
 | `Alt-r` | Weekly Review |
+| `Alt-e` | Reference     |
 | `Alt-w` | Waiting For   |
 | `Alt-s` | Someday/Maybe |
 | `Alt-l` | Calendar      |

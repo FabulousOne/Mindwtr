@@ -13,7 +13,6 @@ export const TASK_STATUS_ORDER: Record<TaskStatus, number> = {
 };
 
 const LEGACY_STATUS_MAP: Record<string, TaskStatus> = {
-    todo: 'next',
     planned: 'next',
     pending: 'next',
     'in-progress': 'next',

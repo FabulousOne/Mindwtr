@@ -57,9 +57,11 @@ Mindwtr supports natural language quick-add. Type directly in the task input:
 | `#tag`             | `Research topic #creative` | Adds #creative tag    |
 | `+Project`         | `Call vendor +HomeReno`    | Assigns to project    |
 | `+Multi Word`      | `+New Project Name`        | Assigns to "New Project Name" |
+| `!Area`            | `Plan roadmap !Work`       | Assigns to area       |
+| `/area:<name>`     | `/area:Personal`           | Assigns to area (no spaces) |
 | `/due:date`        | `Report /due:friday`       | Sets due date         |
 | `/note:text`       | `Task /note:remember X`    | Adds description      |
-| `/status`          | `/next`, `/waiting`, `/done` | Sets status (also `/someday`, `/inbox`) |
+| `/status`          | `/next`, `/waiting`, `/someday`, `/done`, `/archived`, `/inbox` | Sets status |
 
 **Date examples:**
 - `/due:today`, `/due:tomorrow`

@@ -225,9 +225,12 @@ Mindwtr parses natural language when adding tasks:
 | `@context`   | `@home`           | Adds context        |
 | `#tag`       | `#focused`        | Adds tag            |
 | `+Project`   | `+HomeReno`       | Assigns to project  |
+| `+Multi Word` | `+New Project`    | Assigns to "New Project" |
+| `!Area`       | `Plan roadmap !Work` | Assigns to area       |
+| `/area:<name>` | `/area:Personal` | Assigns to area (no spaces) |
 | `/due:date`  | `/due:friday`     | Sets due date       |
 | `/note:text` | `/note:call back` | Adds description    |
-| `/next`      | `/next`           | Sets status to next |
+| `/status`    | `/next`, `/waiting`, `/someday`, `/done`, `/archived`, `/inbox` | Sets status |
 
 **Date formats:** today, tomorrow, friday, next week, in 3 days, 2025-01-15
 
@@ -375,7 +378,8 @@ See [[Desktop Keyboard Shortcuts]] for the complete list.
 - `/` — Open search
 - `?` — Show shortcuts help
 - `gi` — Go to Inbox
-- `ga` — Go to Focus
+- `gn` — Go to Next
+- `gf` — Go to Focus
 - `j/k` — Move selection down/up
 - `e` — Edit selected task
 - `x` — Toggle done

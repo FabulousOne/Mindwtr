@@ -206,6 +206,7 @@ export default function SettingsPage() {
     const [weeklyReviewDayPickerOpen, setWeeklyReviewDayPickerOpen] = useState(false);
     const [modelPicker, setModelPicker] = useState<null | 'model' | 'copilot' | 'speech'>(null);
     const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+    const [weekStartPickerOpen, setWeekStartPickerOpen] = useState(false);
     const [syncOptionsOpen, setSyncOptionsOpen] = useState(false);
     const [externalCalendars, setExternalCalendars] = useState<ExternalCalendarSubscription[]>([]);
     const [newCalendarName, setNewCalendarName] = useState('');
@@ -229,6 +230,7 @@ export default function SettingsPage() {
     const weeklyReviewEnabled = settings.weeklyReviewEnabled === true;
     const weeklyReviewTime = settings.weeklyReviewTime || '18:00';
     const weeklyReviewDay = Number.isFinite(settings.weeklyReviewDay) ? settings.weeklyReviewDay as number : 0;
+    const weekStart = settings.weekStart === 'monday' ? 'monday' : 'sunday';
     const loggingEnabled = settings.diagnostics?.loggingEnabled === true;
     const lastSyncStats = settings.lastSyncStats ?? null;
     const syncConflictCount = (lastSyncStats?.tasks.conflicts || 0) + (lastSyncStats?.projects.conflicts || 0);
@@ -502,6 +504,11 @@ export default function SettingsPage() {
     const mapThemeToSetting = (mode: typeof themeMode): AppData['settings']['theme'] => mode;
     const [themePickerOpen, setThemePickerOpen] = useState(false);
     const currentThemeLabel = themeOptions.find((opt) => opt.value === themeMode)?.label ?? t('settings.system');
+    const weekStartOptions: { value: 'sunday' | 'monday'; label: string }[] = [
+        { value: 'sunday', label: t('settings.weekStartSunday') },
+        { value: 'monday', label: t('settings.weekStartMonday') },
+    ];
+    const currentWeekStartLabel = weekStartOptions.find((opt) => opt.value === weekStart)?.label ?? t('settings.weekStartSunday');
     const openLink = (url: string) => Linking.openURL(url);
     const updateAISettings = (next: Partial<NonNullable<typeof settings.ai>>) => {
         updateSettings({ ai: { ...(settings.ai ?? {}), ...next } }).catch(logSettingsError);
@@ -1552,6 +1559,56 @@ export default function SettingsPage() {
                                             >
                                                 <Text style={[styles.pickerOptionText, { color: selected ? tc.tint : tc.text }]}>
                                                     {lang.native}
+                                                </Text>
+                                                {selected && <Text style={{ color: tc.tint, fontSize: 18 }}>✓</Text>}
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </View>
+                        </Pressable>
+                    </Modal>
+
+                    <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginTop: 12 }]}>
+                        <TouchableOpacity style={styles.settingRow} onPress={() => setWeekStartPickerOpen(true)}>
+                            <View style={styles.settingInfo}>
+                                <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.weekStart')}</Text>
+                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                    {currentWeekStartLabel}
+                                </Text>
+                            </View>
+                            <Text style={{ color: tc.secondaryText, fontSize: 18 }}>▾</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <Modal
+                        transparent
+                        visible={weekStartPickerOpen}
+                        animationType="fade"
+                        onRequestClose={() => setWeekStartPickerOpen(false)}
+                    >
+                        <Pressable style={styles.pickerOverlay} onPress={() => setWeekStartPickerOpen(false)}>
+                            <View
+                                style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
+                                onStartShouldSetResponder={() => true}
+                            >
+                                <Text style={[styles.pickerTitle, { color: tc.text }]}>{t('settings.weekStart')}</Text>
+                                <ScrollView style={styles.pickerList} contentContainerStyle={styles.pickerListContent}>
+                                    {weekStartOptions.map((option) => {
+                                        const selected = weekStart === option.value;
+                                        return (
+                                            <TouchableOpacity
+                                                key={option.value}
+                                                style={[
+                                                    styles.pickerOption,
+                                                    { borderColor: tc.border, backgroundColor: selected ? tc.filterBg : 'transparent' },
+                                                ]}
+                                                onPress={() => {
+                                                    updateSettings({ weekStart: option.value }).catch(logSettingsError);
+                                                    setWeekStartPickerOpen(false);
+                                                }}
+                                            >
+                                                <Text style={[styles.pickerOptionText, { color: selected ? tc.tint : tc.text }]}>
+                                                    {option.label}
                                                 </Text>
                                                 {selected && <Text style={{ color: tc.tint, fontSize: 18 }}>✓</Text>}
                                             </TouchableOpacity>

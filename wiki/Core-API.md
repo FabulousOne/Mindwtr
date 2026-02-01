@@ -296,9 +296,11 @@ const result = parseQuickAdd(input: string, projects?: Project[]);
 | `@context`   | `@home`            | `contexts: ['@home']`       |
 | `#tag`       | `#focused`         | `tags: ['#focused']`        |
 | `+Project`   | `+HomeReno`        | `projectId: 'matching-id'`  |
+| `!Area`      | `!Work`            | `areaId: 'matching-id'`     |
+| `/area:<name>` | `/area:Personal` | `areaId: 'matching-id'`     |
 | `/due:date`  | `/due:friday`      | `dueDate: 'ISO string'`     |
 | `/note:text` | `/note:remember X` | `description: 'remember X'` |
-| `/status`    | `/next`            | `status: 'next'`            |
+| `/status`    | `/next`            | `status: 'next'` (supports `/inbox`, `/waiting`, `/someday`, `/done`, `/archived`) |
 
 ---
 

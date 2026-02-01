@@ -615,7 +615,9 @@ const buildReplacements = (pairs: Array<[string, string]>) =>
 const PROTECTED_TOKENS = [
         '/due:<when>',
         '/note:<text>',
-        '/next|/todo',
+        '/next',
+        '/area:<name>',
+        '!Area',
         '@context',
         '#tag',
         '+Project',

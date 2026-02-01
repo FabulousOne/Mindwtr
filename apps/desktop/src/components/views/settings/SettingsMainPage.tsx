@@ -3,6 +3,7 @@ import type { Language } from '../../../contexts/language-context';
 
 type ThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia';
 type DensityMode = 'comfortable' | 'compact';
+type WeekStart = 'sunday' | 'monday';
 
 type Labels = {
     appearance: string;
@@ -17,6 +18,9 @@ type Labels = {
     nord: string;
     sepia: string;
     language: string;
+    weekStart: string;
+    weekStartSunday: string;
+    weekStartMonday: string;
     keybindings: string;
     keybindingsDesc: string;
     keybindingVim: string;
@@ -43,6 +47,8 @@ type SettingsMainPageProps = {
     onDensityChange: (mode: DensityMode) => void;
     language: Language;
     onLanguageChange: (lang: Language) => void;
+    weekStart: WeekStart;
+    onWeekStartChange: (weekStart: WeekStart) => void;
     keybindingStyle: 'vim' | 'emacs';
     onKeybindingStyleChange: (style: 'vim' | 'emacs') => void;
     onOpenHelp: () => void;
@@ -66,6 +72,8 @@ export function SettingsMainPage({
     onDensityChange,
     language,
     onLanguageChange,
+    weekStart,
+    onWeekStartChange,
     keybindingStyle,
     onKeybindingStyleChange,
     onOpenHelp,
@@ -143,6 +151,25 @@ export function SettingsMainPage({
                                     {lang.native}
                                 </option>
                             ))}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="p-4 flex items-center justify-between gap-6">
+                    <div className="min-w-0">
+                        <div className="text-sm font-medium">{t.weekStart}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                            {weekStart === 'monday' ? t.weekStartMonday : t.weekStartSunday}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <select
+                            value={weekStart}
+                            onChange={(e) => onWeekStartChange(e.target.value as WeekStart)}
+                            className="text-sm bg-muted/50 text-foreground border border-border rounded px-2 py-1 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        >
+                            <option value="sunday">{t.weekStartSunday}</option>
+                            <option value="monday">{t.weekStartMonday}</option>
                         </select>
                     </div>
                 </div>

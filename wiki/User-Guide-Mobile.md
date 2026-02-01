@@ -111,10 +111,12 @@ Mindwtr parses natural language when adding tasks:
 | `@context`   | `@home`           | Adds context       |
 | `#tag`       | `#focused`        | Adds tag           |
 | `+Project`   | `+HomeReno`       | Assigns to project |
-| `+Multi Word`| `+New Project`    | Assigns to "New Project" |
+| `+Multi Word` | `+New Project`    | Assigns to "New Project" |
+| `!Area`       | `Plan roadmap !Work` | Assigns to area       |
+| `/area:<name>` | `/area:Personal` | Assigns to area (no spaces) |
 | `/due:date`  | `/due:friday`     | Sets due date      |
 | `/note:text` | `/note:call back` | Adds description   |
-| `/status`    | `/next`, `/waiting` | Sets status      |
+| `/status`    | `/next`, `/waiting`, `/someday`, `/done`, `/archived`, `/inbox` | Sets status |
 
 **Date formats:** today, tomorrow, friday, next week, in 3 days
 

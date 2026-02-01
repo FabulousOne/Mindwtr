@@ -144,15 +144,26 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
     tagMatches.forEach((tag) => tags.add(tag));
     tagMatches.forEach((tag) => (working = stripToken(working, tag)));
 
-    // Area: /area:<id> or !Area Name
+    // Area: /area:<id|name> or !Area Name
     let areaId: string | undefined;
     const areaIdMatch = working.match(/\/area:([^\s/]+)/i);
     if (areaIdMatch) {
-        const token = areaIdMatch[1];
+        const token = restoreEscapes(areaIdMatch[1] ?? '').trim();
         if (token) {
-            areaId = token;
+            const matched =
+                areas?.find((area) => area.id === token)
+                ?? areas?.find((area) => area.name.toLowerCase() === token.toLowerCase());
+            if (matched) {
+                areaId = matched.id;
+            } else if (!areas || areas.length === 0) {
+                if (/^[0-9a-f-]{8,}$/i.test(token)) {
+                    areaId = token;
+                }
+            }
         }
-        working = stripToken(working, areaIdMatch[0]);
+        if (areaId) {
+            working = stripToken(working, areaIdMatch[0]);
+        }
     } else {
         const areaMatch = working.match(/(?:^|\s)!([^\s/]+(?:\s+(?![@#+/!])[^/\s]+)*)/);
         if (areaMatch) {
@@ -187,9 +198,9 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
         working = stripToken(working, dueMatch[0]);
     }
 
-    // Status tokens like /next, /todo, etc.
+    // Status tokens like /next, /waiting, etc.
     let status: TaskStatus | undefined;
-    const statusMatch = working.match(/\/(inbox|todo|next|in-progress|waiting|someday|done|archived)\b/i);
+    const statusMatch = working.match(/\/(inbox|next|in-progress|waiting|someday|done|archived)\b/i);
     if (statusMatch) {
         const token = statusMatch[1].toLowerCase();
         status = STATUS_TOKENS[token] ?? normalizeTaskStatus(token);
