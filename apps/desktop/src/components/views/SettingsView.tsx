@@ -22,7 +22,7 @@ import { isFlatpakRuntime, isTauriRuntime } from '../../lib/runtime';
 import { reportError } from '../../lib/report-error';
 import { SyncService } from '../../lib/sync-service';
 import { clearLog, getLogPath, logDiagnosticsEnabled, logWarn } from '../../lib/app-log';
-import { checkForUpdates, type UpdateInfo, GITHUB_RELEASES_URL, verifyDownloadChecksum } from '../../lib/update-service';
+import { checkForUpdates, type UpdateInfo, GITHUB_RELEASES_URL, MS_STORE_URL, verifyDownloadChecksum } from '../../lib/update-service';
 import { labelFallback, labelKeyOverrides, type SettingsLabels } from './settings/labels';
 import { SettingsUpdateModal } from './settings/SettingsUpdateModal';
 import { SettingsSidebar } from './settings/SettingsSidebar';
@@ -114,6 +114,15 @@ export function SettingsView() {
             return false;
         }
     }, [isTauri]);
+    const isWindows = useMemo(() => {
+        if (!isTauri) return false;
+        try {
+            return /win/i.test(navigator.userAgent);
+        } catch {
+            return false;
+        }
+    }, [isTauri]);
+    const [windowsUpdateChannel, setWindowsUpdateChannel] = useState<'store' | 'direct' | 'unknown'>('unknown');
     const windowDecorationsEnabled = settings?.window?.decorations !== false;
     const closeBehavior = settings?.window?.closeBehavior ?? 'ask';
     const trayVisible = settings?.window?.showTray !== false;
@@ -162,6 +171,31 @@ export function SettingsView() {
             reportError('Failed to persist update badge state', error);
         }
     }, []);
+
+    useEffect(() => {
+        if (!isTauri || !isWindows) {
+            setWindowsUpdateChannel('direct');
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                const isStore = await invoke<boolean>('is_windows_store_install');
+                if (!cancelled) {
+                    setWindowsUpdateChannel(isStore ? 'store' : 'direct');
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setWindowsUpdateChannel('direct');
+                }
+                reportError('Failed to detect Windows update channel', error);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isTauri, isWindows]);
 
     const {
         aiEnabled,
@@ -283,6 +317,17 @@ export function SettingsView() {
 
     useEffect(() => {
         if (!isTauri || !appVersion || appVersion === 'web') return;
+        if (isWindows && windowsUpdateChannel === 'unknown') return;
+        if (isWindows && windowsUpdateChannel === 'store') {
+            setHasUpdateBadge(false);
+            try {
+                localStorage.setItem(UPDATE_BADGE_AVAILABLE_KEY, 'false');
+                localStorage.removeItem(UPDATE_BADGE_LATEST_KEY);
+            } catch (error) {
+                reportError('Failed to clear update badge state', error);
+            }
+            return;
+        }
         try {
             const storedAvailable = localStorage.getItem(UPDATE_BADGE_AVAILABLE_KEY);
             const storedLatest = localStorage.getItem(UPDATE_BADGE_LATEST_KEY);
@@ -298,10 +343,12 @@ export function SettingsView() {
         } catch (error) {
             reportError('Failed to read update badge state', error);
         }
-    }, [appVersion, isTauri]);
+    }, [appVersion, isTauri, isWindows, windowsUpdateChannel]);
 
     useEffect(() => {
         if (!isTauri || !appVersion || appVersion === 'web') return;
+        if (isWindows && windowsUpdateChannel === 'unknown') return;
+        if (isWindows && windowsUpdateChannel === 'store') return;
         let lastCheck = 0;
         try {
             lastCheck = Number(localStorage.getItem(UPDATE_BADGE_LAST_CHECK_KEY) || 0);
@@ -331,7 +378,7 @@ export function SettingsView() {
         return () => {
             cancelled = true;
         };
-    }, [appVersion, isTauri, persistUpdateBadge]);
+    }, [appVersion, isTauri, isWindows, windowsUpdateChannel, persistUpdateBadge]);
 
     useEffect(() => {
         if (!loggingEnabled) {
@@ -496,6 +543,26 @@ export function SettingsView() {
         setUpdateError(null);
         setUpdateNotice(null);
         try {
+            if (isWindows) {
+                let channel = windowsUpdateChannel;
+                if (channel === 'unknown' && isTauri) {
+                    try {
+                        const { invoke } = await import('@tauri-apps/api/core');
+                        const isStore = await invoke<boolean>('is_windows_store_install');
+                        channel = isStore ? 'store' : 'direct';
+                        setWindowsUpdateChannel(channel);
+                    } catch (error) {
+                        reportError('Failed to detect Windows update channel', error);
+                        channel = 'direct';
+                        setWindowsUpdateChannel('direct');
+                    }
+                }
+                if (channel === 'store') {
+                    await openLink(MS_STORE_URL);
+                    setUpdateNotice(t.storeUpdateHint);
+                    return;
+                }
+            }
             try {
                 localStorage.setItem(UPDATE_BADGE_LAST_CHECK_KEY, String(Date.now()));
             } catch (error) {
@@ -934,6 +1001,9 @@ export function SettingsView() {
         }
 
         if (page === 'about') {
+            const updateActionLabel = isWindows && windowsUpdateChannel === 'store'
+                ? t.checkStoreUpdates
+                : t.checkForUpdates;
             return (
                 <SettingsAboutPage
                     t={t}
@@ -941,6 +1011,7 @@ export function SettingsView() {
                     onOpenLink={openLink}
                     onCheckUpdates={handleCheckUpdates}
                     isCheckingUpdate={isCheckingUpdate}
+                    updateActionLabel={updateActionLabel}
                     updateError={updateError}
                     updateNotice={updateNotice}
                 />

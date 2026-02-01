@@ -21,6 +21,7 @@ type SettingsAboutPageProps = {
     onOpenLink: (url: string) => void;
     onCheckUpdates: () => void;
     isCheckingUpdate: boolean;
+    updateActionLabel?: string;
     updateError: string | null;
     updateNotice: string | null;
 };
@@ -31,9 +32,11 @@ export function SettingsAboutPage({
     onOpenLink,
     onCheckUpdates,
     isCheckingUpdate,
+    updateActionLabel,
     updateError,
     updateNotice,
 }: SettingsAboutPageProps) {
+    const actionLabel = updateActionLabel ?? t.checkForUpdates;
     return (
         <div className="bg-muted/30 rounded-lg p-6 space-y-4 border border-border">
             <div className="flex justify-between items-center">
@@ -96,7 +99,7 @@ export function SettingsAboutPage({
             </div>
             <div className="border-t border-border/50"></div>
             <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">{t.checkForUpdates}</span>
+                <span className="text-muted-foreground">{actionLabel}</span>
                 <button
                     onClick={onCheckUpdates}
                     disabled={isCheckingUpdate}
@@ -108,7 +111,7 @@ export function SettingsAboutPage({
                     )}
                 >
                     <RefreshCw className={cn("w-4 h-4", isCheckingUpdate && "animate-spin")} />
-                    {isCheckingUpdate ? t.checking : t.checkForUpdates}
+                    {isCheckingUpdate ? t.checking : actionLabel}
                 </button>
             </div>
             {updateError && (

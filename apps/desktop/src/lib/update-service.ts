@@ -1,11 +1,13 @@
 /**
- * Update service for checking GitHub releases and downloading updates
+ * Update service for checking GitHub releases and downloading updates.
  */
 
 import { reportError } from './report-error';
 
 const GITHUB_RELEASES_API = 'https://api.github.com/repos/dongdongbh/Mindwtr/releases/latest';
 const GITHUB_RELEASES_URL = 'https://github.com/dongdongbh/Mindwtr/releases/latest';
+const MS_STORE_PRODUCT_ID = '9N0V5B0B6FRX';
+const MS_STORE_URL = `ms-windows-store://pdp/?ProductId=${MS_STORE_PRODUCT_ID}`;
 
 export interface UpdateInfo {
     hasUpdate: boolean;
@@ -191,4 +193,4 @@ export async function verifyDownloadChecksum(downloadUrl: string, assets: Update
     return actual === expected;
 }
 
-export { GITHUB_RELEASES_URL };
+export { GITHUB_RELEASES_URL, MS_STORE_URL };

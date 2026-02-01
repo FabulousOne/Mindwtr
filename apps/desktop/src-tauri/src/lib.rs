@@ -280,6 +280,19 @@ fn quit_app(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+fn is_windows_store_install() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("APPX_PACKAGE_FAMILY_NAME").is_some()
+            || std::env::var_os("APPX_PACKAGE_FULL_NAME").is_some()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
+#[tauri::command]
 fn start_audio_recording(state: tauri::State<'_, AudioRecorderState>) -> Result<(), String> {
     let mut guard = state.inner().0.lock().map_err(|_| "Recorder lock poisoned".to_string())?;
     if guard.is_some() {
@@ -2575,6 +2588,7 @@ pub fn run() {
             append_log_line,
             clear_log_file,
             consume_quick_add_pending,
+            is_windows_store_install,
             quit_app
         ])
         .run(tauri::generate_context!())
