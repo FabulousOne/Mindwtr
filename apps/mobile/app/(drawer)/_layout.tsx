@@ -15,7 +15,7 @@ export default function AppLayout() {
         headerTintColor: tc.text,
         headerTitleAlign: 'center',
         headerShadowVisible: false,
-        headerBackTitleVisible: false,
+        headerBackButtonDisplayMode: 'minimal',
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
