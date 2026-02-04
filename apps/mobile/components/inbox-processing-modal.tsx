@@ -123,16 +123,20 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
     setAiModal(null);
   };
 
+  const hasInitialized = useRef(false);
+  const closingRef = useRef(false);
+
   const handleClose = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
     resetProcessingState();
     onClose();
   };
 
-  const hasInitialized = useRef(false);
-
   useEffect(() => {
     if (!visible) {
       hasInitialized.current = false;
+      closingRef.current = false;
       return;
     }
     if (hasInitialized.current) return;
@@ -480,6 +484,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={handleClose}
+        onDismiss={handleClose}
       >
         <View style={[styles.fullScreenContainer, { backgroundColor: tc.bg }]}>
           <View style={headerStyle}>
@@ -530,6 +535,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={handleClose}
+        onDismiss={handleClose}
       >
         <View style={[styles.fullScreenContainer, { backgroundColor: tc.bg }]}>
           <View style={headerStyle}>

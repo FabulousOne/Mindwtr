@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, Alert, Pressable, ScrollView, SectionList, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Area, Attachment, generateUUID, Project, PRESET_TAGS, Task, TaskStatus, useTaskStore, validateAttachmentForUpload } from '@mindwtr/core';
 import { Trash2 } from 'lucide-react-native';
@@ -29,6 +29,7 @@ export default function ProjectsScreen() {
   const { isDark } = useTheme();
   const { t } = useLanguage();
   const tc = useThemeColors();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const statusPalette: Record<Project['status'], { text: string; bg: string; border: string }> = {
     active: { text: tc.tint, bg: `${tc.tint}22`, border: tc.tint },
@@ -53,6 +54,7 @@ export default function ProjectsScreen() {
   const [expandedAreaColorId, setExpandedAreaColorId] = useState<string | null>(null);
   const { projectId, taskId } = useLocalSearchParams<{ projectId?: string; taskId?: string }>();
   const lastOpenedTaskIdRef = useRef<string | null>(null);
+  const closingProjectRef = useRef(false);
   const ALL_TAGS = '__all__';
   const NO_TAGS = '__none__';
   const ALL_AREAS = '__all__';
@@ -161,6 +163,12 @@ export default function ProjectsScreen() {
     setHighlightTask(task.id);
     setEditingTask(task);
   }, [taskId, projectId, selectedProject, tasks, setHighlightTask]);
+
+  useEffect(() => {
+    if (!selectedProject) {
+      closingProjectRef.current = false;
+    }
+  }, [selectedProject]);
 
 
   const sortAreasByName = () => {
@@ -373,6 +381,8 @@ export default function ProjectsScreen() {
   };
 
   const closeProjectDetail = () => {
+    if (closingProjectRef.current) return;
+    closingProjectRef.current = true;
     persistSelectedProjectEdits(selectedProject);
     setSelectedProject(null);
     setNotesExpanded(false);
@@ -594,6 +604,13 @@ export default function ProjectsScreen() {
   };
 
 
+  const modalHeaderStyle = [styles.modalHeader, {
+    borderBottomColor: tc.border,
+    backgroundColor: tc.cardBg,
+    paddingTop: Math.max(insets.top, 10),
+    paddingBottom: 10,
+  }];
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={[styles.container, { backgroundColor: tc.bg }]}>
@@ -787,11 +804,12 @@ export default function ProjectsScreen() {
         visible={!!selectedProject}
         animationType="slide"
         onRequestClose={closeProjectDetail}
+        onDismiss={closeProjectDetail}
       >
-                <SafeAreaView style={{ flex: 1, backgroundColor: tc.bg }}>
+                <SafeAreaView style={{ flex: 1, backgroundColor: tc.bg }} edges={['left', 'right', 'bottom']}>
                   {selectedProject ? (
                     <>
-                <View style={[styles.modalHeader, { borderBottomColor: tc.border, backgroundColor: tc.cardBg }]}>
+                <View style={modalHeaderStyle}>
                   <TouchableOpacity onPress={closeProjectDetail} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <Text style={[styles.backButtonText, { color: tc.tint }]}>{t('common.back') || 'Back'}</Text>
                   </TouchableOpacity>
@@ -834,7 +852,7 @@ export default function ProjectsScreen() {
                 <ScrollView
                   style={{ flex: 1 }}
                   contentContainerStyle={styles.projectDetailScroll}
-                  keyboardShouldPersistTaps="handled"
+                  keyboardShouldPersistTaps="always"
                 >
 
                 <View style={[styles.statusBlock, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
