@@ -380,29 +380,14 @@ jobs:
             throw "Metadata update failed after $maxRetries attempts: $updateOutput"
           }
 
-      - name: Upload Microsoft Store package (draft)
-        if: (startsWith(github.ref, 'refs/tags/') || inputs.run_msstore == 'true' || inputs.run_msstore == true) && steps.msstore_status.outputs.skip != 'true' && env.MSSTORE_SKIP_PUBLISH != 'true'
-        shell: pwsh
-        env:
-          MS_STORE_APP_ID: ${{ secrets.MS_STORE_APP_ID || '9N0V5B0B6FRX' }}
-        run: |
-          $msix = (Resolve-Path "mindwtr_${{ steps.version.outputs.version }}_x64.msix").Path
-          $uploadOutput = & msstore publish $msix -id $env:MS_STORE_APP_ID --noCommit 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            if ($uploadOutput -match 'InvalidState' -or $uploadOutput -match 'certification' -or $uploadOutput -match 'Pending Submission') {
-              Write-Warning "Store submission is already in certification. Skipping package upload."
-              exit 0
-            }
-            throw "Store package upload failed: $uploadOutput"
-          }
-
       - name: Publish to Microsoft Store
         if: (startsWith(github.ref, 'refs/tags/') || inputs.run_msstore == 'true' || inputs.run_msstore == true) && steps.msstore_status.outputs.skip != 'true' && env.MSSTORE_SKIP_PUBLISH != 'true'
         shell: pwsh
         env:
           MS_STORE_APP_ID: ${{ secrets.MS_STORE_APP_ID || '9N0V5B0B6FRX' }}
         run: |
-          $publishOutput = & msstore submission publish $env:MS_STORE_APP_ID 2>&1
+          $msix = (Resolve-Path "mindwtr_${{ steps.version.outputs.version }}_x64.msix").Path
+          $publishOutput = & msstore publish $msix -id $env:MS_STORE_APP_ID 2>&1
           if ($LASTEXITCODE -ne 0) {
             if ($publishOutput -match 'InvalidState' -or $publishOutput -match 'certification' -or $publishOutput -match 'Pending Submission') {
               Write-Warning "Store submission is already in certification. Skipping publish."
