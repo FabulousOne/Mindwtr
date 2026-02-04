@@ -32,7 +32,7 @@
 "\u5B8C\u5168\u79BB\u7EBF\u53EF\u7528\uFF0C\u65E0\u9700\u4E92\u8054\u7F51\u8FDE\u63A5",
           "\u5B8C\u5168\u5F00\u6E90\uFF0C\u5B89\u5168\u900F\u660E"
         ],
-        "ReleaseNotes": "\u2022 \u5feb\u901f\u6dfb\u52a0\u652f\u6301 Area\uff08\u9886\u57df\uff09\uff0c\u5e76\u53ef\u9009\u62e9\u5468\u8d77\u59cb\u65e5\uff08\u5468\u65e5/\u5468\u4e00\uff09\u3002\n\u2022 \u540c\u6b65\u4fee\u590d\u8ba9\u4e3b\u9898\u3001\u8bed\u8a00\u4e0e\u952e\u4f4d\u98ce\u683c\u5728\u8bbe\u5907\u95f4\u4fdd\u6301\u4e00\u81f4\u3002\n\u2022 \u79fb\u52a8\u7aef Whisper \u91c7\u96c6\u66f4\u7a33\u5b9a\uff0ciOS \u8fd4\u56de\u6309\u94ae\u6807\u9898\u5df2\u9690\u85cf\u3002\n\u2022 \u684c\u9762\u7aef\u89c6\u56fe\u5feb\u6377\u952e\u4f18\u5316\uff0c\u66f4\u65b0\u68c0\u67e5\u652f\u6301\u901a\u9053\u533a\u5206\u3002\n\u2022 OpenAI \u9ed8\u8ba4\u6a21\u578b\u5207\u6362\u4e3a GPT-4o mini\uff0c\u5e76\u6539\u8fdb\u9519\u8bef\u63d0\u793a\u3002",
+        "ReleaseNotes": "\u2022 WebDAV \u9644\u4ef6\u540c\u6b65\u4f7f\u7528\u5df2\u4fdd\u5b58\u51ed\u636e\uff0c\u4f20\u8f93\u66f4\u53ef\u9760\u3002\n\u2022 \u770b\u677f\u89c6\u56fe\u9690\u85cf\u60ac\u6d6e\u63d0\u793a\uff0c\u754c\u9762\u66f4\u6e05\u723d\u3002\n\u2022 \u7d27\u51d1\u5217\u8868\u4e2d\u4efb\u52a1\u64cd\u4f5c\u4e0d\u518d\u663e\u793a\u9879\u76ee\u5fbd\u6807\u3002",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -84,7 +84,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "\u2022 Quick-add now supports Areas, and you can choose Sunday/Monday as the week start.\n\u2022 Sync fixes keep theme, language, and keybinding style consistent across devices.\n\u2022 Mobile Whisper capture is more stable, and iOS back button titles are hidden.\n\u2022 Desktop view keybindings refined and update checks are channel-aware.\n\u2022 OpenAI default model switched to GPT-4o mini with clearer errors.",
+        "ReleaseNotes": "\u2022 WebDAV attachment sync now uses stored credentials for reliable transfers.\n\u2022 Board view hover hint removed for a cleaner layout.\n\u2022 Task actions no longer show project badge in compact lists.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -132,7 +132,7 @@
           "No requiere conexi\u00F3n a internet para funcionar",
           "C\u00F3digo abierto y transparente"
         ],
-        "ReleaseNotes": "\u2022 Quick-add ahora admite Areas y puedes elegir el inicio de semana (domingo/lunes).\n\u2022 Las correcciones de sincronizaci\u00f3n mantienen tema, idioma y estilo de teclas consistentes.\n\u2022 La captura de Whisper en m\u00f3vil es m\u00e1s estable y se oculta el t\u00edtulo del bot\u00f3n atr\u00e1s en iOS.\n\u2022 Atajos de vista mejorados en escritorio y comprobaciones de actualizaci\u00f3n por canal.\n\u2022 El modelo predeterminado de OpenAI cambia a GPT-4o mini con mejores errores.",
+        "ReleaseNotes": "\u2022 La sincronizaci\u00f3n de adjuntos por WebDAV usa credenciales guardadas para transferencias m\u00e1s fiables.\n\u2022 Se elimin\u00f3 el aviso al pasar el cursor en la vista de tablero para un dise\u00f1o m\u00e1s limpio.\n\u2022 Las acciones de tarea ya no muestran la insignia del proyecto en listas compactas.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
