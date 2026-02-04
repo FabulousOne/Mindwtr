@@ -7,12 +7,20 @@ on:
         description: 'Release tag (e.g., v0.2.3)'
         required: false
         type: string
+      run_msstore:
+        description: 'Run Microsoft Store publish steps even if this is not a tag push'
+        required: false
+        type: boolean
   workflow_dispatch:
     inputs:
       tag:
         description: 'Release tag (e.g., v0.2.3)'
         required: false
         type: string
+      run_msstore:
+        description: 'Run Microsoft Store publish steps even if this is not a tag push'
+        required: false
+        type: boolean
 
 permissions:
   contents: write
@@ -157,7 +165,7 @@ jobs:
         uses: microsoft/setup-msstore-cli@v1
 
       - name: Validate Microsoft Store secrets
-        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/') || inputs.run_msstore == 'true' || inputs.run_msstore == true
         shell: pwsh
         env:
           MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
@@ -174,7 +182,7 @@ jobs:
           }
 
       - name: Reconfigure store credentials
-        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/') || inputs.run_msstore == 'true' || inputs.run_msstore == true
         shell: pwsh
         env:
           MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
@@ -190,7 +198,7 @@ jobs:
 
       - name: Check Microsoft Store submission status
         id: msstore_status
-        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/') || inputs.run_msstore == 'true' || inputs.run_msstore == true
         shell: pwsh
         env:
           MS_STORE_APP_ID: ${{ secrets.MS_STORE_APP_ID || '9N0V5B0B6FRX' }}
@@ -226,7 +234,7 @@ jobs:
           "skip=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Update Microsoft Store metadata
-        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch' && steps.msstore_status.outputs.skip != 'true'
+        if: (startsWith(github.ref, 'refs/tags/') || inputs.run_msstore == 'true' || inputs.run_msstore == true) && steps.msstore_status.outputs.skip != 'true'
         shell: pwsh
         env:
           MS_STORE_APP_ID: ${{ secrets.MS_STORE_APP_ID || '9N0V5B0B6FRX' }}
@@ -280,7 +288,7 @@ jobs:
 
       - name: Publish to Microsoft Store
         id: msstore_publish
-        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch' && steps.msstore_status.outputs.skip != 'true'
+        if: (startsWith(github.ref, 'refs/tags/') || inputs.run_msstore == 'true' || inputs.run_msstore == true) && steps.msstore_status.outputs.skip != 'true'
         shell: pwsh
         env:
           MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
