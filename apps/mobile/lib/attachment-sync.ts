@@ -31,6 +31,7 @@ const WEBDAV_ATTACHMENT_RETRY_OPTIONS = { maxAttempts: 5, baseDelayMs: 2000, max
 const WEBDAV_ATTACHMENT_MIN_INTERVAL_MS = 400;
 const WEBDAV_ATTACHMENT_COOLDOWN_MS = 60_000;
 const WEBDAV_ATTACHMENT_MAX_DOWNLOADS_PER_SYNC = 10;
+const WEBDAV_ATTACHMENT_MAX_UPLOADS_PER_SYNC = 10;
 const WEBDAV_ATTACHMENT_MISSING_BACKOFF_MS = 15 * 60_000;
 const WEBDAV_ATTACHMENT_ERROR_BACKOFF_MS = 2 * 60_000;
 const webdavAttachmentDownloadBackoff = new Map<string, number>();
@@ -731,6 +732,8 @@ export const syncWebdavAttachments = async (
   let didMutate = false;
   const downloadQueue: Attachment[] = [];
   let abortedByRateLimit = false;
+  let uploadCount = 0;
+  let uploadLimitLogged = false;
   for (const attachment of attachmentsById.values()) {
     if (attachment.kind !== 'file') continue;
     if (attachment.deletedAt) continue;
@@ -809,6 +812,16 @@ export const syncWebdavAttachments = async (
     }
 
     if (!attachment.cloudKey && hasLocalPath && existsLocally && !isHttp) {
+      if (uploadCount >= WEBDAV_ATTACHMENT_MAX_UPLOADS_PER_SYNC) {
+        if (!uploadLimitLogged) {
+          logAttachmentInfo('WebDAV attachment upload limit reached', {
+            limit: String(WEBDAV_ATTACHMENT_MAX_UPLOADS_PER_SYNC),
+          });
+          uploadLimitLogged = true;
+        }
+        continue;
+      }
+      uploadCount += 1;
       try {
         const size = await getAttachmentByteSize(attachment, uri);
         const validation = await validateAttachmentForUpload(attachment, size);
