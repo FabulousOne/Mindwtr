@@ -21,7 +21,7 @@ import { useLanguage, type Language } from '../../contexts/language-context';
 import { isFlatpakRuntime, isTauriRuntime } from '../../lib/runtime';
 import { reportError } from '../../lib/report-error';
 import { SyncService } from '../../lib/sync-service';
-import { clearLog, getLogPath, logDiagnosticsEnabled, logWarn } from '../../lib/app-log';
+import { clearLog, getLogPath } from '../../lib/app-log';
 import { checkForUpdates, type UpdateInfo, GITHUB_RELEASES_URL, MS_STORE_URL, verifyDownloadChecksum } from '../../lib/update-service';
 import { labelFallback, labelKeyOverrides, type SettingsLabels } from './settings/labels';
 import { SettingsUpdateModal } from './settings/SettingsUpdateModal';
@@ -387,12 +387,6 @@ export function SettingsView() {
         }
         if (didWriteLogRef.current) return;
         didWriteLogRef.current = true;
-        logDiagnosticsEnabled().catch((error) => {
-            void logWarn('Failed to log diagnostics', {
-                scope: 'diagnostics',
-                extra: { error: error instanceof Error ? error.message : String(error) },
-            });
-        });
     }, [loggingEnabled]);
 
     useEffect(() => {
@@ -519,9 +513,6 @@ export function SettingsView() {
                 loggingEnabled: nextEnabled,
             },
         }).then(showSaved).catch((error) => reportError('Failed to update logging settings', error));
-        if (nextEnabled) {
-            await logDiagnosticsEnabled();
-        }
     };
 
     const handleClearLog = async () => {
@@ -778,6 +769,9 @@ export function SettingsView() {
             syncPath,
             setSyncPath,
             isSyncing,
+            syncQueued,
+            syncLastResult,
+            syncLastResultAt,
             syncError,
             syncBackend,
             webdavUrl,
@@ -838,6 +832,9 @@ export function SettingsView() {
                 onSaveCloud={handleSaveCloud}
                 onSyncNow={handleSync}
                 isSyncing={isSyncing}
+                syncQueued={syncQueued}
+                syncLastResult={syncLastResult}
+                syncLastResultAt={syncLastResultAt}
                 syncError={syncError}
                 syncPreferences={syncPreferences}
                 onUpdateSyncPreferences={handleUpdateSyncPreferences}

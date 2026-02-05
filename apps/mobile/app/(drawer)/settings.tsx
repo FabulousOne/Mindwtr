@@ -52,7 +52,7 @@ import {
 import { pickAndParseSyncFile, pickAndParseSyncFolder, exportData } from '../../lib/storage-file';
 import { fetchExternalCalendarEvents, getExternalCalendars, saveExternalCalendars } from '../../lib/external-calendar';
 import { loadAIKey, saveAIKey } from '../../lib/ai-config';
-import { clearLog, getLogPath, logError, logInfo, logWarn } from '../../lib/app-log';
+import { clearLog, getLogPath, logError, logWarn } from '../../lib/app-log';
 import { performMobileSync } from '../../lib/sync-service';
 import { requestNotificationPermission, startMobileNotifications } from '../../lib/notification-service';
 import {
@@ -1115,11 +1115,6 @@ export default function SettingsPage() {
                 loggingEnabled: value,
             },
         })
-            .then(async () => {
-                if (value) {
-                    await logInfo('Debug logging enabled', { scope: 'diagnostics' });
-                }
-            })
             .catch(logSettingsError);
     };
 

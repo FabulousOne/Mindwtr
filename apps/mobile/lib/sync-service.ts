@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppData, MergeStats, useTaskStore, webdavGetJson, webdavPutJson, cloudGetJson, cloudPutJson, flushPendingSave, performSyncCycle, findOrphanedAttachments, removeOrphanedAttachmentsFromData, webdavDeleteFile, cloudDeleteFile, CLOCK_SKEW_THRESHOLD_MS, appendSyncHistory } from '@mindwtr/core';
+import { AppData, MergeStats, useTaskStore, webdavGetJson, webdavPutJson, cloudGetJson, cloudPutJson, flushPendingSave, performSyncCycle, findOrphanedAttachments, removeOrphanedAttachmentsFromData, webdavDeleteFile, cloudDeleteFile, CLOCK_SKEW_THRESHOLD_MS, appendSyncHistory, withRetry } from '@mindwtr/core';
 import { mobileStorage } from './storage-adapter';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { readSyncFile, writeSyncFile } from './storage-file';
@@ -17,6 +17,7 @@ import {
 } from './sync-constants';
 
 const DEFAULT_SYNC_TIMEOUT_MS = 30_000;
+const WEBDAV_RETRY_OPTIONS = { maxAttempts: 5, baseDelayMs: 2000, maxDelayMs: 30_000 };
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const SYNC_FILE_NAME = 'data.json';
 const LEGACY_SYNC_FILE_NAME = 'mindwtr-sync.json';
@@ -24,6 +25,10 @@ const LEGACY_SYNC_FILE_NAME = 'mindwtr-sync.json';
 const logSyncWarning = (message: string, error?: unknown) => {
   const extra = error ? { error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)) } : undefined;
   void logWarn(message, { scope: 'sync', extra });
+};
+
+const logSyncInfo = (message: string, extra?: Record<string, string>) => {
+  void logInfo(message, { scope: 'sync', extra });
 };
 
 const injectExternalCalendars = async (data: AppData): Promise<AppData> => {
@@ -124,6 +129,8 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
       return { success: true };
     }
 
+    logSyncInfo('Sync start', { backend });
+
     let step = 'init';
     let syncUrl: string | undefined;
     let wroteLocal = false;
@@ -161,6 +168,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
 
       // Pre-sync local attachments so cloudKeys exist before writing remote data.
       step = 'attachments_prepare';
+      logSyncInfo('Sync step', { step });
       try {
         const localData = await mobileStorage.getData();
         let preMutated = false;
@@ -187,11 +195,15 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         },
         readRemote: async () => {
           if (backend === 'webdav' && webdavConfig?.url) {
-            return await webdavGetJson<AppData>(webdavConfig.url, {
-              username: webdavConfig.username,
-              password: webdavConfig.password,
-              timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
-            });
+            return await withRetry(
+              () =>
+                webdavGetJson<AppData>(webdavConfig.url, {
+                  username: webdavConfig.username,
+                  password: webdavConfig.password,
+                  timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+                }),
+              WEBDAV_RETRY_OPTIONS
+            );
           }
           if (backend === 'cloud' && cloudConfig?.url) {
             return await cloudGetJson<AppData>(cloudConfig.url, {
@@ -212,7 +224,15 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
           const sanitized = sanitizeAppDataForRemote(data);
           if (backend === 'webdav') {
             if (!webdavConfig?.url) throw new Error('WebDAV URL not configured');
-            await webdavPutJson(webdavConfig.url, sanitized, { username: webdavConfig.username, password: webdavConfig.password, timeoutMs: DEFAULT_SYNC_TIMEOUT_MS });
+            await withRetry(
+              () =>
+                webdavPutJson(webdavConfig.url, sanitized, {
+                  username: webdavConfig.username,
+                  password: webdavConfig.password,
+                  timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+                }),
+              WEBDAV_RETRY_OPTIONS
+            );
             return;
           }
           if (backend === 'cloud') {
@@ -225,6 +245,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         },
         onStep: (next) => {
           step = next;
+          logSyncInfo('Sync step', { step });
         },
       });
 
@@ -259,6 +280,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
 
       if (backend === 'webdav' && webdavConfigValue?.url) {
         step = 'attachments';
+        logSyncInfo('Sync step', { step });
         const baseSyncUrl = getBaseSyncUrl(webdavConfigValue.url);
         const mutated = await syncWebdavAttachments(mergedData, webdavConfigValue, baseSyncUrl);
         if (mutated) {
@@ -269,6 +291,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
 
       if (backend === 'cloud' && cloudConfigValue?.url) {
         step = 'attachments';
+        logSyncInfo('Sync step', { step });
         const baseSyncUrl = getCloudBaseUrl(cloudConfigValue.url);
         const mutated = await syncCloudAttachments(mergedData, cloudConfigValue, baseSyncUrl);
         if (mutated) {
@@ -279,6 +302,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
 
       if (backend === 'file' && fileSyncPath) {
         step = 'attachments';
+        logSyncInfo('Sync step', { step });
         const mutated = await syncFileAttachments(mergedData, fileSyncPath);
         if (mutated) {
           await mobileStorage.saveData(mergedData);
@@ -290,6 +314,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
 
       if (shouldRunAttachmentCleanup(mergedData.settings.attachments?.lastCleanupAt)) {
         step = 'attachments_cleanup';
+        logSyncInfo('Sync step', { step });
         const orphaned = findOrphanedAttachments(mergedData);
         if (orphaned.length > 0) {
           const isFileBackend = backend === 'file';

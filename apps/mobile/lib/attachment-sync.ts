@@ -8,6 +8,7 @@ import {
   computeSha256Hex,
   globalProgressTracker,
   webdavGetFile,
+  webdavFileExists,
   webdavMakeDirectory,
   webdavPutFile,
   withRetry,
@@ -21,11 +22,18 @@ import {
   WEBDAV_URL_KEY,
   WEBDAV_USERNAME_KEY,
 } from './sync-constants';
-import { logWarn, sanitizeLogMessage } from './app-log';
+import { logInfo, logWarn, sanitizeLogMessage } from './app-log';
 
 const ATTACHMENTS_DIR_NAME = 'attachments';
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
 const StorageAccessFramework = (FileSystem as any).StorageAccessFramework;
+const WEBDAV_ATTACHMENT_RETRY_OPTIONS = { maxAttempts: 5, baseDelayMs: 2000, maxDelayMs: 60_000 };
+const WEBDAV_ATTACHMENT_MIN_INTERVAL_MS = 400;
+const WEBDAV_ATTACHMENT_COOLDOWN_MS = 60_000;
+const WEBDAV_ATTACHMENT_MAX_DOWNLOADS_PER_SYNC = 10;
+const WEBDAV_ATTACHMENT_MISSING_BACKOFF_MS = 15 * 60_000;
+const WEBDAV_ATTACHMENT_ERROR_BACKOFF_MS = 2 * 60_000;
+const webdavAttachmentDownloadBackoff = new Map<string, number>();
 
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const BASE64_LOOKUP = (() => {
@@ -49,6 +57,50 @@ const logAttachmentWarn = (message: string, error?: unknown) => {
   void logWarn(message, { scope: 'attachment', extra });
 };
 
+const logAttachmentInfo = (message: string, extra?: Record<string, string>) => {
+  void logInfo(message, { scope: 'attachment', extra });
+};
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const getErrorStatus = (error: unknown): number | null => {
+  if (!error || typeof error !== 'object') return null;
+  const anyError = error as { status?: unknown; statusCode?: unknown; response?: { status?: unknown } };
+  const status = anyError.status ?? anyError.statusCode ?? anyError.response?.status;
+  return typeof status === 'number' ? status : null;
+};
+
+const getWebdavDownloadBackoff = (attachmentId: string): number | null => {
+  const blockedUntil = webdavAttachmentDownloadBackoff.get(attachmentId);
+  if (!blockedUntil) return null;
+  if (Date.now() >= blockedUntil) {
+    webdavAttachmentDownloadBackoff.delete(attachmentId);
+    return null;
+  }
+  return blockedUntil;
+};
+
+const setWebdavDownloadBackoff = (attachmentId: string, error: unknown): void => {
+  const status = getErrorStatus(error);
+  if (status === 404) {
+    webdavAttachmentDownloadBackoff.set(attachmentId, Date.now() + WEBDAV_ATTACHMENT_MISSING_BACKOFF_MS);
+    return;
+  }
+  webdavAttachmentDownloadBackoff.set(attachmentId, Date.now() + WEBDAV_ATTACHMENT_ERROR_BACKOFF_MS);
+};
+
+const isWebdavRateLimitedError = (error: unknown): boolean => {
+  const status = getErrorStatus(error);
+  if (status === 429 || status === 503) return true;
+  const message = error instanceof Error ? error.message : String(error || '');
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('blockedtemporarily') ||
+    normalized.includes('too many requests') ||
+    normalized.includes('rate limit') ||
+    normalized.includes('rate limited')
+  );
+};
 
 const reportProgress = (
   attachmentId: string,
@@ -86,6 +138,102 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
     out += hasB2 ? BASE64_ALPHABET[triplet & 0x3f] : '=';
   }
   return out;
+};
+
+const encodeBase64Utf8 = (value: string): string => {
+  const Encoder = typeof TextEncoder === 'function' ? TextEncoder : undefined;
+  if (Encoder) {
+    return bytesToBase64(new Encoder().encode(value));
+  }
+  try {
+    const encoded = encodeURIComponent(value);
+    const bytes: number[] = [];
+    for (let i = 0; i < encoded.length; i += 1) {
+      const ch = encoded[i];
+      if (ch === '%') {
+        const hex = encoded.slice(i + 1, i + 3);
+        bytes.push(Number.parseInt(hex, 16));
+        i += 2;
+      } else {
+        bytes.push(ch.charCodeAt(0));
+      }
+    }
+    return bytesToBase64(new Uint8Array(bytes));
+  } catch {
+    const bytes = new Uint8Array(value.split('').map((ch) => ch.charCodeAt(0) & 0xff));
+    return bytesToBase64(bytes);
+  }
+};
+
+const buildBasicAuthHeader = (username?: string, password?: string): string | null => {
+  if (!username && !password) return null;
+  return `Basic ${encodeBase64Utf8(`${username || ''}:${password || ''}`)}`;
+};
+
+const resolveUploadType = (): any => {
+  const types = (FileSystem as any).FileSystemUploadType;
+  return types?.BINARY_CONTENT ?? types?.BINARY ?? undefined;
+};
+
+const uploadWebdavFileWithFileSystem = async (
+  url: string,
+  fileUri: string,
+  contentType: string,
+  username: string,
+  password: string,
+  onProgress?: (sent: number, total: number) => void,
+  totalBytes?: number
+): Promise<boolean> => {
+  const uploadAsync = (FileSystem as any).uploadAsync;
+  if (typeof uploadAsync !== 'function') return false;
+  if (!fileUri.startsWith('file://')) return false;
+
+  const authHeader = buildBasicAuthHeader(username, password);
+  const headers: Record<string, string> = {
+    'Content-Type': contentType || DEFAULT_CONTENT_TYPE,
+  };
+  if (authHeader) headers.Authorization = authHeader;
+
+  const uploadType = resolveUploadType();
+  const createUploadTask = (FileSystem as any).createUploadTask;
+  if (typeof createUploadTask === 'function' && onProgress) {
+    const task = createUploadTask(
+      url,
+      fileUri,
+      {
+        httpMethod: 'PUT',
+        headers,
+        uploadType,
+      },
+      (event: { totalBytesSent?: number; totalBytesExpectedToSend?: number }) => {
+        const sent = Number(event.totalBytesSent ?? 0);
+        const expected = Number(event.totalBytesExpectedToSend ?? totalBytes ?? 0);
+        if (expected > 0) {
+          onProgress(sent, expected);
+        }
+      }
+    );
+    const result = await task.uploadAsync();
+    const status = Number((result as { status?: number } | null)?.status ?? 0);
+    if (status && (status < 200 || status >= 300)) {
+      const error = new Error(`WebDAV File PUT failed (${status})`);
+      (error as { status?: number }).status = status;
+      throw error;
+    }
+    return true;
+  }
+
+  const result = await uploadAsync(url, fileUri, { httpMethod: 'PUT', headers, uploadType });
+  const status = Number((result as { status?: number } | null)?.status ?? 0);
+  if (status && (status < 200 || status >= 300)) {
+    const error = new Error(`WebDAV File PUT failed (${status})`);
+    (error as { status?: number }).status = status;
+    throw error;
+  }
+  if (onProgress && Number.isFinite(totalBytes ?? NaN) && (totalBytes ?? 0) > 0) {
+    onProgress(totalBytes ?? 0, totalBytes ?? 0);
+  }
+  return true;
 };
 
 const base64ToBytes = (base64: string): Uint8Array => {
@@ -477,6 +625,12 @@ export const persistAttachmentLocally = async (attachment: Attachment): Promise<
   const filename = `${attachment.id}${ext}`;
   const targetUri = `${attachmentsDir}${filename}`;
   try {
+    logAttachmentInfo('Cache attachment start', {
+      id: attachment.id,
+      title: attachment.title || 'attachment',
+      uri,
+      size: Number.isFinite(attachment.size ?? NaN) ? String(attachment.size) : 'unknown',
+    });
     const alreadyExists = await fileExists(targetUri);
     if (!alreadyExists) {
       if (uri.startsWith('content://')) {
@@ -493,6 +647,11 @@ export const persistAttachmentLocally = async (attachment: Attachment): Promise<
         size = info.size;
       }
     }
+    logAttachmentInfo('Cache attachment done', {
+      id: attachment.id,
+      uri: targetUri,
+      size: Number.isFinite(size ?? NaN) ? String(size) : 'unknown',
+    });
     return {
       ...attachment,
       uri: targetUri,
@@ -510,6 +669,26 @@ export const syncWebdavAttachments = async (
   webDavConfig: WebDavConfig,
   baseSyncUrl: string
 ): Promise<boolean> => {
+  let lastRequestAt = 0;
+  let blockedUntil = 0;
+  const waitForSlot = async (): Promise<void> => {
+    const now = Date.now();
+    if (blockedUntil && now < blockedUntil) {
+      throw new Error(`WebDAV rate limited for ${blockedUntil - now}ms`);
+    }
+    const elapsed = now - lastRequestAt;
+    if (elapsed < WEBDAV_ATTACHMENT_MIN_INTERVAL_MS) {
+      await sleep(WEBDAV_ATTACHMENT_MIN_INTERVAL_MS - elapsed);
+    }
+    lastRequestAt = Date.now();
+  };
+  const handleRateLimit = (error: unknown): boolean => {
+    if (!isWebdavRateLimitedError(error)) return false;
+    blockedUntil = Date.now() + WEBDAV_ATTACHMENT_COOLDOWN_MS;
+    logAttachmentWarn('WebDAV rate limited; pausing attachment sync', error);
+    return true;
+  };
+
   const attachmentsDirUrl = `${baseSyncUrl}/${ATTACHMENTS_DIR_NAME}`;
   try {
     await webdavMakeDirectory(attachmentsDirUrl, {
@@ -520,7 +699,7 @@ export const syncWebdavAttachments = async (
     logAttachmentWarn('Failed to ensure WebDAV attachments directory', error);
   }
 
-  await getAttachmentsDir();
+  const attachmentsDir = await getAttachmentsDir();
 
   const attachmentsById = new Map<string, Attachment>();
   for (const task of appData.tasks) {
@@ -534,48 +713,189 @@ export const syncWebdavAttachments = async (
     }
   }
 
+  logAttachmentInfo('WebDAV attachment sync start', {
+    count: String(attachmentsById.size),
+  });
+
   let didMutate = false;
+  const downloadQueue: Attachment[] = [];
+  let abortedByRateLimit = false;
   for (const attachment of attachmentsById.values()) {
     if (attachment.kind !== 'file') continue;
     if (attachment.deletedAt) continue;
+    if (abortedByRateLimit) break;
 
     const uri = attachment.uri || '';
     const isHttp = /^https?:\/\//i.test(uri);
     const isContent = uri.startsWith('content://');
     const hasLocalPath = Boolean(uri) && !isHttp;
+    logAttachmentInfo('WebDAV attachment check', {
+      id: attachment.id,
+      title: attachment.title || 'attachment',
+      uri,
+      cloud: attachment.cloudKey ? 'set' : 'missing',
+      localStatus: attachment.localStatus || '',
+      uriKind: isHttp ? 'http' : (isContent ? 'content' : 'file'),
+    });
+    const existsStart = Date.now();
     const existsLocally = hasLocalPath ? await fileExists(uri) : false;
+    logAttachmentInfo('WebDAV attachment exists check', {
+      id: attachment.id,
+      exists: existsLocally ? 'true' : 'false',
+      ms: String(Date.now() - existsStart),
+    });
     const nextStatus: Attachment['localStatus'] = (existsLocally || isContent || isHttp) ? 'available' : 'missing';
     if (attachment.localStatus !== nextStatus) {
       attachment.localStatus = nextStatus;
       didMutate = true;
     }
+    if (existsLocally || isContent || isHttp) {
+      webdavAttachmentDownloadBackoff.delete(attachment.id);
+    }
+
+    if (attachment.cloudKey && hasLocalPath && existsLocally && !isHttp) {
+      try {
+        const remoteExists = await withRetry(
+          async () => {
+            await waitForSlot();
+            return await webdavFileExists(`${baseSyncUrl}/${attachment.cloudKey}`, {
+              username: webDavConfig.username,
+              password: webDavConfig.password,
+            });
+          },
+          WEBDAV_ATTACHMENT_RETRY_OPTIONS
+        );
+        logAttachmentInfo('WebDAV attachment remote exists', {
+          id: attachment.id,
+          exists: remoteExists ? 'true' : 'false',
+        });
+        if (!remoteExists) {
+          attachment.cloudKey = undefined;
+          webdavAttachmentDownloadBackoff.delete(attachment.id);
+          didMutate = true;
+        }
+      } catch (error) {
+        if (handleRateLimit(error)) {
+          abortedByRateLimit = true;
+          break;
+        }
+        logAttachmentWarn('WebDAV attachment remote check failed', error);
+      }
+    }
+
+    if (!attachment.cloudKey && !hasLocalPath) {
+      logAttachmentInfo('Skip upload (no local uri)', {
+        id: attachment.id,
+        title: attachment.title || 'attachment',
+      });
+      continue;
+    }
+    if (hasLocalPath && !existsLocally && !isHttp && !isContent) {
+      if (!attachment.cloudKey) {
+        logAttachmentWarn(`Attachment file missing for ${attachment.title}`, new Error(`uri:${uri}`));
+        continue;
+      }
+    }
 
     if (!attachment.cloudKey && hasLocalPath && existsLocally && !isHttp) {
       try {
-        const fileData = await readFileAsBytes(uri);
-        const validation = await validateAttachmentForUpload(attachment, fileData.byteLength);
+        const size = await getAttachmentByteSize(attachment, uri);
+        const validation = await validateAttachmentForUpload(attachment, size);
         if (!validation.valid) {
           logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
           continue;
         }
-        reportProgress(attachment.id, 'upload', 0, fileData.byteLength, 'active');
-        const buffer = toArrayBuffer(fileData);
         const cloudKey = buildCloudKey(attachment);
-        await webdavPutFile(
-          `${baseSyncUrl}/${cloudKey}`,
-          buffer,
-          attachment.mimeType || DEFAULT_CONTENT_TYPE,
-          {
-            username: webDavConfig.username,
-            password: webDavConfig.password,
-            onProgress: (loaded, total) => reportProgress(attachment.id, 'upload', loaded, total, 'active'),
-          }
-        );
+        const startedAt = Date.now();
+        reportProgress(attachment.id, 'upload', 0, size ?? 0, 'active');
+        const uploadUrl = `${baseSyncUrl}/${cloudKey}`;
+        const uploadBytes = size ?? 0;
+        let uploadedWithFileSystem = false;
+        if (uploadUrl) {
+          logAttachmentInfo('WebDAV attachment upload start', {
+            id: attachment.id,
+            bytes: String(uploadBytes),
+            cloudKey,
+          });
+          uploadedWithFileSystem = await withRetry(
+            async () => {
+              await waitForSlot();
+              return await uploadWebdavFileWithFileSystem(
+                uploadUrl,
+                uri,
+                attachment.mimeType || DEFAULT_CONTENT_TYPE,
+                webDavConfig.username,
+                webDavConfig.password,
+                (loaded, total) => reportProgress(attachment.id, 'upload', loaded, total, 'active'),
+                uploadBytes
+              );
+            },
+            {
+              ...WEBDAV_ATTACHMENT_RETRY_OPTIONS,
+              onRetry: (error, attempt, delayMs) => {
+                logAttachmentInfo('Retrying WebDAV attachment upload', {
+                  id: attachment.id,
+                  attempt: String(attempt + 1),
+                  delayMs: String(delayMs),
+                  error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)),
+                });
+              },
+            }
+          );
+        }
+        if (!uploadedWithFileSystem) {
+          const readStart = Date.now();
+          logAttachmentInfo('WebDAV attachment read start', {
+            id: attachment.id,
+            uri,
+          });
+          const fileData = await readFileAsBytes(uri);
+          logAttachmentInfo('WebDAV attachment read done', {
+            id: attachment.id,
+            bytes: String(fileData.byteLength),
+            ms: String(Date.now() - readStart),
+          });
+          const buffer = toArrayBuffer(fileData);
+          await withRetry(
+            async () => {
+              await waitForSlot();
+              return await webdavPutFile(
+                uploadUrl,
+                buffer,
+                attachment.mimeType || DEFAULT_CONTENT_TYPE,
+                {
+                  username: webDavConfig.username,
+                  password: webDavConfig.password,
+                }
+              );
+            },
+            {
+              ...WEBDAV_ATTACHMENT_RETRY_OPTIONS,
+              onRetry: (error, attempt, delayMs) => {
+                logAttachmentInfo('Retrying WebDAV attachment upload', {
+                  id: attachment.id,
+                  attempt: String(attempt + 1),
+                  delayMs: String(delayMs),
+                  error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)),
+                });
+              },
+            }
+          );
+        }
         attachment.cloudKey = cloudKey;
         attachment.localStatus = 'available';
         didMutate = true;
-        reportProgress(attachment.id, 'upload', fileData.byteLength, fileData.byteLength, 'completed');
+        reportProgress(attachment.id, 'upload', size ?? 0, size ?? 0, 'completed');
+        logAttachmentInfo('Attachment uploaded', {
+          id: attachment.id,
+          bytes: String(size ?? 0),
+          ms: String(Date.now() - startedAt),
+        });
       } catch (error) {
+        if (handleRateLimit(error)) {
+          abortedByRateLimit = true;
+          break;
+        }
         reportProgress(
           attachment.id,
           'upload',
@@ -587,8 +907,81 @@ export const syncWebdavAttachments = async (
         logAttachmentWarn(`Failed to upload attachment ${attachment.title}`, error);
       }
     }
+
+    if (attachment.cloudKey && !existsLocally && !isContent && !isHttp) {
+      downloadQueue.push(attachment);
+    }
   }
 
+  if (attachmentsDir && !abortedByRateLimit) {
+    let downloadCount = 0;
+    for (const attachment of downloadQueue) {
+      if (attachment.kind !== 'file') continue;
+      if (attachment.deletedAt) continue;
+      if (abortedByRateLimit) break;
+      if (getWebdavDownloadBackoff(attachment.id)) continue;
+      if (downloadCount >= WEBDAV_ATTACHMENT_MAX_DOWNLOADS_PER_SYNC) {
+        logAttachmentInfo('WebDAV attachment download limit reached', {
+          limit: String(WEBDAV_ATTACHMENT_MAX_DOWNLOADS_PER_SYNC),
+        });
+        break;
+      }
+      downloadCount += 1;
+
+      try {
+        const downloadUrl = `${baseSyncUrl}/${attachment.cloudKey}`;
+        const fileData = await withRetry(
+          async () => {
+            await waitForSlot();
+            return await webdavGetFile(downloadUrl, {
+              username: webDavConfig.username,
+              password: webDavConfig.password,
+              onProgress: (loaded, total) => reportProgress(attachment.id, 'download', loaded, total, 'active'),
+            });
+          },
+          WEBDAV_ATTACHMENT_RETRY_OPTIONS
+        );
+        const bytes = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer);
+        await validateAttachmentHash(attachment, bytes);
+        const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.title)}`;
+        const targetUri = `${attachmentsDir}${filename}`;
+        await writeBytesSafely(targetUri, bytes);
+        attachment.uri = targetUri;
+        if (attachment.localStatus !== 'available') {
+          attachment.localStatus = 'available';
+          didMutate = true;
+        }
+        webdavAttachmentDownloadBackoff.delete(attachment.id);
+        reportProgress(attachment.id, 'download', bytes.length, bytes.length, 'completed');
+      } catch (error) {
+        if (handleRateLimit(error)) {
+          abortedByRateLimit = true;
+          break;
+        }
+        setWebdavDownloadBackoff(attachment.id, error);
+        if (attachment.localStatus !== 'missing') {
+          attachment.localStatus = 'missing';
+          didMutate = true;
+        }
+        reportProgress(
+          attachment.id,
+          'download',
+          0,
+          attachment.size ?? 0,
+          'failed',
+          error instanceof Error ? error.message : String(error)
+        );
+        logAttachmentWarn(`Failed to download attachment ${attachment.title}`, error);
+      }
+    }
+  }
+
+  if (abortedByRateLimit) {
+    logAttachmentWarn('WebDAV attachment sync aborted due to rate limiting');
+  }
+  logAttachmentInfo('WebDAV attachment sync done', {
+    mutated: didMutate ? 'true' : 'false',
+  });
   return didMutate;
 };
 

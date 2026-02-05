@@ -13,7 +13,7 @@ type UseSyncSettingsOptions = {
 
 export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: UseSyncSettingsOptions) => {
     const [syncPath, setSyncPath] = useState('');
-    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncStatus, setSyncStatus] = useState(() => SyncService.getSyncStatus());
     const [syncError, setSyncError] = useState<string | null>(null);
     const [syncBackend, setSyncBackend] = useState<SyncBackend>('off');
     const [webdavUrl, setWebdavUrl] = useState('');
@@ -25,6 +25,7 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
     const showToast = useUiStore((state) => state.showToast);
 
     useEffect(() => {
+        const unsubscribe = SyncService.subscribeSyncStatus(setSyncStatus);
         SyncService.getSyncPath()
             .then(setSyncPath)
             .catch((error) => {
@@ -57,6 +58,7 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
                 setSyncError('Failed to load Cloud config.');
                 void logError(error, { scope: 'sync', step: 'loadCloud' });
             });
+        return unsubscribe;
     }, []);
 
     const handleSaveSyncPath = useCallback(async () => {
@@ -124,7 +126,6 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
 
     const handleSync = useCallback(async () => {
         try {
-            setIsSyncing(true);
             setSyncError(null);
 
             if (syncBackend === 'off') {
@@ -155,15 +156,16 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
             void logError(error, { scope: 'sync', step: 'perform' });
             setSyncError(String(error));
             showToast(String(error), 'error');
-        } finally {
-            setIsSyncing(false);
         }
     }, [cloudUrl, handleSaveCloud, handleSaveWebDav, showToast, syncBackend, syncPath, webdavUrl]);
 
     return {
         syncPath,
         setSyncPath,
-        isSyncing,
+        isSyncing: syncStatus.inFlight,
+        syncQueued: syncStatus.queued,
+        syncLastResult: syncStatus.lastResult,
+        syncLastResultAt: syncStatus.lastResultAt,
         syncError,
         syncBackend,
         setSyncBackend,

@@ -8,6 +8,14 @@ import { logError, logWarn } from './app-log';
 
 const DATA_KEY = WIDGET_DATA_KEY;
 const LEGACY_DATA_KEYS = ['focus-gtd-data', 'gtd-todo-data', 'gtd-data'];
+
+let saveQueue: Promise<void> = Promise.resolve();
+
+const enqueueSave = async (work: () => Promise<void>): Promise<void> => {
+    const next = saveQueue.catch(() => undefined).then(work);
+    saveQueue = next.catch(() => undefined);
+    return next;
+};
 const SQLITE_DB_NAME = 'mindwtr.db';
 
 type SqliteState = {
@@ -321,31 +329,33 @@ const createStorage = (): StorageAdapter => {
             }
         },
         saveData: async (data: AppData): Promise<void> => {
-            try {
-                if (!shouldUseSqlite) {
-                    throw new Error('SQLite disabled in Expo Go');
+            return enqueueSave(async () => {
+                try {
+                    if (!shouldUseSqlite) {
+                        throw new Error('SQLite disabled in Expo Go');
+                    }
+                    const { adapter } = await getSqliteState();
+                    await adapter.saveData(data);
+                    preferJsonBackup = false;
+                    didWarnPreferJsonBackup = false;
+                } catch (error) {
+                    preferJsonBackup = true;
+                    warnPreferJsonBackup();
+                    if (__DEV__ && !shouldUseSqlite && String(error).includes('Expo Go')) {
+                        logStorageWarn('[Storage] SQLite disabled in Expo Go, keeping JSON backup');
+                    } else {
+                        logStorageWarn('[Storage] SQLite save failed, keeping JSON backup', error);
+                    }
                 }
-                const { adapter } = await getSqliteState();
-                await adapter.saveData(data);
-                preferJsonBackup = false;
-                didWarnPreferJsonBackup = false;
-            } catch (error) {
-                preferJsonBackup = true;
-                warnPreferJsonBackup();
-                if (__DEV__ && !shouldUseSqlite && String(error).includes('Expo Go')) {
-                    logStorageWarn('[Storage] SQLite disabled in Expo Go, keeping JSON backup');
-                } else {
-                    logStorageWarn('[Storage] SQLite save failed, keeping JSON backup', error);
+                try {
+                    const jsonValue = JSON.stringify(data);
+                    await AsyncStorage.setItem(DATA_KEY, jsonValue);
+                    await updateAndroidWidgetFromData(data);
+                } catch (e) {
+                    logStorageError('Failed to save data', e);
+                    throw new Error('Failed to save data: ' + (e as Error).message);
                 }
-            }
-            try {
-                const jsonValue = JSON.stringify(data);
-                await AsyncStorage.setItem(DATA_KEY, jsonValue);
-                await updateAndroidWidgetFromData(data);
-            } catch (e) {
-                logStorageError('Failed to save data', e);
-                throw new Error('Failed to save data: ' + (e as Error).message);
-            }
+            });
         },
         queryTasks: async (options) => {
             try {

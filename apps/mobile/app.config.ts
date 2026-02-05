@@ -7,14 +7,16 @@ const isFossBuild = process.env.FOSS_BUILD === '1' || process.env.FOSS_BUILD ===
 export default ({ config }: ConfigContext): ExpoConfig => {
   const base = config as ExpoConfig;
   const plugins: PluginEntry[] = Array.isArray(base.plugins) ? [...base.plugins] : [];
+  const fossPluginBlocklist = new Set(['expo-notifications', './plugins/android-manifest-fixes']);
   const filteredPlugins = isFossBuild
     ? plugins.filter((plugin) => {
         if (typeof plugin === 'string') {
-          return plugin !== 'expo-notifications';
+          return !fossPluginBlocklist.has(plugin);
         }
         if (Array.isArray(plugin)) {
           if (plugin.length === 0) return true;
-          return plugin[0] !== 'expo-notifications';
+          const name = plugin[0];
+          return typeof name === 'string' ? !fossPluginBlocklist.has(name) : true;
         }
         return true;
       })

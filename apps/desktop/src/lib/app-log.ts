@@ -215,18 +215,6 @@ export async function logWarn(
     });
 }
 
-export async function logDiagnosticsEnabled(): Promise<string | null> {
-    return appendLogLine(
-        {
-            ts: new Date().toISOString(),
-            level: 'info',
-            scope: 'diagnostics',
-            message: 'Debug logging enabled',
-        },
-        { force: true }
-    );
-}
-
 export async function logSyncError(
     error: unknown,
     context: { backend: string; step: string; url?: string }
@@ -263,7 +251,4 @@ export function setupGlobalErrorLogging(): void {
         void logError(event.reason, { scope: 'unhandledrejection' });
     });
 
-    if (isDiagnosticsEnabled()) {
-        void logDiagnosticsEnabled();
-    }
 }

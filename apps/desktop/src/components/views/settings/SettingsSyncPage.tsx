@@ -41,6 +41,7 @@ type Labels = {
     cloudSave: string;
     syncNow: string;
     syncing: string;
+    syncQueued: string;
     lastSync: string;
     lastSyncSuccess: string;
     lastSyncConflict: string;
@@ -90,6 +91,9 @@ type SettingsSyncPageProps = {
     onSaveCloud: () => Promise<void> | void;
     onSyncNow: () => Promise<void> | void;
     isSyncing: boolean;
+    syncQueued: boolean;
+    syncLastResult: 'success' | 'error' | null;
+    syncLastResultAt: string | null;
     syncError: string | null;
     lastSyncDisplay: string;
     lastSyncStatus: AppData['settings']['lastSyncStatus'];
@@ -151,6 +155,9 @@ export function SettingsSyncPage({
     onSaveCloud,
     onSyncNow,
     isSyncing,
+    syncQueued,
+    syncLastResult,
+    syncLastResultAt,
     syncError,
     lastSyncDisplay,
     lastSyncStatus,
@@ -180,6 +187,21 @@ export function SettingsSyncPage({
     ].slice(0, 6);
     const historyEntries = (lastSyncHistory ?? []).slice(0, 6);
     const syncPrefs = syncPreferences ?? {};
+    const recentResultLabel = (() => {
+        if (!syncLastResultAt || !syncLastResult) return null;
+        const timestamp = Date.parse(syncLastResultAt);
+        if (!Number.isFinite(timestamp)) return null;
+        if (Date.now() - timestamp > 8000) return null;
+        return syncLastResult === 'success' ? t.lastSyncSuccess : t.lastSyncError;
+    })();
+    const syncStatusLabel = isSyncing
+        ? (syncQueued ? t.syncQueued : t.syncing)
+        : recentResultLabel;
+    const syncStatusTone = isSyncing
+        ? 'text-muted-foreground'
+        : syncLastResult === 'error'
+            ? 'text-destructive'
+            : 'text-muted-foreground';
     const formatHistoryStatus = (status: 'success' | 'conflict' | 'error') => {
         if (status === 'success') return t.lastSyncSuccess;
         if (status === 'conflict') return t.lastSyncConflict;
@@ -443,6 +465,11 @@ export function SettingsSyncPage({
                                 <ExternalLink className={cn("w-4 h-4", isSyncing && "animate-spin")} />
                                 {isSyncing ? t.syncing : t.syncNow}
                             </button>
+                            {syncStatusLabel && (
+                                <span className={cn("text-xs", syncStatusTone)}>
+                                    {syncStatusLabel}
+                                </span>
+                            )}
                             {syncError && <span className="text-xs text-destructive">{syncError}</span>}
                         </div>
                     )}

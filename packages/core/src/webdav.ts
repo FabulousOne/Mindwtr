@@ -96,7 +96,9 @@ export async function webdavGetJson<T>(
     if (res.status === 404) return null;
     if (!res.ok) {
         const text = await res.text().catch(() => '');
-        throw new Error(`WebDAV GET failed (${res.status}): ${text || res.statusText}`);
+        const error = new Error(`WebDAV GET failed (${res.status}): ${text || res.statusText}`);
+        (error as { status?: number }).status = res.status;
+        throw error;
     }
 
     const text = await res.text();
@@ -131,7 +133,9 @@ export async function webdavPutJson(
 
     if (!res.ok) {
         const text = await res.text().catch(() => '');
-        throw new Error(`WebDAV PUT failed (${res.status}): ${text || res.statusText}`);
+        const error = new Error(`WebDAV PUT failed (${res.status}): ${text || res.statusText}`);
+        (error as { status?: number }).status = res.status;
+        throw error;
     }
 }
 
@@ -183,8 +187,34 @@ export async function webdavPutFile(
     );
 
     if (!res.ok) {
-        throw new Error(`WebDAV File PUT failed (${res.status})`);
+        const error = new Error(`WebDAV File PUT failed (${res.status})`);
+        (error as { status?: number }).status = res.status;
+        throw error;
     }
+}
+
+export async function webdavFileExists(
+    url: string,
+    options: WebDavOptions = {}
+): Promise<boolean> {
+    assertSecureUrl(url, WEBDAV_HTTPS_ERROR, WEBDAV_INSECURE_OPTIONS);
+    const fetcher = options.fetcher ?? fetch;
+    const res = await fetchWithTimeout(
+        url,
+        { method: 'HEAD', headers: buildHeaders(options) },
+        options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        fetcher,
+        WEBDAV_TIMEOUT_ERROR,
+    );
+
+    if (res.status === 404) return false;
+    if (res.status === 405) return true;
+    if (!res.ok) {
+        const error = new Error(`WebDAV HEAD failed (${res.status})`);
+        (error as { status?: number }).status = res.status;
+        throw error;
+    }
+    return true;
 }
 
 export async function webdavGetFile(
@@ -202,7 +232,9 @@ export async function webdavGetFile(
     );
 
     if (!res.ok) {
-        throw new Error(`WebDAV File GET failed (${res.status})`);
+        const error = new Error(`WebDAV File GET failed (${res.status})`);
+        (error as { status?: number }).status = res.status;
+        throw error;
     }
 
     const onProgress = options.onProgress;

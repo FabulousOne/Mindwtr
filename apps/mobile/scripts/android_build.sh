@@ -76,6 +76,7 @@ text = path.read_text()
 block = """
 
 configurations.all {
+    exclude group: 'com.google.android.gms'
     exclude group: 'com.google.firebase'
     exclude group: 'com.google.android.datatransport'
     exclude group: 'com.google.mlkit'

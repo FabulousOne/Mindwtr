@@ -13,6 +13,7 @@ import {
     webdavPutJson,
     webdavGetFile,
     webdavPutFile,
+    webdavFileExists,
     webdavMakeDirectory,
     webdavDeleteFile,
     cloudGetFile,
@@ -43,6 +44,13 @@ const CLOUD_URL_KEY = 'mindwtr-cloud-url';
 const CLOUD_TOKEN_KEY = 'mindwtr-cloud-token';
 const SYNC_FILE_NAME = 'data.json';
 const LEGACY_SYNC_FILE_NAME = 'mindwtr-sync.json';
+const WEBDAV_ATTACHMENT_RETRY_OPTIONS = { maxAttempts: 5, baseDelayMs: 2000, maxDelayMs: 60_000 };
+const WEBDAV_ATTACHMENT_MIN_INTERVAL_MS = 400;
+const WEBDAV_ATTACHMENT_COOLDOWN_MS = 60_000;
+const WEBDAV_ATTACHMENT_MAX_DOWNLOADS_PER_SYNC = 10;
+const WEBDAV_ATTACHMENT_MISSING_BACKOFF_MS = 15 * 60_000;
+const WEBDAV_ATTACHMENT_ERROR_BACKOFF_MS = 2 * 60_000;
+const webdavAttachmentDownloadBackoff = new Map<string, number>();
 
 const toStableJson = (value: unknown): string => {
     const normalize = (input: any): any => {
@@ -78,6 +86,51 @@ const logSyncWarning = (message: string, error?: unknown) => {
         ? { error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)) }
         : undefined;
     void logWarn(message, { scope: 'sync', extra });
+};
+
+const logSyncInfo = (message: string, extra?: Record<string, string>) => {
+    void logInfo(message, { scope: 'sync', extra });
+};
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const getErrorStatus = (error: unknown): number | null => {
+    if (!error || typeof error !== 'object') return null;
+    const anyError = error as { status?: unknown; statusCode?: unknown; response?: { status?: unknown } };
+    const status = anyError.status ?? anyError.statusCode ?? anyError.response?.status;
+    return typeof status === 'number' ? status : null;
+};
+
+const getWebdavDownloadBackoff = (attachmentId: string): number | null => {
+    const blockedUntil = webdavAttachmentDownloadBackoff.get(attachmentId);
+    if (!blockedUntil) return null;
+    if (Date.now() >= blockedUntil) {
+        webdavAttachmentDownloadBackoff.delete(attachmentId);
+        return null;
+    }
+    return blockedUntil;
+};
+
+const setWebdavDownloadBackoff = (attachmentId: string, error: unknown): void => {
+    const status = getErrorStatus(error);
+    if (status === 404) {
+        webdavAttachmentDownloadBackoff.set(attachmentId, Date.now() + WEBDAV_ATTACHMENT_MISSING_BACKOFF_MS);
+        return;
+    }
+    webdavAttachmentDownloadBackoff.set(attachmentId, Date.now() + WEBDAV_ATTACHMENT_ERROR_BACKOFF_MS);
+};
+
+const isWebdavRateLimitedError = (error: unknown): boolean => {
+    const status = getErrorStatus(error);
+    if (status === 429 || status === 503) return true;
+    const message = error instanceof Error ? error.message : String(error || '');
+    const normalized = message.toLowerCase();
+    return (
+        normalized.includes('blockedtemporarily') ||
+        normalized.includes('too many requests') ||
+        normalized.includes('rate limit') ||
+        normalized.includes('rate limited')
+    );
 };
 
 const injectExternalCalendars = async (data: AppData): Promise<AppData> => {
@@ -124,6 +177,19 @@ const isSyncFilePath = (path: string) => {
     return normalized.endsWith(`/${SYNC_FILE_NAME}`) || normalized.endsWith(`/${LEGACY_SYNC_FILE_NAME}`);
 };
 
+const buildStoreSnapshot = (): AppData => {
+    const state = useTaskStore.getState();
+    return {
+        tasks: [...state._allTasks],
+        projects: [...state._allProjects],
+        sections: [...state._allSections],
+        areas: [...state._allAreas],
+        settings: state.settings ?? {},
+    };
+};
+
+const cloneAppData = (data: AppData): AppData => JSON.parse(JSON.stringify(data)) as AppData;
+
 const normalizeWebdavUrl = (rawUrl: string): string => {
     const trimmed = rawUrl.replace(/\/+$/, '');
     return trimmed.toLowerCase().endsWith('.json') ? trimmed : `${trimmed}/${SYNC_FILE_NAME}`;
@@ -141,6 +207,7 @@ const FILE_BACKEND_VALIDATION_CONFIG = {
     blockedMimeTypes: [],
 };
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 const stripFileScheme = (uri: string): string => {
     if (!/^file:\/\//i.test(uri)) return uri;
@@ -554,6 +621,28 @@ async function syncAttachments(
         }
     }
 
+    logSyncInfo('WebDAV attachment sync start', { count: String(attachmentsById.size) });
+
+    let lastRequestAt = 0;
+    let blockedUntil = 0;
+    const waitForSlot = async (): Promise<void> => {
+        const now = Date.now();
+        if (blockedUntil && now < blockedUntil) {
+            throw new Error(`WebDAV rate limited for ${blockedUntil - now}ms`);
+        }
+        const elapsed = now - lastRequestAt;
+        if (elapsed < WEBDAV_ATTACHMENT_MIN_INTERVAL_MS) {
+            await sleep(WEBDAV_ATTACHMENT_MIN_INTERVAL_MS - elapsed);
+        }
+        lastRequestAt = Date.now();
+    };
+    const handleRateLimit = (error: unknown): boolean => {
+        if (!isWebdavRateLimitedError(error)) return false;
+        blockedUntil = Date.now() + WEBDAV_ATTACHMENT_COOLDOWN_MS;
+        logSyncWarning('WebDAV rate limited; pausing attachment sync', error);
+        return true;
+    };
+
     const readLocalFile = async (path: string): Promise<Uint8Array> => {
         if (path.startsWith(baseDataDir)) {
             const relative = path.slice(baseDataDir.length).replace(/^[\\/]/, '');
@@ -576,21 +665,65 @@ async function syncAttachments(
     };
 
     let didMutate = false;
+    const downloadQueue: Attachment[] = [];
+    let abortedByRateLimit = false;
 
     for (const attachment of attachmentsById.values()) {
         if (attachment.kind !== 'file') continue;
         if (attachment.deletedAt) continue;
+        if (abortedByRateLimit) break;
 
         const rawUri = attachment.uri ? stripFileScheme(attachment.uri) : '';
         const isHttp = /^https?:\/\//i.test(rawUri);
         const localPath = isHttp ? '' : rawUri;
         const hasLocalPath = Boolean(localPath);
         const existsLocally = hasLocalPath ? await localFileExists(localPath) : false;
+        logSyncInfo('WebDAV attachment check', {
+            id: attachment.id,
+            title: attachment.title || 'attachment',
+            uri: localPath ? localPath : rawUri,
+            cloud: attachment.cloudKey ? 'set' : 'missing',
+            local: hasLocalPath ? 'true' : 'false',
+            exists: existsLocally ? 'true' : 'false',
+        });
 
         const nextStatus: Attachment['localStatus'] = existsLocally ? 'available' : 'missing';
         if (attachment.localStatus !== nextStatus) {
             attachment.localStatus = nextStatus;
             didMutate = true;
+        }
+        if (existsLocally) {
+            webdavAttachmentDownloadBackoff.delete(attachment.id);
+        }
+
+        if (attachment.cloudKey && existsLocally) {
+            try {
+                const remoteExists = await withRetry(
+                    async () => {
+                        await waitForSlot();
+                        return await webdavFileExists(`${baseSyncUrl}/${attachment.cloudKey}`, {
+                            username: webDavConfig.username,
+                            password,
+                            fetcher,
+                        });
+                    },
+                    WEBDAV_ATTACHMENT_RETRY_OPTIONS
+                );
+                logSyncInfo('WebDAV attachment remote exists', {
+                    id: attachment.id,
+                    exists: remoteExists ? 'true' : 'false',
+                });
+                if (!remoteExists) {
+                    attachment.cloudKey = undefined;
+                    didMutate = true;
+                }
+            } catch (error) {
+                if (handleRateLimit(error)) {
+                    abortedByRateLimit = true;
+                    break;
+                }
+                logSyncWarning('Failed to check WebDAV attachment remote status', error);
+            }
         }
 
         if (!attachment.cloudKey && existsLocally) {
@@ -603,22 +736,52 @@ async function syncAttachments(
                     continue;
                 }
                 reportProgress(attachment.id, 'upload', 0, fileData.length, 'active');
-                await webdavPutFile(
-                    `${baseSyncUrl}/${cloudKey}`,
-                    fileData,
-                    attachment.mimeType || 'application/octet-stream',
+                logSyncInfo('WebDAV attachment upload start', {
+                    id: attachment.id,
+                    bytes: String(fileData.length),
+                    cloudKey,
+                });
+                await withRetry(
+                    async () => {
+                        await waitForSlot();
+                        return await webdavPutFile(
+                            `${baseSyncUrl}/${cloudKey}`,
+                            fileData,
+                            attachment.mimeType || 'application/octet-stream',
+                            {
+                                headers: { 'Content-Length': String(fileData.length) },
+                                username: webDavConfig.username,
+                                password,
+                                fetcher,
+                                timeoutMs: UPLOAD_TIMEOUT_MS,
+                            }
+                        );
+                    },
                     {
-                        username: webDavConfig.username,
-                        password,
-                        fetcher,
-                        onProgress: (loaded, total) => reportProgress(attachment.id, 'upload', loaded, total, 'active'),
+                        ...WEBDAV_ATTACHMENT_RETRY_OPTIONS,
+                        onRetry: (error, attempt, delayMs) => {
+                            logSyncInfo('Retrying WebDAV attachment upload', {
+                                id: attachment.id,
+                                attempt: String(attempt + 1),
+                                delayMs: String(delayMs),
+                                error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)),
+                            });
+                        },
                     }
                 );
                 attachment.cloudKey = cloudKey;
                 attachment.localStatus = 'available';
                 didMutate = true;
                 reportProgress(attachment.id, 'upload', fileData.length, fileData.length, 'completed');
+                logSyncInfo('WebDAV attachment upload done', {
+                    id: attachment.id,
+                    bytes: String(fileData.length),
+                });
             } catch (error) {
+                if (handleRateLimit(error)) {
+                    abortedByRateLimit = true;
+                    break;
+                }
                 reportProgress(
                     attachment.id,
                     'upload',
@@ -629,52 +792,86 @@ async function syncAttachments(
                 );
                 logSyncWarning(`Failed to upload attachment ${attachment.title}`, error);
             }
+            continue;
         }
 
         if (attachment.cloudKey && !existsLocally) {
-            attachment.localStatus = 'downloading';
-            didMutate = true;
-            try {
-                const downloadUrl = `${baseSyncUrl}/${attachment.cloudKey}`;
-                const fileData = await withRetry(() =>
-                    webdavGetFile(downloadUrl, {
+            downloadQueue.push(attachment);
+        }
+    }
+
+    let downloadCount = 0;
+    for (const attachment of downloadQueue) {
+        if (attachment.kind !== 'file') continue;
+        if (attachment.deletedAt) continue;
+        if (abortedByRateLimit) break;
+        if (getWebdavDownloadBackoff(attachment.id)) continue;
+        if (downloadCount >= WEBDAV_ATTACHMENT_MAX_DOWNLOADS_PER_SYNC) {
+            logSyncInfo('WebDAV attachment download limit reached', {
+                limit: String(WEBDAV_ATTACHMENT_MAX_DOWNLOADS_PER_SYNC),
+            });
+            break;
+        }
+        downloadCount += 1;
+
+        try {
+            const downloadUrl = `${baseSyncUrl}/${attachment.cloudKey}`;
+            const fileData = await withRetry(
+                async () => {
+                    await waitForSlot();
+                    return await webdavGetFile(downloadUrl, {
                         username: webDavConfig.username,
                         password,
                         fetcher,
                         onProgress: (loaded, total) => reportProgress(attachment.id, 'download', loaded, total, 'active'),
-                    })
-                );
-                const bytes = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer);
-                await validateAttachmentHash(attachment, bytes);
-                const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
-                const relativePath = `${LOCAL_ATTACHMENTS_DIR}/${filename}`;
-                await writeAttachmentFileSafely(relativePath, bytes, {
-                    baseDir: BaseDirectory.Data,
-                    writeFile,
-                    rename,
-                    remove,
-                });
-                const absolutePath = await join(baseDataDir, relativePath);
-                attachment.uri = absolutePath;
+                    });
+                },
+                WEBDAV_ATTACHMENT_RETRY_OPTIONS
+            );
+            const bytes = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer);
+            await validateAttachmentHash(attachment, bytes);
+            const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
+            const relativePath = `${LOCAL_ATTACHMENTS_DIR}/${filename}`;
+            await writeAttachmentFileSafely(relativePath, bytes, {
+                baseDir: BaseDirectory.Data,
+                writeFile,
+                rename,
+                remove,
+            });
+            const absolutePath = await join(baseDataDir, relativePath);
+            attachment.uri = absolutePath;
+            if (attachment.localStatus !== 'available') {
                 attachment.localStatus = 'available';
                 didMutate = true;
-                reportProgress(attachment.id, 'download', bytes.length, bytes.length, 'completed');
-            } catch (error) {
+            }
+            webdavAttachmentDownloadBackoff.delete(attachment.id);
+            reportProgress(attachment.id, 'download', bytes.length, bytes.length, 'completed');
+        } catch (error) {
+            if (handleRateLimit(error)) {
+                abortedByRateLimit = true;
+                break;
+            }
+            setWebdavDownloadBackoff(attachment.id, error);
+            if (attachment.localStatus !== 'missing') {
                 attachment.localStatus = 'missing';
                 didMutate = true;
-                reportProgress(
-                    attachment.id,
-                    'download',
-                    0,
-                    attachment.size ?? 0,
-                    'failed',
-                    error instanceof Error ? error.message : String(error)
-                );
-                logSyncWarning(`Failed to download attachment ${attachment.title}`, error);
             }
+            reportProgress(
+                attachment.id,
+                'download',
+                0,
+                attachment.size ?? 0,
+                'failed',
+                error instanceof Error ? error.message : String(error)
+            );
+            logSyncWarning(`Failed to download attachment ${attachment.title}`, error);
         }
     }
 
+    if (abortedByRateLimit) {
+        logSyncWarning('WebDAV attachment sync aborted due to rate limiting');
+    }
+    logSyncInfo('WebDAV attachment sync done', { mutated: didMutate ? 'true' : 'false' });
     return didMutate;
 }
 
@@ -787,8 +984,6 @@ async function syncCloudAttachments(
         }
 
         if (attachment.cloudKey && !existsLocally) {
-            attachment.localStatus = 'downloading';
-            didMutate = true;
             try {
                 const downloadUrl = `${baseSyncUrl}/${attachment.cloudKey}`;
                 const fileData = await withRetry(() =>
@@ -810,12 +1005,16 @@ async function syncCloudAttachments(
                 });
                 const absolutePath = await join(baseDataDir, relativePath);
                 attachment.uri = absolutePath;
-                attachment.localStatus = 'available';
-                didMutate = true;
+                if (attachment.localStatus !== 'available') {
+                    attachment.localStatus = 'available';
+                    didMutate = true;
+                }
                 reportProgress(attachment.id, 'download', bytes.length, bytes.length, 'completed');
             } catch (error) {
-                attachment.localStatus = 'missing';
-                didMutate = true;
+                if (attachment.localStatus !== 'missing') {
+                    attachment.localStatus = 'missing';
+                    didMutate = true;
+                }
                 reportProgress(
                     attachment.id,
                     'download',
@@ -932,8 +1131,6 @@ async function syncFileAttachments(
         }
 
         if (attachment.cloudKey && !existsLocally) {
-            attachment.localStatus = 'downloading';
-            didMutate = true;
             try {
                 const sourcePath = await join(baseSyncDir, attachment.cloudKey);
                 const hasRemote = await exists(sourcePath);
@@ -950,11 +1147,15 @@ async function syncFileAttachments(
                 });
                 const absolutePath = await join(baseDataDir, relativePath);
                 attachment.uri = absolutePath;
-                attachment.localStatus = 'available';
-                didMutate = true;
+                if (attachment.localStatus !== 'available') {
+                    attachment.localStatus = 'available';
+                    didMutate = true;
+                }
             } catch (error) {
-                attachment.localStatus = 'missing';
-                didMutate = true;
+                if (attachment.localStatus !== 'missing') {
+                    attachment.localStatus = 'missing';
+                    didMutate = true;
+                }
                 logSyncWarning(`Failed to copy attachment ${attachment.title} from sync folder`, error);
             }
         }
@@ -967,6 +1168,20 @@ export class SyncService {
     private static didMigrate = false;
     private static syncInFlight: Promise<{ success: boolean; stats?: MergeStats; error?: string }> | null = null;
     private static syncQueued = false;
+    private static syncStatus: {
+        inFlight: boolean;
+        queued: boolean;
+        step: string | null;
+        lastResult: 'success' | 'error' | null;
+        lastResultAt: string | null;
+    } = {
+        inFlight: false,
+        queued: false,
+        step: null,
+        lastResult: null,
+        lastResultAt: null,
+    };
+    private static syncListeners = new Set<(status: typeof SyncService.syncStatus) => void>();
     private static fileWatcherStop: (() => void) | null = null;
     private static fileWatcherPath: string | null = null;
     private static fileWatcherBackend: SyncBackend | null = null;
@@ -974,6 +1189,21 @@ export class SyncService {
     private static lastObservedHash: string | null = null;
     private static ignoreFileEventsUntil = 0;
     private static externalSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+    static getSyncStatus() {
+        return SyncService.syncStatus;
+    }
+
+    static subscribeSyncStatus(listener: (status: typeof SyncService.syncStatus) => void): () => void {
+        SyncService.syncListeners.add(listener);
+        listener(SyncService.syncStatus);
+        return () => SyncService.syncListeners.delete(listener);
+    }
+
+    private static updateSyncStatus(partial: Partial<typeof SyncService.syncStatus>) {
+        SyncService.syncStatus = { ...SyncService.syncStatus, ...partial };
+        SyncService.syncListeners.forEach((listener) => listener(SyncService.syncStatus));
+    }
 
     private static getSyncBackendLocal(): SyncBackend {
         return normalizeSyncBackend(localStorage.getItem(SYNC_BACKEND_KEY));
@@ -1295,6 +1525,7 @@ export class SyncService {
     static async performSync(): Promise<{ success: boolean; stats?: MergeStats; error?: string }> {
         if (SyncService.syncInFlight) {
             SyncService.syncQueued = true;
+            SyncService.updateSyncStatus({ queued: true });
             return SyncService.syncInFlight;
         }
 
@@ -1303,9 +1534,22 @@ export class SyncService {
         let syncUrl: string | undefined;
         let localSnapshotChangeAt = useTaskStore.getState().lastDataChangeAt;
 
+        SyncService.updateSyncStatus({
+            inFlight: true,
+            queued: false,
+            step,
+            lastResult: SyncService.syncStatus.lastResult,
+            lastResultAt: SyncService.syncStatus.lastResultAt,
+        });
+
+        const setStep = (next: string) => {
+            step = next;
+            SyncService.updateSyncStatus({ step: next });
+        };
+
         const runSync = async (): Promise<{ success: boolean; stats?: MergeStats; error?: string }> => {
             // 1. Flush pending writes so disk reflects the latest state
-            step = 'flush';
+            setStep('flush');
             await flushPendingSave();
 
             // 2. Read/merge/write via shared core orchestration.
@@ -1320,15 +1564,16 @@ export class SyncService {
             const ensureLocalSnapshotFresh = () => {
                 if (useTaskStore.getState().lastDataChangeAt > localSnapshotChangeAt) {
                     SyncService.syncQueued = true;
+                    SyncService.updateSyncStatus({ queued: true });
                     throw new LocalSyncAbort();
                 }
             };
 
             // Pre-sync local attachments so cloudKeys exist before writing remote data.
             if (isTauriRuntime() && (backend === 'webdav' || backend === 'file' || backend === 'cloud')) {
-                step = 'attachments_prepare';
+                setStep('attachments_prepare');
                 try {
-                    const localData = await tauriInvoke<AppData>('get_data');
+                    const localData = cloneAppData(buildStoreSnapshot());
                     let preMutated = false;
                     if (backend === 'webdav' && webdavConfig?.url) {
                         const baseUrl = getBaseSyncUrl(webdavConfig.url);
@@ -1340,16 +1585,20 @@ export class SyncService {
                         preMutated = await syncCloudAttachments(localData, cloudConfig, baseUrl);
                     }
                     if (preMutated) {
+                        ensureLocalSnapshotFresh();
                         await tauriInvoke('save_data', { data: localData });
                     }
                 } catch (error) {
+                    if (error instanceof LocalSyncAbort) {
+                        throw error;
+                    }
                     logSyncWarning('Attachment pre-sync warning', error);
                 }
             }
             const syncResult = await performSyncCycle({
                 readLocal: async () => {
                     const baseData = isTauriRuntime()
-                        ? await tauriInvoke<AppData>('get_data')
+                        ? cloneAppData(buildStoreSnapshot())
                         : await webStorage.getData();
                     const data = await injectExternalCalendars(baseData);
                     localSnapshotChangeAt = useTaskStore.getState().lastDataChangeAt;
@@ -1423,7 +1672,7 @@ export class SyncService {
                     await tauriInvoke('write_sync_file', { data: sanitized });
                 },
                 onStep: (next) => {
-                    step = next;
+                    setStep(next);
                 },
             });
             const stats = syncResult.stats;
@@ -1451,9 +1700,12 @@ export class SyncService {
                 );
             }
 
+            ensureLocalSnapshotFresh();
+
             if ((backend === 'webdav' || backend === 'file' || backend === 'cloud') && isTauriRuntime()) {
-                step = 'attachments';
+                setStep('attachments');
                 try {
+                    ensureLocalSnapshotFresh();
                     if (backend === 'webdav') {
                         const config = await SyncService.getWebDavConfig();
                         const baseUrl = config.url ? getBaseSyncUrl(config.url) : '';
@@ -1481,6 +1733,9 @@ export class SyncService {
                         }
                     }
                 } catch (error) {
+                    if (error instanceof LocalSyncAbort) {
+                        throw error;
+                    }
                     logSyncWarning('Attachment sync warning', error);
                 }
             }
@@ -1488,13 +1743,15 @@ export class SyncService {
             await cleanupAttachmentTempFiles();
 
             if (isTauriRuntime() && shouldRunAttachmentCleanup(mergedData.settings.attachments?.lastCleanupAt)) {
-                step = 'attachments_cleanup';
+                setStep('attachments_cleanup');
+                ensureLocalSnapshotFresh();
                 mergedData = await cleanupOrphanedAttachments(mergedData, backend);
                 await tauriInvoke('save_data', { data: mergedData });
             }
 
             // 7. Refresh UI Store
-            step = 'refresh';
+            setStep('refresh');
+            ensureLocalSnapshotFresh();
             await useTaskStore.getState().fetchData({ silent: true });
 
             const syncStatus = syncResult.status;
@@ -1553,6 +1810,13 @@ export class SyncService {
         SyncService.syncInFlight = resultPromise;
         const result = await resultPromise;
         SyncService.syncInFlight = null;
+        SyncService.updateSyncStatus({
+            inFlight: false,
+            step: null,
+            queued: SyncService.syncQueued,
+            lastResult: result.success ? 'success' : 'error',
+            lastResultAt: new Date().toISOString(),
+        });
 
         if (SyncService.syncQueued) {
             SyncService.syncQueued = false;

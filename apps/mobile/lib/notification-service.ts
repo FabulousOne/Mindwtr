@@ -41,6 +41,37 @@ const logNotificationError = (message: string, error?: unknown) => {
   void logWarn(`[Notifications] ${message}`, { scope: 'notifications', extra });
 };
 
+const normalizeNotificationData = (data?: Record<string, unknown>): Record<string, unknown> | undefined => {
+  if (!data) return undefined;
+  try {
+    const json = JSON.stringify(data, (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
+    const parsed = JSON.parse(json) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+};
+
+const scheduleNotification = async (
+  api: NotificationsApi,
+  request: { content: NotificationContentInput; trigger: unknown },
+  context: string,
+) => {
+  try {
+    return await api.scheduleNotificationAsync({
+      ...request,
+      content: {
+        ...request.content,
+        data: normalizeNotificationData(request.content.data),
+      },
+    } as any);
+  } catch (error) {
+    logNotificationError(`Failed to schedule ${context}`, error);
+    return null;
+  }
+};
+
 async function loadNotifications(): Promise<NotificationsApi | null> {
   if (Notifications) return Notifications;
 
@@ -145,7 +176,7 @@ async function rescheduleDailyDigest(api: NotificationsApi) {
 
   if (morningEnabled) {
     const { hour, minute } = parseTimeOfDay(settings.dailyDigestMorningTime, { hour: 9, minute: 0 });
-    const id = await api.scheduleNotificationAsync({
+    const id = await scheduleNotification(api, {
       content: {
         title: tr['digest.morningTitle'],
         body: tr['digest.morningBody'],
@@ -156,13 +187,15 @@ async function rescheduleDailyDigest(api: NotificationsApi) {
         hour,
         minute,
       } as any,
-    });
-    scheduledDigestByKind.set('morning', id);
+    }, 'daily digest (morning)');
+    if (id) {
+      scheduledDigestByKind.set('morning', id);
+    }
   }
 
   if (eveningEnabled) {
     const { hour, minute } = parseTimeOfDay(settings.dailyDigestEveningTime, { hour: 20, minute: 0 });
-    const id = await api.scheduleNotificationAsync({
+    const id = await scheduleNotification(api, {
       content: {
         title: tr['digest.eveningTitle'],
         body: tr['digest.eveningBody'],
@@ -173,8 +206,10 @@ async function rescheduleDailyDigest(api: NotificationsApi) {
         hour,
         minute,
       } as any,
-    });
-    scheduledDigestByKind.set('evening', id);
+    }, 'daily digest (evening)');
+    if (id) {
+      scheduledDigestByKind.set('evening', id);
+    }
   }
 }
 
@@ -205,7 +240,7 @@ async function rescheduleWeeklyReview(api: NotificationsApi) {
   const { hour, minute } = parseTimeOfDay(weeklyReviewTime, { hour: 18, minute: 0 });
   const weekday = weeklyReviewDay + 1; // Expo: 1 = Sunday
 
-  scheduledWeeklyReviewId = await api.scheduleNotificationAsync({
+  scheduledWeeklyReviewId = await scheduleNotification(api, {
     content: {
       title: tr['digest.weeklyReviewTitle'],
       body: tr['digest.weeklyReviewBody'],
@@ -217,7 +252,7 @@ async function rescheduleWeeklyReview(api: NotificationsApi) {
       hour,
       minute,
     } as any,
-  });
+  }, 'weekly review');
 }
 
 async function scheduleForTask(api: NotificationsApi, task: Task, when: Date) {
@@ -229,16 +264,18 @@ async function scheduleForTask(api: NotificationsApi, task: Task, when: Date) {
   };
 
   const secondsUntil = Math.max(1, Math.floor((when.getTime() - Date.now()) / 1000));
-  const id = await api.scheduleNotificationAsync({
+  const id = await scheduleNotification(api, {
     content,
     trigger: {
       type: api.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: secondsUntil,
       repeats: false,
     } as any,
-  });
+  }, `task reminder (${task.id})`);
 
-  scheduledByTask.set(task.id, { scheduledAtIso: when.toISOString(), notificationId: id });
+  if (id) {
+    scheduledByTask.set(task.id, { scheduledAtIso: when.toISOString(), notificationId: id });
+  }
 }
 
 async function scheduleForProject(api: NotificationsApi, project: Project, when: Date, label: string) {
@@ -250,16 +287,18 @@ async function scheduleForProject(api: NotificationsApi, project: Project, when:
   };
 
   const secondsUntil = Math.max(1, Math.floor((when.getTime() - Date.now()) / 1000));
-  const id = await api.scheduleNotificationAsync({
+  const id = await scheduleNotification(api, {
     content,
     trigger: {
       type: api.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: secondsUntil,
       repeats: false,
     } as any,
-  });
+  }, `project review (${project.id})`);
 
-  scheduledByProject.set(project.id, { scheduledAtIso: when.toISOString(), notificationId: id });
+  if (id) {
+    scheduledByProject.set(project.id, { scheduledAtIso: when.toISOString(), notificationId: id });
+  }
 }
 
 async function cancelTaskNotification(api: NotificationsApi, taskId: string, entry: ScheduledEntry) {
