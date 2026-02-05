@@ -3223,6 +3223,14 @@ export default function SettingsPage() {
                                         style={[styles.textInput, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
                                     />
                                 </View>
+                                {Platform.OS === 'web' && (
+                                    <Text style={[styles.settingDescription, { color: '#F59E0B' }]}>
+                                        {localize(
+                                            'Web warning: WebDAV passwords are stored in browser storage. Use only on trusted devices.',
+                                            'Web 提示：WebDAV 密码会保存在浏览器本地存储中，请仅在可信设备使用。'
+                                        )}
+                                    </Text>
+                                )}
 
                                 <TouchableOpacity
                                     style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}

@@ -377,6 +377,11 @@ export function SettingsSyncPage({
                                     />
                                 </div>
                             </div>
+                            {!isTauri && (
+                                <p className="text-xs text-amber-600">
+                                    Web warning: WebDAV passwords are stored in browser storage. Use only on trusted devices.
+                                </p>
+                            )}
 
                             <div className="flex justify-end">
                                 <button
