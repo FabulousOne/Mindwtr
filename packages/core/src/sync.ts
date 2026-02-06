@@ -316,12 +316,28 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
             stats.maxClockSkewMs = absoluteSkew;
         }
         const withinSkew = Math.abs(timeDiff) <= CLOCK_SKEW_THRESHOLD_MS;
+        const resolveOperationTime = (item: T): number => {
+            if (item.deletedAt) {
+                const deletedTimeRaw = new Date(item.deletedAt).getTime();
+                if (Number.isFinite(deletedTimeRaw)) return deletedTimeRaw;
+            }
+            const updatedTimeRaw = item.updatedAt ? new Date(item.updatedAt).getTime() : NaN;
+            return Number.isFinite(updatedTimeRaw) ? updatedTimeRaw : 0;
+        };
         let winner = safeIncomingTime > safeLocalTime ? incomingItem : localItem;
         if (hasRevision) {
-            if (revDiff !== 0) {
+            if (localDeleted !== incomingDeleted) {
+                const localOpTime = resolveOperationTime(localItem);
+                const incomingOpTime = resolveOperationTime(incomingItem);
+                if (incomingOpTime > localOpTime) {
+                    winner = incomingItem;
+                } else if (localOpTime > incomingOpTime) {
+                    winner = localItem;
+                } else {
+                    winner = localDeleted ? localItem : incomingItem;
+                }
+            } else if (revDiff !== 0) {
                 winner = revDiff > 0 ? localItem : incomingItem;
-            } else if (localDeleted !== incomingDeleted) {
-                winner = localDeleted ? localItem : incomingItem;
             } else if (revByDiff && localRevBy && incomingRevBy) {
                 winner = incomingRevBy.localeCompare(localRevBy) > 0 ? incomingItem : localItem;
             } else if (safeIncomingTime !== safeLocalTime) {
@@ -330,18 +346,14 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
                 winner = incomingItem;
             }
         } else if (localDeleted !== incomingDeleted) {
-            const deletedItem = localDeleted ? localItem : incomingItem;
-            const liveItem = localDeleted ? incomingItem : localItem;
-            const deletedTimeRaw = deletedItem.deletedAt ? new Date(deletedItem.deletedAt).getTime() : 0;
-            const liveTimeRaw = liveItem.updatedAt ? new Date(liveItem.updatedAt).getTime() : 0;
-            const deletedTime = Number.isFinite(deletedTimeRaw) ? deletedTimeRaw : 0;
-            const liveTime = Number.isFinite(liveTimeRaw) ? liveTimeRaw : 0;
-            const deleteShouldWin = deletedTime + CLOCK_SKEW_THRESHOLD_MS >= liveTime;
-
-            if (withinSkew) {
-                winner = deleteShouldWin ? deletedItem : liveItem;
-            } else if (deleteShouldWin) {
-                winner = deletedItem;
+            const localOpTime = resolveOperationTime(localItem);
+            const incomingOpTime = resolveOperationTime(incomingItem);
+            if (incomingOpTime > localOpTime) {
+                winner = incomingItem;
+            } else if (localOpTime > incomingOpTime) {
+                winner = localItem;
+            } else {
+                winner = localDeleted ? localItem : incomingItem;
             }
         } else if (withinSkew && safeIncomingTime === safeLocalTime) {
             winner = incomingItem;

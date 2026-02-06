@@ -277,6 +277,38 @@ describe('Sync Logic', () => {
             expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:04:00.000Z');
         });
 
+        it('uses strict last operation time for delete-vs-live conflicts', () => {
+            const local = mockAppData([createMockTask('1', '2023-01-02T00:00:00.000Z', '2023-01-02T00:00:00.000Z')]);
+            const incoming = mockAppData([createMockTask('1', '2023-01-02T00:03:00.000Z')]);
+
+            const merged = mergeAppData(local, incoming);
+
+            expect(merged.tasks).toHaveLength(1);
+            expect(merged.tasks[0].deletedAt).toBeUndefined();
+            expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:03:00.000Z');
+        });
+
+        it('uses strict last operation time for delete-vs-live conflicts with revisions', () => {
+            const localTask = {
+                ...createMockTask('1', '2023-01-02T00:00:00.000Z', '2023-01-02T00:00:00.000Z'),
+                rev: 10,
+                revBy: 'device-a',
+            } satisfies Task;
+            const incomingTask = {
+                ...createMockTask('1', '2023-01-02T00:03:00.000Z'),
+                rev: 9,
+                revBy: 'device-b',
+            } satisfies Task;
+            const local = mockAppData([localTask]);
+            const incoming = mockAppData([incomingTask]);
+
+            const merged = mergeAppData(local, incoming);
+
+            expect(merged.tasks).toHaveLength(1);
+            expect(merged.tasks[0].deletedAt).toBeUndefined();
+            expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:03:00.000Z');
+        });
+
         it('prefers newer item when timestamps are within skew threshold', () => {
             const local = mockAppData([createMockTask('1', '2023-01-02T00:00:00.000Z')]);
             const incoming = mockAppData([createMockTask('1', '2023-01-02T00:04:00.000Z')]);
