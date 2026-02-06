@@ -523,6 +523,26 @@ describe('Sync Logic', () => {
             expect(wroteRemote).toBe(true);
             expect(wroteLocal).toBe(false);
         });
+
+        it('reports orchestration steps in order', async () => {
+            const steps: string[] = [];
+            await performSyncCycle({
+                readLocal: async () => mockAppData([createMockTask('1', '2024-01-01T00:00:00.000Z')]),
+                readRemote: async () => mockAppData(),
+                writeLocal: async () => undefined,
+                writeRemote: async () => undefined,
+                onStep: (step) => {
+                    steps.push(step);
+                },
+            });
+            expect(steps).toEqual([
+                'read-local',
+                'read-remote',
+                'merge',
+                'write-remote',
+                'write-local',
+            ]);
+        });
     });
 
     describe('appendSyncHistory', () => {

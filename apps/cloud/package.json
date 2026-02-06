@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun run src/server.ts",
-    "start": "bun run src/server.ts"
+    "start": "bun run src/server.ts",
+    "test": "bun test"
   },
   "dependencies": {
     "@mindwtr/core": "workspace:*"

@@ -212,6 +212,16 @@ async function readJsonBody(req: Request, maxBodyBytes: number, encoder: TextEnc
     }
 }
 
+export const __cloudTestUtils = {
+    parseArgs,
+    getToken,
+    tokenToKey,
+    validateAppData,
+    asStatus,
+    pickTaskList,
+    readJsonBody,
+};
+
 async function main() {
     const flags = parseArgs(process.argv.slice(2));
     const port = Number(flags.port || process.env.PORT || 8787);
@@ -590,7 +600,10 @@ async function main() {
     });
 }
 
-main().catch((err) => {
-    logError('Failed to start server', err);
-    process.exit(1);
-});
+const isMainModule = typeof Bun !== 'undefined' && (import.meta as ImportMeta & { main?: boolean }).main === true;
+if (isMainModule) {
+    main().catch((err) => {
+        logError('Failed to start server', err);
+        process.exit(1);
+    });
+}
