@@ -180,6 +180,11 @@ const buildBasicAuthHeader = (username?: string, password?: string): string | nu
   return `Basic ${encodeBase64Utf8(`${username || ''}:${password || ''}`)}`;
 };
 
+const buildBearerAuthHeader = (token?: string): string | null => {
+  if (!token) return null;
+  return `Bearer ${token}`;
+};
+
 const resolveUploadType = (): any => {
   const types = (FileSystem as any).FileSystemUploadType;
   return types?.BINARY_CONTENT ?? types?.BINARY ?? undefined;
@@ -237,6 +242,66 @@ const uploadWebdavFileWithFileSystem = async (
   const status = Number((result as { status?: number } | null)?.status ?? 0);
   if (status && (status < 200 || status >= 300)) {
     const error = new Error(`WebDAV File PUT failed (${status})`);
+    (error as { status?: number }).status = status;
+    throw error;
+  }
+  if (onProgress && Number.isFinite(totalBytes ?? NaN) && (totalBytes ?? 0) > 0) {
+    onProgress(totalBytes ?? 0, totalBytes ?? 0);
+  }
+  return true;
+};
+
+const uploadCloudFileWithFileSystem = async (
+  url: string,
+  fileUri: string,
+  contentType: string,
+  token: string,
+  onProgress?: (sent: number, total: number) => void,
+  totalBytes?: number
+): Promise<boolean> => {
+  const uploadAsync = (FileSystem as any).uploadAsync;
+  if (typeof uploadAsync !== 'function') return false;
+  if (!fileUri.startsWith('file://')) return false;
+
+  const authHeader = buildBearerAuthHeader(token);
+  const headers: Record<string, string> = {
+    'Content-Type': contentType || DEFAULT_CONTENT_TYPE,
+  };
+  if (authHeader) headers.Authorization = authHeader;
+
+  const uploadType = resolveUploadType();
+  const createUploadTask = (FileSystem as any).createUploadTask;
+  if (typeof createUploadTask === 'function' && onProgress) {
+    const task = createUploadTask(
+      url,
+      fileUri,
+      {
+        httpMethod: 'PUT',
+        headers,
+        uploadType,
+      },
+      (event: { totalBytesSent?: number; totalBytesExpectedToSend?: number }) => {
+        const sent = Number(event.totalBytesSent ?? 0);
+        const expected = Number(event.totalBytesExpectedToSend ?? totalBytes ?? 0);
+        if (expected > 0) {
+          onProgress(sent, expected);
+        }
+      }
+    );
+    const result = await task.uploadAsync();
+    const status = Number((result as { status?: number } | null)?.status ?? 0);
+    if (status && (status < 200 || status >= 300)) {
+      const error = new Error(`Cloud File PUT failed (${status})`);
+      (error as { status?: number }).status = status;
+      throw error;
+    }
+    return true;
+  }
+
+  const result = await uploadAsync(url, fileUri, { httpMethod: 'PUT', headers, uploadType });
+  const status = Number((result as { status?: number } | null)?.status ?? 0);
+  if (status && (status < 200 || status >= 300)) {
+    const error = new Error(`Cloud File PUT failed (${status})`);
     (error as { status?: number }).status = status;
     throw error;
   }
@@ -983,28 +1048,47 @@ export const syncCloudAttachments = async (
 
     if (!attachment.cloudKey && hasLocalPath && existsLocally && !isHttp) {
       try {
-        const fileData = await readFileAsBytes(uri);
-        const validation = await validateAttachmentForUpload(attachment, fileData.byteLength);
+        let fileSize = await getAttachmentByteSize(attachment, uri);
+        let fileData: Uint8Array | null = null;
+        if (!Number.isFinite(fileSize ?? NaN)) {
+          fileData = await readFileAsBytes(uri);
+          fileSize = fileData.byteLength;
+        }
+
+        const validation = await validateAttachmentForUpload(attachment, fileSize);
         if (!validation.valid) {
           logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
           continue;
         }
-        reportProgress(attachment.id, 'upload', 0, fileData.byteLength, 'active');
-        const buffer = toArrayBuffer(fileData);
+        const totalBytes = Math.max(0, Number(fileSize ?? 0));
+        reportProgress(attachment.id, 'upload', 0, totalBytes, 'active');
         const cloudKey = buildCloudKey(attachment);
-        await cloudPutFile(
-          `${baseSyncUrl}/${cloudKey}`,
-          buffer,
+        const uploadUrl = `${baseSyncUrl}/${cloudKey}`;
+        const uploadedWithFileSystem = await uploadCloudFileWithFileSystem(
+          uploadUrl,
+          uri,
           attachment.mimeType || DEFAULT_CONTENT_TYPE,
-          {
-            token: cloudConfig.token,
-            onProgress: (loaded, total) => reportProgress(attachment.id, 'upload', loaded, total, 'active'),
-          }
+          cloudConfig.token,
+          (loaded, total) => reportProgress(attachment.id, 'upload', loaded, total, 'active'),
+          totalBytes
         );
+        if (!uploadedWithFileSystem) {
+          const uploadBytes = fileData ?? await readFileAsBytes(uri);
+          const buffer = toArrayBuffer(uploadBytes);
+          await cloudPutFile(
+            uploadUrl,
+            buffer,
+            attachment.mimeType || DEFAULT_CONTENT_TYPE,
+            { token: cloudConfig.token }
+          );
+        }
         attachment.cloudKey = cloudKey;
+        if (!Number.isFinite(attachment.size ?? NaN) && Number.isFinite(fileSize ?? NaN)) {
+          attachment.size = Number(fileSize);
+        }
         attachment.localStatus = 'available';
         didMutate = true;
-        reportProgress(attachment.id, 'upload', fileData.byteLength, fileData.byteLength, 'completed');
+        reportProgress(attachment.id, 'upload', totalBytes, totalBytes, 'completed');
       } catch (error) {
         reportProgress(
           attachment.id,
