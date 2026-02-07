@@ -10,6 +10,7 @@ import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
 import { TaskItem } from '../TaskItem';
 import { projectMatchesAreaFilter, resolveAreaFilter, taskMatchesAreaFilter } from '../../lib/area-filter';
+import { PomodoroPanel } from './PomodoroPanel';
 
 export function AgendaView() {
     const perf = usePerformanceMonitor('AgendaView');
@@ -420,6 +421,21 @@ export function AgendaView() {
 
     const visibleActive = filteredActiveTasks.length;
     const nextActionsCount = sections.nextActions.length;
+    const pomodoroTasks = useMemo(() => {
+        const ordered = [
+            ...focusedTasks,
+            ...sections.nextActions,
+            ...sections.dueToday,
+            ...sections.overdue,
+            ...sections.reviewDue,
+        ];
+        const byId = new Map<string, Task>();
+        ordered.forEach((task) => {
+            if (task.deletedAt) return;
+            byId.set(task.id, task);
+        });
+        return Array.from(byId.values());
+    }, [focusedTasks, sections]);
 
     return (
         <ErrorBoundary>
@@ -464,6 +480,8 @@ export function AgendaView() {
                     </button>
                 </div>
             </header>
+
+            <PomodoroPanel tasks={pomodoroTasks} />
 
             <div className="bg-card border border-border rounded-lg p-3 space-y-3">
                 <div className="flex items-center justify-between">

@@ -38,3 +38,4 @@ export * from './ai-config';
 export * from './sqlite-schema';
 export * from './sqlite-adapter';
 export * from './logger';
+export * from './pomodoro';

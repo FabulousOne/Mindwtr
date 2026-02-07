@@ -9,6 +9,7 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useTheme } from '../../../contexts/theme-context';
 import { useLanguage } from '../../../contexts/language-context';
 import { TaskEditModal } from '@/components/task-edit-modal';
+import { PomodoroPanel } from '@/components/pomodoro-panel';
 
 export default function FocusScreen() {
   const { taskId, openToken } = useLocalSearchParams<{ taskId?: string; openToken?: string }>();
@@ -128,6 +129,14 @@ export default function FocusScreen() {
     { title: t('focus.schedule') ?? 'Today', data: schedule, type: 'schedule' as const },
     { title: t('focus.nextActions') ?? t('list.next'), data: nextActions, type: 'next' as const },
   ]), [schedule, nextActions, t]);
+  const pomodoroTasks = useMemo(() => {
+    const byId = new Map<string, Task>();
+    [...schedule, ...nextActions].forEach((task) => {
+      if (task.deletedAt) return;
+      byId.set(task.id, task);
+    });
+    return Array.from(byId.values());
+  }, [schedule, nextActions]);
 
   const onEdit = useCallback((task: Task) => {
     setEditingTask(task);
@@ -165,6 +174,10 @@ export default function FocusScreen() {
         ]}
         ListHeaderComponent={(
           <View style={styles.header}>
+            <PomodoroPanel
+              tasks={pomodoroTasks}
+              onMarkDone={(id) => updateTask(id, { status: 'done', isFocusedToday: false })}
+            />
             <Text style={[styles.dateText, { color: tc.secondaryText }]}>
               {format(new Date(), 'EEEE, MMMM do')}
             </Text>
