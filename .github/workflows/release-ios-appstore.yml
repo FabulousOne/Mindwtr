@@ -206,31 +206,31 @@ jobs:
           if [ -n "${IOS_EXPORT_OPTIONS:-}" ]; then
             decode_base64 "$IOS_EXPORT_OPTIONS" "$EXPORT_OPTIONS_PATH"
           else
-            cat > "$EXPORT_OPTIONS_PATH" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>app-store</string>
-    <key>destination</key>
-    <string>export</string>
-    <key>signingStyle</key>
-    <string>manual</string>
-    <key>teamID</key>
-    <string>${PROFILE_TEAM_ID}</string>
-    <key>provisioningProfiles</key>
-    <dict>
-        <key>${EXPECTED_BUNDLE_ID}</key>
-        <string>${PROFILE_NAME}</string>
-    </dict>
-    <key>stripSwiftSymbols</key>
-    <true/>
-    <key>uploadSymbols</key>
-    <true/>
-</dict>
-</plist>
-EOF
+            {
+              printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>'
+              printf '%s\n' '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+              printf '%s\n' '<plist version="1.0">'
+              printf '%s\n' '<dict>'
+              printf '%s\n' '    <key>method</key>'
+              printf '%s\n' '    <string>app-store</string>'
+              printf '%s\n' '    <key>destination</key>'
+              printf '%s\n' '    <string>export</string>'
+              printf '%s\n' '    <key>signingStyle</key>'
+              printf '%s\n' '    <string>manual</string>'
+              printf '%s\n' '    <key>teamID</key>'
+              printf '    <string>%s</string>\n' "$PROFILE_TEAM_ID"
+              printf '%s\n' '    <key>provisioningProfiles</key>'
+              printf '%s\n' '    <dict>'
+              printf '        <key>%s</key>\n' "$EXPECTED_BUNDLE_ID"
+              printf '        <string>%s</string>\n' "$PROFILE_NAME"
+              printf '%s\n' '    </dict>'
+              printf '%s\n' '    <key>stripSwiftSymbols</key>'
+              printf '%s\n' '    <true/>'
+              printf '%s\n' '    <key>uploadSymbols</key>'
+              printf '%s\n' '    <true/>'
+              printf '%s\n' '</dict>'
+              printf '%s\n' '</plist>'
+            } > "$EXPORT_OPTIONS_PATH"
           fi
           echo "EXPORT_OPTIONS_PATH=$EXPORT_OPTIONS_PATH" >> "$GITHUB_ENV"
 
