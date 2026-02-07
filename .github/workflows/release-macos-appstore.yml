@@ -118,8 +118,10 @@ jobs:
       - name: Build signed macOS app bundle (App Store)
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.MAS_SIGNING_IDENTITY }}
-          CMAKE_C_FLAGS: -march=armv8.2-a+dotprod
-          CMAKE_CXX_FLAGS: -march=armv8.2-a+dotprod
+          CFLAGS: -march=armv8.5-a+i8mm
+          CXXFLAGS: -march=armv8.5-a+i8mm
+          CMAKE_C_FLAGS: -march=armv8.5-a+i8mm
+          CMAKE_CXX_FLAGS: -march=armv8.5-a+i8mm
           TAURI_LOG_LEVEL: debug
         run: |
           set -euo pipefail
