@@ -6,8 +6,7 @@ on:
       upload:
         description: Upload to App Store Connect
         required: false
-        type: boolean
-        default: true
+        default: 'true'
 
 permissions:
   contents: read
@@ -51,7 +50,7 @@ jobs:
           IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          UPLOAD_TO_APP_STORE: ${{ github.event.inputs.upload == 'true' }}
+          UPLOAD_TO_APP_STORE: ${{ github.event.inputs.upload || 'true' }}
         run: |
           set -euo pipefail
           missing=0
@@ -274,7 +273,7 @@ EOF
           ls -la "$EXPORT_PATH"
 
       - name: Upload IPA to App Store Connect
-        if: ${{ github.event.inputs.upload == 'true' }}
+        if: ${{ (github.event.inputs.upload || 'true') == 'true' }}
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
@@ -295,4 +294,3 @@ EOF
           if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "${KEYCHAIN_PATH}" ]; then
             security delete-keychain "$KEYCHAIN_PATH" || true
           fi
-
