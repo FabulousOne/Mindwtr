@@ -961,7 +961,7 @@ export function QuickCaptureSheet({
       <Pressable style={styles.backdrop} onPress={handleClose} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 24 : 0}
+        keyboardVerticalOffset={0}
         style={styles.keyboardAvoiding}
       >
         <View style={[styles.sheet, { backgroundColor: tc.cardBg, paddingBottom: Math.max(20, insets.bottom + 12) }]}>
