@@ -165,7 +165,8 @@ export function TaskItemDisplay({
         && !selectionMode
         && !readOnly
         && task.status !== 'done'
-        && task.status !== 'archived';
+        && task.status !== 'archived'
+        && task.status !== 'reference';
     const overlayDragHandle = actionsOverlay && !!dragHandle;
     const overlayQuickDone = actionsOverlay && showQuickDoneButton;
     const inlineLeftControls = !actionsOverlay && (showQuickDoneButton || dragHandle);
@@ -271,7 +272,7 @@ export function TaskItemDisplay({
                     >
                         <div
                             className={cn(
-                                "font-medium truncate text-foreground group-hover/content:text-primary transition-colors",
+                                "font-semibold truncate text-foreground group-hover/content:text-primary transition-colors",
                                 dense ? "text-sm" : "text-base",
                                 task.status === 'done' && "line-through text-muted-foreground",
                                 actionsOverlay && "pr-20",
@@ -283,7 +284,7 @@ export function TaskItemDisplay({
                         {task.description && (
                             <p
                                 className={cn(
-                                    "text-muted-foreground mt-1 w-full break-words",
+                                    "font-normal text-muted-foreground mt-1 w-full break-words",
                                     dense ? "text-xs" : "text-sm",
                                     isRtl && "text-right"
                                 )}
@@ -497,6 +498,23 @@ export function TaskItemDisplay({
                     )}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
+                    {!isViewOpen && task.tags.length > 0 && (
+                        <div className="flex items-center gap-1 max-w-[240px] overflow-hidden">
+                            {task.tags.slice(0, 2).map((tag) => (
+                                <MetadataBadge
+                                    key={tag}
+                                    variant="tag"
+                                    label={tag.replace(/^#/, '')}
+                                />
+                            ))}
+                            {task.tags.length > 2 && (
+                                <MetadataBadge
+                                    variant="tag"
+                                    label={`+${task.tags.length - 2}`}
+                                />
+                            )}
+                        </div>
+                    )}
                     {showProjectBadgeInActions && project && (
                         <div className="hidden md:flex items-center max-w-[180px]">
                             {renderProjectBadge()}
@@ -531,7 +549,7 @@ export function TaskItemDisplay({
                                 onClick={onDuplicate}
                                 aria-label={t('taskEdit.duplicateTask')}
                                 title={t('taskEdit.duplicateTask')}
-                                className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted/50"
+                                className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted/50"
                             >
                                 <Copy className="w-4 h-4" />
                             </button>
@@ -540,14 +558,14 @@ export function TaskItemDisplay({
                                 onClick={() => onStatusChange('next')}
                                 aria-label={t('waiting.moveToNext')}
                                 title={t('waiting.moveToNext')}
-                                className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted/50"
+                                className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted/50"
                             >
                                 <RotateCcw className="w-4 h-4" />
                             </button>
                             <button
                                 onClick={onDelete}
                                 aria-label={t('task.aria.delete')}
-                                className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/20"
+                                className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-muted-foreground hover:text-muted-foreground/70 p-1 rounded hover:bg-muted/50"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
@@ -560,7 +578,7 @@ export function TaskItemDisplay({
                                     onClick={() => onStatusChange('reference')}
                                     aria-label={t('task.convertToReference')}
                                     title={t('task.convertToReference')}
-                                    className="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-blue-500/10"
+                                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted/50"
                                 >
                                     <BookOpen className="w-4 h-4" />
                                 </button>
@@ -570,7 +588,7 @@ export function TaskItemDisplay({
                                     value={task.status}
                                     aria-label={t('task.aria.status')}
                                     onChange={(e) => onStatusChange(e.target.value as TaskStatus)}
-                                    className="text-xs px-2 py-1 rounded cursor-pointer bg-muted/50 text-foreground border border-border hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                    className="text-[11px] font-medium px-2.5 py-0.5 rounded-full cursor-pointer appearance-none bg-primary/10 text-primary border-none hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/40"
                                 >
                                     <option value="inbox">{t('status.inbox')}</option>
                                     <option value="next">{t('status.next')}</option>
@@ -585,7 +603,7 @@ export function TaskItemDisplay({
                             <button
                                 onClick={onDelete}
                                 aria-label={t('task.aria.delete')}
-                                className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/20"
+                                className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-muted-foreground hover:text-muted-foreground/70 p-1 rounded hover:bg-muted/50"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>

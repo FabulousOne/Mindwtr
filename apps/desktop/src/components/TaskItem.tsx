@@ -6,7 +6,6 @@ import {
     TaskEditorFieldId,
     type Recurrence,
     parseRRuleString,
-    getStatusColor,
     Project,
     Section,
     PRESET_CONTEXTS,
@@ -832,12 +831,11 @@ export const TaskItem = memo(function TaskItem({
                     startEditing();
                 }}
                 className={cn(
-                    "group bg-card border border-border rounded-lg hover:shadow-md transition-all animate-in fade-in slide-in-from-bottom-2 border-l-4",
-                    isCompact ? "p-2" : "p-4",
-                    isSelected && "ring-2 ring-primary/40",
-                    isHighlighted && "ring-2 ring-primary/70 border-primary/40"
+                    "group rounded-xl border border-transparent hover:bg-muted/40 dark:hover:bg-muted/20 transition-colors animate-in fade-in slide-in-from-bottom-2",
+                    isCompact ? "p-2.5" : "px-3 py-3",
+                    isSelected && "ring-2 ring-primary/40 bg-primary/5",
+                    isHighlighted && "ring-2 ring-primary/70 bg-primary/5"
                 )}
-                style={{ borderLeftColor: getStatusColor(task.status).border }}
             >
                 <div className={cn("flex items-start", isCompact ? "gap-2" : "gap-3")}>
                     {selectionMode && (
