@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS areas (
   icon TEXT,
   orderNum INTEGER NOT NULL,
   createdAt TEXT,
-  updatedAt TEXT
+  updatedAt TEXT,
+  deletedAt TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sections (
@@ -94,6 +95,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_deletedAt ON tasks(deletedAt);
 CREATE INDEX IF NOT EXISTS idx_tasks_dueDate ON tasks(dueDate);
 CREATE INDEX IF NOT EXISTS idx_tasks_startTime ON tasks(startTime);
 CREATE INDEX IF NOT EXISTS idx_tasks_reviewAt ON tasks(reviewAt);
+CREATE INDEX IF NOT EXISTS idx_tasks_completedAt ON tasks(completedAt);
 CREATE INDEX IF NOT EXISTS idx_tasks_createdAt ON tasks(createdAt);
 CREATE INDEX IF NOT EXISTS idx_tasks_updatedAt ON tasks(updatedAt);
 CREATE INDEX IF NOT EXISTS idx_tasks_status_deletedAt ON tasks(status, deletedAt);

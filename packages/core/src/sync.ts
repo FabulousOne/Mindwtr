@@ -95,6 +95,27 @@ const isNonEmptyString = (value: unknown): value is string =>
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const isValidTimestamp = (value: unknown): value is string =>
+    typeof value === 'string' && Number.isFinite(Date.parse(value));
+
+const validateRevisionFields = (
+    item: Record<string, unknown>,
+    label: string,
+    index: number,
+    errors: string[]
+) => {
+    const rev = item.rev;
+    if (rev !== undefined) {
+        if (typeof rev !== 'number' || !Number.isFinite(rev) || rev < 0 || !Number.isInteger(rev)) {
+            errors.push(`${label}[${index}].rev must be a non-negative integer when present`);
+        }
+    }
+    const revBy = item.revBy;
+    if (revBy !== undefined && !isNonEmptyString(revBy)) {
+        errors.push(`${label}[${index}].revBy must be a non-empty string when present`);
+    }
+};
+
 const validateEntityShape = (
     items: unknown[],
     label: 'tasks' | 'projects' | 'sections',
@@ -109,9 +130,24 @@ const validateEntityShape = (
         if (!isNonEmptyString(item.id)) {
             errors.push(`${label}[${index}].id must be a non-empty string`);
         }
+        if (item.createdAt !== undefined && !isNonEmptyString(item.createdAt)) {
+            errors.push(`${label}[${index}].createdAt must be a non-empty string when present`);
+        } else if (isNonEmptyString(item.createdAt) && !isValidTimestamp(item.createdAt)) {
+            errors.push(`${label}[${index}].createdAt must be a valid ISO timestamp when present`);
+        }
         if (!isNonEmptyString(item.updatedAt)) {
             errors.push(`${label}[${index}].updatedAt must be a non-empty string`);
+        } else if (!isValidTimestamp(item.updatedAt)) {
+            errors.push(`${label}[${index}].updatedAt must be a valid ISO timestamp`);
         }
+        if (isValidTimestamp(item.createdAt) && isValidTimestamp(item.updatedAt)) {
+            const createdMs = Date.parse(item.createdAt);
+            const updatedMs = Date.parse(item.updatedAt);
+            if (updatedMs < createdMs) {
+                errors.push(`${label}[${index}].updatedAt must be greater than or equal to createdAt`);
+            }
+        }
+        validateRevisionFields(item, label, index, errors);
     }
 };
 
@@ -139,6 +175,20 @@ const validateMergedSyncData = (data: AppData): string[] => {
             if (!isNonEmptyString(area.name)) {
                 errors.push(`areas[${index}].name must be a non-empty string`);
             }
+            if (area.createdAt !== undefined && !isValidTimestamp(area.createdAt)) {
+                errors.push(`areas[${index}].createdAt must be a valid ISO timestamp when present`);
+            }
+            if (area.updatedAt !== undefined && !isValidTimestamp(area.updatedAt)) {
+                errors.push(`areas[${index}].updatedAt must be a valid ISO timestamp when present`);
+            }
+            if (isValidTimestamp(area.createdAt) && isValidTimestamp(area.updatedAt)) {
+                const createdMs = Date.parse(area.createdAt);
+                const updatedMs = Date.parse(area.updatedAt);
+                if (updatedMs < createdMs) {
+                    errors.push(`areas[${index}].updatedAt must be greater than or equal to createdAt`);
+                }
+            }
+            validateRevisionFields(area, 'areas', index, errors);
         }
     }
     return errors;
@@ -533,56 +583,21 @@ function mergeEntities<T extends { id: string; updatedAt: string; deletedAt?: st
     return mergeEntitiesWithStats(local, incoming).merged;
 }
 
-function mergeAreas(local: Area[], incoming: Area[]): Area[] {
-    const localMap = new Map<string, Area>(local.map(area => [area.id, area]));
-    const incomingMap = new Map<string, Area>(incoming.map(area => [area.id, area]));
-    const allIds = new Set<string>([...localMap.keys(), ...incomingMap.keys()]);
-    const merged: Area[] = [];
-
-    const resolveTime = (area?: Area): number => {
-        const timestamp = area?.updatedAt || area?.createdAt;
-        const parsed = timestamp ? new Date(timestamp).getTime() : 0;
-        return Number.isFinite(parsed) ? parsed : 0;
+const normalizeAreaForMerge = (area: Area, nowIso: string): Area & { createdAt: string; updatedAt: string } => {
+    const createdAt = area.createdAt || area.updatedAt || nowIso;
+    const updatedAt = area.updatedAt || area.createdAt || nowIso;
+    return {
+        ...area,
+        createdAt,
+        updatedAt,
     };
-    const resolveRev = (area?: Area): number => {
-        const value = area?.rev;
-        return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-    };
-    const resolveRevBy = (area?: Area): string => (typeof area?.revBy === 'string' ? area.revBy : '');
+};
 
-    for (const id of allIds) {
-        const localArea = localMap.get(id);
-        const incomingArea = incomingMap.get(id);
-
-        if (localArea && !incomingArea) {
-            merged.push(localArea);
-            continue;
-        }
-        if (incomingArea && !localArea) {
-            merged.push(incomingArea);
-            continue;
-        }
-        if (!localArea || !incomingArea) continue;
-
-        const localRev = resolveRev(localArea);
-        const incomingRev = resolveRev(incomingArea);
-        const localRevBy = resolveRevBy(localArea);
-        const incomingRevBy = resolveRevBy(incomingArea);
-        const hasRevision = localRev > 0 || incomingRev > 0 || !!localRevBy || !!incomingRevBy;
-        let winner = localArea;
-        if (hasRevision && localRev !== incomingRev) {
-            winner = localRev > incomingRev ? localArea : incomingArea;
-        } else if (hasRevision && localRevBy !== incomingRevBy && localRevBy && incomingRevBy) {
-            winner = incomingRevBy.localeCompare(localRevBy) > 0 ? incomingArea : localArea;
-        } else {
-            const localTime = resolveTime(localArea);
-            const incomingTime = resolveTime(incomingArea);
-            winner = incomingTime > localTime ? incomingArea : localArea;
-        }
-        merged.push(winner);
-    }
-
-    return merged
+function mergeAreas(local: Area[], incoming: Area[], nowIso: string): Area[] {
+    const localNormalized = local.map((area) => normalizeAreaForMerge(area, nowIso));
+    const incomingNormalized = incoming.map((area) => normalizeAreaForMerge(area, nowIso));
+    const result = mergeEntitiesWithStats(localNormalized, incomingNormalized);
+    return result.merged
         .map((area, index) => ({
             ...area,
             order: Number.isFinite(area.order) ? area.order : index,
@@ -637,12 +652,19 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
                 return attachment;
             }
             const incomingAttachment = incomingById.get(attachment.id);
+            const localUriAvailable = localAttachment.localStatus !== 'missing'
+                && typeof localAttachment.uri === 'string'
+                && localAttachment.uri.trim().length > 0;
             return {
                 ...attachment,
                 cloudKey: attachment.cloudKey || localAttachment.cloudKey || incomingAttachment?.cloudKey,
                 fileHash: attachment.fileHash || localAttachment.fileHash || incomingAttachment?.fileHash,
-                uri: localAttachment.uri,
-                localStatus: localAttachment.localStatus,
+                uri: localUriAvailable
+                    ? localAttachment.uri
+                    : (attachment.uri || incomingAttachment?.uri || localAttachment.uri),
+                localStatus: localUriAvailable
+                    ? localAttachment.localStatus
+                    : (attachment.localStatus || incomingAttachment?.localStatus || localAttachment.localStatus),
             };
         });
     };
@@ -664,7 +686,7 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
             tasks: tasksResult.merged,
             projects: projectsResult.merged,
             sections: sectionsMerged,
-            areas: mergeAreas(localNormalized.areas, incomingNormalized.areas),
+            areas: mergeAreas(localNormalized.areas, incomingNormalized.areas, nowIso),
             settings: mergeSettingsForSync(localNormalized.settings, incomingNormalized.settings),
         },
         stats: {
@@ -700,6 +722,15 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
         mergeResult.stats.tasks.maxClockSkewMs || 0,
         mergeResult.stats.projects.maxClockSkewMs || 0
     );
+    if (maxClockSkewMs > CLOCK_SKEW_THRESHOLD_MS) {
+        logWarn('Sync merge detected large clock skew', {
+            scope: 'sync',
+            context: {
+                maxClockSkewMs: Math.round(maxClockSkewMs),
+                thresholdMs: CLOCK_SKEW_THRESHOLD_MS,
+            },
+        });
+    }
     const timestampAdjustments = (mergeResult.stats.tasks.timestampAdjustments || 0)
         + (mergeResult.stats.projects.timestampAdjustments || 0);
     const historyEntry: SyncHistoryEntry = {
@@ -746,12 +777,12 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
         throw new Error(`Sync validation failed: ${sample}`);
     }
 
-    // Write remote first so a failed remote flush does not advance local sync state.
-    io.onStep?.('write-remote');
-    await io.writeRemote(finalData);
-
     io.onStep?.('write-local');
     await io.writeLocal(finalData);
+
+    // Write local first so a local persistence failure cannot leave remote ahead.
+    io.onStep?.('write-remote');
+    await io.writeRemote(finalData);
 
     return { data: finalData, stats: mergeResult.stats, status: nextSyncStatus };
 }

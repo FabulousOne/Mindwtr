@@ -183,6 +183,7 @@ export class SqliteAdapter {
         }
         await this.ensureTaskColumns();
         await this.ensureProjectColumns();
+        await this.ensureAreaColumns();
         if (this.client.exec) {
             await this.client.exec(SQLITE_FTS_SCHEMA);
             await this.client.exec(SQLITE_INDEX_SCHEMA);
@@ -319,6 +320,24 @@ export class SqliteAdapter {
         await this.client.run(
             'CREATE INDEX IF NOT EXISTS idx_projects_area_order ON projects(areaId, orderNum)'
         );
+    }
+
+    private async ensureAreaColumns() {
+        const columns = await this.client.all<{ name?: string }>('PRAGMA table_info(areas)');
+        const names = new Set(columns.map((col) => col.name));
+        const definitions: Array<{ name: string; sql: string }> = [
+            { name: 'color', sql: 'ALTER TABLE areas ADD COLUMN color TEXT' },
+            { name: 'icon', sql: 'ALTER TABLE areas ADD COLUMN icon TEXT' },
+            { name: 'orderNum', sql: 'ALTER TABLE areas ADD COLUMN orderNum INTEGER' },
+            { name: 'createdAt', sql: 'ALTER TABLE areas ADD COLUMN createdAt TEXT' },
+            { name: 'updatedAt', sql: 'ALTER TABLE areas ADD COLUMN updatedAt TEXT' },
+            { name: 'deletedAt', sql: 'ALTER TABLE areas ADD COLUMN deletedAt TEXT' },
+        ];
+        for (const definition of definitions) {
+            if (!names.has(definition.name)) {
+                await this.client.run(definition.sql);
+            }
+        }
     }
 
     private async ensureFtsPopulated(forceRebuild = false) {
@@ -528,6 +547,7 @@ export class SqliteAdapter {
             order: Number(row.orderNum ?? 0),
             createdAt: row.createdAt as string | undefined,
             updatedAt: row.updatedAt as string | undefined,
+            deletedAt: row.deletedAt as string | undefined,
         }));
 
         const settings = settingsRow?.data ? fromJson<AppData['settings']>(settingsRow.data, {}) : {};
@@ -865,6 +885,7 @@ export class SqliteAdapter {
                     'orderNum',
                     'createdAt',
                     'updatedAt',
+                    'deletedAt',
                 ],
                 data.areas.map((area) => [
                     area.id,
@@ -874,13 +895,15 @@ export class SqliteAdapter {
                     area.order,
                     area.createdAt ?? null,
                     area.updatedAt ?? null,
+                    area.deletedAt ?? null,
                 ]),
                 `name=excluded.name,
                  color=excluded.color,
                  icon=excluded.icon,
                  orderNum=excluded.orderNum,
                  createdAt=excluded.createdAt,
-                 updatedAt=excluded.updatedAt`,
+                 updatedAt=excluded.updatedAt,
+                 deletedAt=excluded.deletedAt`,
             );
 
             await this.client.run(

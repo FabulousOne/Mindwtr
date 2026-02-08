@@ -210,6 +210,7 @@ export const createSettingsActions = ({
                 const nameSet = new Set<string>();
                 let hasDuplicateNames = false;
                 for (const area of allAreas) {
+                    if (area.deletedAt) continue;
                     const normalizedName = typeof area?.name === 'string' ? area.name.trim().toLowerCase() : '';
                     if (!normalizedName) continue;
                     if (nameSet.has(normalizedName)) {
@@ -224,6 +225,10 @@ export const createSettingsActions = ({
                     const areaIdRemap = new Map<string, string>();
                     const uniqueAreas: Area[] = [];
                     allAreas.forEach((area) => {
+                        if (area.deletedAt) {
+                            uniqueAreas.push(area);
+                            return;
+                        }
                         const normalizedName = typeof area?.name === 'string' ? area.name.trim().toLowerCase() : '';
                         if (!normalizedName) {
                             uniqueAreas.push(area);
@@ -258,7 +263,8 @@ export const createSettingsActions = ({
                         didAreaMigration = true;
                         return id;
                     };
-                    const areaIdExists = (areaId?: string) => Boolean(areaId && allAreas.some((area) => area.id === areaId));
+                    const areaIdExists = (areaId?: string) =>
+                        Boolean(areaId && allAreas.some((area) => area.id === areaId && !area.deletedAt));
                     allProjects = allProjects.map((project) => {
                         const remappedAreaId = project.areaId ? areaIdRemap.get(project.areaId) : undefined;
                         if (remappedAreaId && remappedAreaId !== project.areaId) {
@@ -294,6 +300,10 @@ export const createSettingsActions = ({
                 const areaIdRemap = new Map<string, string>();
                 const uniqueAreas: Area[] = [];
                 allAreas.forEach((area) => {
+                    if (area.deletedAt) {
+                        uniqueAreas.push(area);
+                        return;
+                    }
                     const normalizedName = typeof area?.name === 'string' ? area.name.trim().toLowerCase() : '';
                     if (!normalizedName) {
                         uniqueAreas.push(area);
@@ -331,11 +341,12 @@ export const createSettingsActions = ({
             const visibleTasks = allTasks.filter(t => !t.deletedAt && t.status !== 'archived');
             const visibleProjects = allProjects.filter(p => !p.deletedAt);
             const visibleSections = allSections.filter((section) => !section.deletedAt);
+            const visibleAreas = allAreas.filter((area) => !area.deletedAt);
             set({
                 tasks: visibleTasks,
                 projects: visibleProjects,
                 sections: visibleSections,
-                areas: allAreas,
+                areas: visibleAreas,
                 settings: nextSettings,
                 _allTasks: allTasks,
                 _allProjects: allProjects,
@@ -455,17 +466,12 @@ export const createSettingsActions = ({
 
     getDerivedState: () => {
         const state = get();
-        if (
-            derivedCache
-            && derivedCache.tasksRef === state.tasks
-            && derivedCache.projectsRef === state.projects
-        ) {
+        if (derivedCache && derivedCache.lastDataChangeAt === state.lastDataChangeAt) {
             return derivedCache.value;
         }
         const derived = computeDerivedState(state.tasks, state.projects);
         derivedCache = {
-            tasksRef: state.tasks,
-            projectsRef: state.projects,
+            lastDataChangeAt: state.lastDataChangeAt,
             value: derived,
         };
         return derived;

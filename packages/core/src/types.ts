@@ -98,6 +98,7 @@ export interface Area {
     revBy?: string; // Device identifier that issued the revision
     createdAt?: string;
     updatedAt?: string;
+    deletedAt?: string; // Soft-delete tombstone for cross-device area deletion
 }
 
 export type AttachmentKind = 'file' | 'link';

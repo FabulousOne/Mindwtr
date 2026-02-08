@@ -97,6 +97,23 @@ describe('TaskStore', () => {
         expect(tasks).toHaveLength(0);
     });
 
+    it('should increment revision metadata when purging a task', () => {
+        const { addTask, deleteTask, purgeTask } = useTaskStore.getState();
+        addTask('Task to Purge');
+
+        const task = useTaskStore.getState()._allTasks[0];
+        deleteTask(task.id);
+        const deleted = useTaskStore.getState()._allTasks.find((item) => item.id === task.id)!;
+        const deletedRev = deleted.rev ?? 0;
+
+        purgeTask(task.id);
+        const purged = useTaskStore.getState()._allTasks.find((item) => item.id === task.id)!;
+        expect(purged.purgedAt).toBeTruthy();
+        expect((purged.rev ?? 0)).toBeGreaterThan(deletedRev);
+        expect(typeof purged.revBy).toBe('string');
+        expect((purged.revBy ?? '').length).toBeGreaterThan(0);
+    });
+
     it('skips fetch while edits are in progress', async () => {
         const { lockEditing, unlockEditing, fetchData } = useTaskStore.getState();
         lockEditing();
@@ -160,6 +177,30 @@ describe('TaskStore', () => {
         expect(projects).toHaveLength(1);
         expect(projects[0].title).toBe('New Project');
         expect(projects[0].color).toBe('#ff0000');
+    });
+
+    it('should soft-delete areas and clear area references from projects/tasks', async () => {
+        const { addArea, addProject, addTask, deleteArea } = useTaskStore.getState();
+        const area = await addArea('Work');
+        expect(area).not.toBeNull();
+        if (!area) return;
+
+        const project = await addProject('Area Project', '#123456', { areaId: area.id });
+        expect(project).not.toBeNull();
+        if (!project) return;
+        addTask('Area Task', { areaId: area.id, status: 'next' });
+
+        await deleteArea(area.id);
+
+        const state = useTaskStore.getState();
+        expect(state.areas).toHaveLength(0);
+        const tombstone = state._allAreas.find((item) => item.id === area.id);
+        expect(tombstone?.deletedAt).toBeTruthy();
+
+        const updatedProject = state._allProjects.find((item) => item.id === project.id)!;
+        expect(updatedProject.areaId).toBeUndefined();
+        const updatedTask = state._allTasks.find((item) => item.title === 'Area Task')!;
+        expect(updatedTask.areaId).toBeUndefined();
     });
 
     it('should move a project to someday without altering task status', () => {

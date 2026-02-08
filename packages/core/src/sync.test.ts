@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mergeAppData, mergeAppDataWithStats, filterDeleted, appendSyncHistory, performSyncCycle } from './sync';
-import { AppData, Task, Project, Attachment, Section } from './types';
+import { AppData, Task, Project, Attachment, Section, Area } from './types';
 
 describe('Sync Logic', () => {
     const createMockTask = (id: string, updatedAt: string, deletedAt?: string): Task => ({
@@ -35,6 +35,15 @@ describe('Sync Logic', () => {
         updatedAt,
         createdAt: '2023-01-01T00:00:00.000Z',
         deletedAt
+    });
+
+    const createMockArea = (id: string, updatedAt: string, deletedAt?: string): Area => ({
+        id,
+        name: `Area ${id}`,
+        order: 0,
+        createdAt: '2023-01-01T00:00:00.000Z',
+        updatedAt,
+        deletedAt,
     });
 
     const mockAppData = (tasks: Task[] = [], projects: Project[] = [], sections: Section[] = []): AppData => ({
@@ -149,6 +158,40 @@ describe('Sync Logic', () => {
             const attachment = merged.tasks[0].attachments?.find(a => a.id === 'att-2');
 
             expect(attachment?.cloudKey).toBe('attachments/att-2.txt');
+        });
+
+        it('falls back to incoming URI when local attachment is missing', () => {
+            const localAttachment: Attachment = {
+                id: 'att-missing',
+                kind: 'file',
+                title: 'doc.txt',
+                uri: '/local/doc.txt',
+                localStatus: 'missing',
+                createdAt: '2023-01-01T00:00:00.000Z',
+                updatedAt: '2023-01-02T00:00:00.000Z',
+            };
+            const incomingAttachment: Attachment = {
+                id: 'att-missing',
+                kind: 'file',
+                title: 'doc.txt',
+                uri: '/incoming/doc.txt',
+                cloudKey: 'attachments/att-missing.txt',
+                createdAt: '2023-01-01T00:00:00.000Z',
+                updatedAt: '2023-01-03T00:00:00.000Z',
+            };
+            const localTask: Task = {
+                ...createMockTask('1', '2023-01-02'),
+                attachments: [localAttachment],
+            };
+            const incomingTask: Task = {
+                ...createMockTask('1', '2023-01-03'),
+                attachments: [incomingAttachment],
+            };
+
+            const merged = mergeAppData(mockAppData([localTask]), mockAppData([incomingTask]));
+            const attachment = merged.tasks[0].attachments?.find((item) => item.id === 'att-missing');
+            expect(attachment?.uri).toBe('/incoming/doc.txt');
+            expect(attachment?.cloudKey).toBe('attachments/att-missing.txt');
         });
 
         it('should preserve attachment deletions using attachment timestamps', () => {
@@ -369,6 +412,21 @@ describe('Sync Logic', () => {
 
             expect(merged.settings.theme).toBe('dark');
         });
+
+        it('keeps area tombstones so deletions sync across devices', () => {
+            const local: AppData = {
+                ...mockAppData(),
+                areas: [createMockArea('a1', '2023-01-01T00:00:00.000Z')],
+            };
+            const incoming: AppData = {
+                ...mockAppData(),
+                areas: [createMockArea('a1', '2023-01-03T00:00:00.000Z', '2023-01-03T00:00:00.000Z')],
+            };
+
+            const merged = mergeAppData(local, incoming);
+            expect(merged.areas).toHaveLength(1);
+            expect(merged.areas[0].deletedAt).toBe('2023-01-03T00:00:00.000Z');
+        });
     });
 
     describe('mergeAppDataWithStats', () => {
@@ -504,7 +562,7 @@ describe('Sync Logic', () => {
             expect(saved!.tasks.some((task) => task.id === 'old-purged')).toBe(true);
         });
 
-        it('does not write local when remote write fails', async () => {
+        it('writes local before remote and surfaces remote failures', async () => {
             let wroteLocal = false;
             let wroteRemote = false;
 
@@ -521,7 +579,22 @@ describe('Sync Logic', () => {
             })).rejects.toThrow('remote write failed');
 
             expect(wroteRemote).toBe(true);
-            expect(wroteLocal).toBe(false);
+            expect(wroteLocal).toBe(true);
+        });
+
+        it('does not write remote when local write fails', async () => {
+            let wroteRemote = false;
+            await expect(performSyncCycle({
+                readLocal: async () => mockAppData([createMockTask('1', '2024-01-01T00:00:00.000Z')]),
+                readRemote: async () => mockAppData(),
+                writeLocal: async () => {
+                    throw new Error('local write failed');
+                },
+                writeRemote: async () => {
+                    wroteRemote = true;
+                },
+            })).rejects.toThrow('local write failed');
+            expect(wroteRemote).toBe(false);
         });
 
         it('reports orchestration steps in order', async () => {
@@ -539,8 +612,8 @@ describe('Sync Logic', () => {
                 'read-local',
                 'read-remote',
                 'merge',
-                'write-remote',
                 'write-local',
+                'write-remote',
             ]);
         });
     });
