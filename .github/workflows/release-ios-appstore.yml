@@ -54,6 +54,9 @@ jobs:
           IOS_DISTRIBUTION_CERT: ${{ secrets.IOS_DISTRIBUTION_CERT }}
           IOS_DISTRIBUTION_CERT_PWD: ${{ secrets.IOS_DISTRIBUTION_CERT_PWD }}
           IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          IOS_ASC_KEY_ID: ${{ secrets.IOS_ASC_KEY_ID }}
+          IOS_ASC_ISSUER_ID: ${{ secrets.IOS_ASC_ISSUER_ID }}
+          IOS_ASC_PRIVATE_KEY: ${{ secrets.IOS_ASC_PRIVATE_KEY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           UPLOAD_TO_APP_STORE: ${{ github.event.inputs.upload || 'true' }}
@@ -63,6 +66,12 @@ jobs:
           for key in IOS_DISTRIBUTION_CERT IOS_DISTRIBUTION_CERT_PWD IOS_PROVISIONING_PROFILE; do
             if [ -z "${!key:-}" ]; then
               echo "::error::Missing required secret: $key"
+              missing=1
+            fi
+          done
+          for key in IOS_ASC_KEY_ID IOS_ASC_ISSUER_ID IOS_ASC_PRIVATE_KEY; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing required App Store Connect API secret: $key"
               missing=1
             fi
           done
@@ -79,6 +88,10 @@ jobs:
           fi
 
       - name: Resolve iOS version metadata
+        env:
+          IOS_ASC_KEY_ID: ${{ secrets.IOS_ASC_KEY_ID }}
+          IOS_ASC_ISSUER_ID: ${{ secrets.IOS_ASC_ISSUER_ID }}
+          IOS_ASC_PRIVATE_KEY: ${{ secrets.IOS_ASC_PRIVATE_KEY }}
         run: |
           set -euo pipefail
           APP_VERSION="$(jq -r '.expo.version // empty' apps/mobile/app.json)"
@@ -87,15 +100,68 @@ jobs:
             echo "::error::Missing expo.version in apps/mobile/app.json"
             exit 1
           fi
-          RUN_BUILD_NUMBER="$(( GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT ))"
-          if [[ "${APP_BUILD_NUMBER_BASE}" =~ ^[0-9]+$ ]]; then
-            if [ "${RUN_BUILD_NUMBER}" -le "${APP_BUILD_NUMBER_BASE}" ]; then
-              RUN_BUILD_NUMBER="$(( APP_BUILD_NUMBER_BASE + 1 ))"
+
+          b64url() {
+            openssl base64 -A | tr '+/' '-_' | tr -d '='
+          }
+
+          REMOTE_MAX_BUILD=0
+          if [ -n "${IOS_ASC_KEY_ID:-}" ] && [ -n "${IOS_ASC_ISSUER_ID:-}" ] && [ -n "${IOS_ASC_PRIVATE_KEY:-}" ]; then
+            KEY_PATH="$RUNNER_TEMP/ios-asc-key.p8"
+            if printf '%s' "$IOS_ASC_PRIVATE_KEY" | grep -q "BEGIN PRIVATE KEY"; then
+              printf '%s' "$IOS_ASC_PRIVATE_KEY" > "$KEY_PATH"
+            else
+              if ! printf '%s' "$IOS_ASC_PRIVATE_KEY" | tr -d '\r' | base64 --decode > "$KEY_PATH" 2>/dev/null; then
+                printf '%s' "$IOS_ASC_PRIVATE_KEY" | tr -d '\r' | base64 -D > "$KEY_PATH"
+              fi
             fi
+
+            NOW="$(date +%s)"
+            EXP="$((NOW + 1200))"
+            JWT_HEADER="$(printf '{"alg":"ES256","kid":"%s","typ":"JWT"}' "$IOS_ASC_KEY_ID" | b64url)"
+            JWT_PAYLOAD="$(printf '{"iss":"%s","iat":%s,"exp":%s,"aud":"appstoreconnect-v1"}' "$IOS_ASC_ISSUER_ID" "$NOW" "$EXP" | b64url)"
+            JWT_UNSIGNED="${JWT_HEADER}.${JWT_PAYLOAD}"
+            JWT_SIGNATURE="$(printf '%s' "$JWT_UNSIGNED" | openssl dgst -binary -sha256 -sign "$KEY_PATH" | b64url)"
+            ASC_TOKEN="${JWT_UNSIGNED}.${JWT_SIGNATURE}"
+
+            APP_LOOKUP_URL="https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]=${EXPECTED_BUNDLE_ID}&limit=1"
+            APP_LOOKUP_JSON="$(curl -fsSL -H "Authorization: Bearer ${ASC_TOKEN}" "$APP_LOOKUP_URL")"
+            APPSTORE_APP_ID="$(printf '%s' "$APP_LOOKUP_JSON" | jq -r '.data[0].id // empty')"
+
+            if [ -n "${APPSTORE_APP_ID}" ]; then
+              NEXT_URL="https://api.appstoreconnect.apple.com/v1/builds?filter[app]=${APPSTORE_APP_ID}&limit=200"
+              while [ -n "${NEXT_URL}" ]; do
+                BUILDS_JSON="$(curl -fsSL -H "Authorization: Bearer ${ASC_TOKEN}" "$NEXT_URL")"
+                PAGE_MAX="$(printf '%s' "$BUILDS_JSON" | jq -r '[.data[]?.attributes.version | select(type=="string") | select(test("^[0-9]+$")) | tonumber] | max // 0')"
+                if [ "${PAGE_MAX}" -gt "${REMOTE_MAX_BUILD}" ]; then
+                  REMOTE_MAX_BUILD="${PAGE_MAX}"
+                fi
+                NEXT_URL="$(printf '%s' "$BUILDS_JSON" | jq -r '.links.next // empty')"
+              done
+            else
+              echo "::warning::App Store Connect app lookup returned no app for bundle id ${EXPECTED_BUNDLE_ID}."
+            fi
+          else
+            echo "::warning::Remote max build lookup skipped. Set IOS_ASC_KEY_ID / IOS_ASC_ISSUER_ID / IOS_ASC_PRIVATE_KEY secrets."
           fi
+
+          LOCAL_MIN_BUILD=1
+          if [[ "${APP_BUILD_NUMBER_BASE}" =~ ^[0-9]+$ ]]; then
+            LOCAL_MIN_BUILD="$((APP_BUILD_NUMBER_BASE + 1))"
+          fi
+          REMOTE_MIN_BUILD="$((REMOTE_MAX_BUILD + 1))"
+          RUN_BUILD_NUMBER="$(( GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT ))"
+          FINAL_BUILD_NUMBER="${RUN_BUILD_NUMBER}"
+          if [ "${LOCAL_MIN_BUILD}" -gt "${FINAL_BUILD_NUMBER}" ]; then
+            FINAL_BUILD_NUMBER="${LOCAL_MIN_BUILD}"
+          fi
+          if [ "${REMOTE_MIN_BUILD}" -gt "${FINAL_BUILD_NUMBER}" ]; then
+            FINAL_BUILD_NUMBER="${REMOTE_MIN_BUILD}"
+          fi
+
           echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
-          echo "APP_BUILD_NUMBER=${RUN_BUILD_NUMBER}" >> "$GITHUB_ENV"
-          echo "Resolved iOS build number: ${RUN_BUILD_NUMBER}"
+          echo "APP_BUILD_NUMBER=${FINAL_BUILD_NUMBER}" >> "$GITHUB_ENV"
+          echo "Resolved iOS build number: ${FINAL_BUILD_NUMBER} (remote max: ${REMOTE_MAX_BUILD}, local base: ${APP_BUILD_NUMBER_BASE}, run-based: ${RUN_BUILD_NUMBER})"
 
       - name: Import iOS distribution certificate
         env:
