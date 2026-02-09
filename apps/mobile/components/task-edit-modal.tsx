@@ -107,6 +107,41 @@ const COMPACT_STATUS_LABELS: Record<TaskStatus, string> = {
     done: 'Done',
     archived: 'Archived',
 };
+const QUICK_TOKEN_LIMIT = 6;
+
+const parseTokenList = (value: string | undefined, tokenPrefix: '@' | '#'): string[] => {
+    if (!value) return [];
+    const tokens = value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .map((item) => {
+            if (item.startsWith(tokenPrefix)) return item;
+            const stripped = item.replace(/^[@#]+/, '').trim();
+            if (!stripped) return '';
+            return `${tokenPrefix}${stripped}`;
+        })
+        .filter(Boolean);
+
+    return Array.from(new Set(tokens));
+};
+
+const getActiveTokenQuery = (value: string | undefined, tokenPrefix: '@' | '#'): string => {
+    if (!value) return '';
+    const draft = value.split(',').pop()?.trim() ?? '';
+    if (!draft.startsWith(tokenPrefix)) return '';
+    return draft.slice(1).trim().toLowerCase();
+};
+
+const replaceTrailingToken = (value: string | undefined, token: string): string => {
+    const source = value ?? '';
+    const lastCommaIndex = source.lastIndexOf(',');
+    if (lastCommaIndex === -1) {
+        return `${token}, `;
+    }
+    const head = source.slice(0, lastCommaIndex + 1).trimEnd();
+    return `${head} ${token}, `;
+};
 
 const normalizeChecklistKey = (value: string): string => value.trim().toLowerCase();
 
@@ -223,6 +258,10 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     const [descriptionDraft, setDescriptionDraft] = useState('');
     const descriptionDraftRef = useRef('');
     const descriptionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [contextInputDraft, setContextInputDraft] = useState('');
+    const [tagInputDraft, setTagInputDraft] = useState('');
+    const [isContextInputFocused, setIsContextInputFocused] = useState(false);
+    const [isTagInputFocused, setIsTagInputFocused] = useState(false);
     const [linkModalVisible, setLinkModalVisible] = useState(false);
     const [audioModalVisible, setAudioModalVisible] = useState(false);
     const [audioAttachment, setAudioAttachment] = useState<Attachment | null>(null);
@@ -269,37 +308,12 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         return Array.from(new Set([...PRESET_TAGS, ...taskTags])).filter(Boolean);
     }, [tasks]);
 
-    // Compute most frequent tags (hashtags)
-    const suggestedHashtags = React.useMemo(() => {
-        const counts = new Map<string, number>();
-        tasks.forEach(t => {
-            t.tags?.forEach(tag => {
-                counts.set(tag, (counts.get(tag) || 0) + 1);
-            });
-        });
-
-        const sorted = Array.from(counts.entries())
-            .sort((a, b) => b[1] - a[1]) // Sort desc by count
-            .map(([tag]) => tag);
-
-        // Explicitly cast PRESET_TAGS to string[] or use it directly
-        // TS Error Fix: If PRESET_TAGS is constant tuple, spread works but type might need assertion
-        // But TS says "Cannot find name", so import is the key.
-        const unique = new Set([...sorted, ...PRESET_TAGS]);
-
-        return Array.from(unique).slice(0, MAX_SUGGESTED_TAGS);
-    }, [tasks]);
-
     const {
         copilotSuggestion,
         copilotApplied,
         copilotContext,
         copilotEstimate,
         copilotTags,
-        showAllContexts,
-        setShowAllContexts,
-        showAllTags,
-        setShowAllTags,
         resetCopilotDraft,
         resetCopilotState,
         applyCopilotSuggestion,
@@ -317,12 +331,66 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         setEditedTask,
     });
 
-    const visibleContextSuggestions = showAllContexts
-        ? suggestedTags
-        : suggestedTags.slice(0, MAX_VISIBLE_SUGGESTIONS);
-    const visibleTagSuggestions = showAllTags
-        ? suggestedHashtags
-        : suggestedHashtags.slice(0, MAX_VISIBLE_SUGGESTIONS);
+    const contextSuggestionPool = useMemo(() => {
+        const taskContexts = tasks.flatMap((item) => item.contexts || []);
+        return Array.from(new Set([...(editedTask.contexts ?? []), ...taskContexts]))
+            .filter((item): item is string => Boolean(item?.startsWith('@')));
+    }, [editedTask.contexts, tasks]);
+    const tagSuggestionPool = useMemo(() => {
+        const taskTags = tasks.flatMap((item) => item.tags || []);
+        return Array.from(new Set([...(editedTask.tags ?? []), ...taskTags]))
+            .filter((item): item is string => Boolean(item?.startsWith('#')));
+    }, [editedTask.tags, tasks]);
+
+    const contextTokenQuery = useMemo(
+        () => getActiveTokenQuery(contextInputDraft, '@'),
+        [contextInputDraft]
+    );
+    const tagTokenQuery = useMemo(
+        () => getActiveTokenQuery(tagInputDraft, '#'),
+        [tagInputDraft]
+    );
+    const contextTokenSuggestions = useMemo(() => {
+        if (!contextTokenQuery) return [];
+        const selected = new Set(parseTokenList(contextInputDraft, '@'));
+        return contextSuggestionPool
+            .filter((token) => token.slice(1).toLowerCase().includes(contextTokenQuery))
+            .filter((token) => !selected.has(token))
+            .slice(0, MAX_VISIBLE_SUGGESTIONS);
+    }, [contextInputDraft, contextSuggestionPool, contextTokenQuery]);
+    const tagTokenSuggestions = useMemo(() => {
+        if (!tagTokenQuery) return [];
+        const selected = new Set(parseTokenList(tagInputDraft, '#'));
+        return tagSuggestionPool
+            .filter((token) => token.slice(1).toLowerCase().includes(tagTokenQuery))
+            .filter((token) => !selected.has(token))
+            .slice(0, MAX_VISIBLE_SUGGESTIONS);
+    }, [tagInputDraft, tagSuggestionPool, tagTokenQuery]);
+    const frequentContextSuggestions = useMemo(
+        () => suggestedTags.slice(0, QUICK_TOKEN_LIMIT),
+        [suggestedTags]
+    );
+    const frequentTagSuggestions = useMemo(() => {
+        const counts = new Map<string, number>();
+        tasks.forEach((item) => {
+            item.tags?.forEach((tag) => {
+                if (!tag?.startsWith('#')) return;
+                counts.set(tag, (counts.get(tag) || 0) + 1);
+            });
+        });
+        const sorted = Array.from(counts.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([tag]) => tag);
+        return Array.from(new Set([...sorted, ...PRESET_TAGS])).slice(0, QUICK_TOKEN_LIMIT);
+    }, [tasks]);
+    const selectedContextTokens = useMemo(
+        () => new Set(parseTokenList(contextInputDraft, '@')),
+        [contextInputDraft]
+    );
+    const selectedTagTokens = useMemo(
+        () => new Set(parseTokenList(tagInputDraft, '#')),
+        [tagInputDraft]
+    );
 
     const resolveInitialTab = (target?: TaskEditTab, currentTask?: Task | null): TaskEditTab => {
         if (target) return target;
@@ -360,6 +428,10 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 const nextDescription = String(normalizedTask.description ?? '');
                 descriptionDraftRef.current = nextDescription;
                 setDescriptionDraft(nextDescription);
+                setContextInputDraft((normalizedTask.contexts ?? []).join(', '));
+                setTagInputDraft((normalizedTask.tags ?? []).join(', '));
+                setIsContextInputFocused(false);
+                setIsTagInputFocused(false);
                 setEditTab(resolveInitialTab(defaultTab, normalizedTask));
                 resetCopilotState();
             }
@@ -376,6 +448,10 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             setTitleDraft('');
             descriptionDraftRef.current = '';
             setDescriptionDraft('');
+            setContextInputDraft('');
+            setTagInputDraft('');
+            setIsContextInputFocused(false);
+            setIsTagInputFocused(false);
             setEditTab(resolveInitialTab(defaultTab, null));
             setCustomWeekdays([]);
         }
@@ -399,6 +475,22 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             }
         }
     }, [visible]);
+
+    useEffect(() => {
+        if (!visible || isContextInputFocused) return;
+        const normalized = (editedTask.contexts ?? []).join(', ');
+        if (contextInputDraft !== normalized) {
+            setContextInputDraft(normalized);
+        }
+    }, [contextInputDraft, editedTask.contexts, isContextInputFocused, visible]);
+
+    useEffect(() => {
+        if (!visible || isTagInputFocused) return;
+        const normalized = (editedTask.tags ?? []).join(', ');
+        if (tagInputDraft !== normalized) {
+            setTagInputDraft(normalized);
+        }
+    }, [editedTask.tags, isTagInputFocused, tagInputDraft, visible]);
 
     useEffect(() => () => {
         if (titleDebounceRef.current) {
@@ -1304,18 +1396,46 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         setCustomRecurrenceVisible(false);
     }, [customInterval, customMode, customOrdinal, customWeekday, customMonthDay, recurrenceStrategyValue, setEditedTask]);
 
-    const toggleContext = (tag: string) => {
-        const current = editedTask.contexts || [];
-        const exists = current.includes(tag);
-
-        let newContexts;
-        if (exists) {
-            newContexts = current.filter(t => t !== tag);
+    const updateContextInput = useCallback((text: string) => {
+        setContextInputDraft(text);
+        setEditedTask((prev) => ({ ...prev, contexts: parseTokenList(text, '@') }));
+    }, [setEditedTask]);
+    const updateTagInput = useCallback((text: string) => {
+        setTagInputDraft(text);
+        setEditedTask((prev) => ({ ...prev, tags: parseTokenList(text, '#') }));
+    }, [setEditedTask]);
+    const applyContextSuggestion = useCallback((token: string) => {
+        updateContextInput(replaceTrailingToken(contextInputDraft, token));
+    }, [contextInputDraft, updateContextInput]);
+    const applyTagSuggestion = useCallback((token: string) => {
+        updateTagInput(replaceTrailingToken(tagInputDraft, token));
+    }, [tagInputDraft, updateTagInput]);
+    const toggleQuickContextToken = useCallback((token: string) => {
+        const next = new Set(parseTokenList(contextInputDraft, '@'));
+        if (next.has(token)) {
+            next.delete(token);
         } else {
-            newContexts = [...current, tag];
+            next.add(token);
         }
-        setEditedTask(prev => ({ ...prev, contexts: newContexts }));
-    };
+        updateContextInput(Array.from(next).join(', '));
+    }, [contextInputDraft, updateContextInput]);
+    const toggleQuickTagToken = useCallback((token: string) => {
+        const next = new Set(parseTokenList(tagInputDraft, '#'));
+        if (next.has(token)) {
+            next.delete(token);
+        } else {
+            next.add(token);
+        }
+        updateTagInput(Array.from(next).join(', '));
+    }, [tagInputDraft, updateTagInput]);
+    const commitContextDraft = useCallback(() => {
+        setIsContextInputFocused(false);
+        updateContextInput(parseTokenList(contextInputDraft, '@').join(', '));
+    }, [contextInputDraft, updateContextInput]);
+    const commitTagDraft = useCallback(() => {
+        setIsTagInputFocused(false);
+        updateTagInput(parseTokenList(tagInputDraft, '#').join(', '));
+    }, [tagInputDraft, updateTagInput]);
 
     const handleDone = () => {
         void handleSave();
@@ -1565,12 +1685,12 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         styles.statusText,
         { color: active ? '#fff' : tc.secondaryText },
     ]);
-    const getSuggestionChipStyle = (active: boolean) => ([
-        styles.suggestionChip,
+    const getQuickTokenChipStyle = (active: boolean) => ([
+        styles.quickTokenChip,
         { backgroundColor: active ? tc.tint : tc.filterBg, borderColor: active ? tc.tint : tc.border },
     ]);
-    const getSuggestionTextStyle = (active: boolean) => ([
-        styles.suggestionText,
+    const getQuickTokenTextStyle = (active: boolean) => ([
+        styles.quickTokenText,
         { color: active ? '#fff' : tc.secondaryText },
     ]);
 
@@ -1706,41 +1826,46 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                         <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.contextsLabel')}</Text>
                         <TextInput
                             style={[styles.input, inputStyle]}
-                            value={editedTask.contexts?.join(', ')}
-                            onChangeText={(text) => setEditedTask(prev => ({
-                                ...prev,
-                                contexts: text.split(',').map(t => t.trim()).filter(Boolean)
-                            }))}
+                            value={contextInputDraft}
+                            onChangeText={updateContextInput}
+                            onFocus={() => setIsContextInputFocused(true)}
+                            onBlur={commitContextDraft}
                             placeholder="@home, @work"
                             autoCapitalize="none"
                             placeholderTextColor={tc.secondaryText}
                         />
-                        <View style={styles.suggestionsContainer}>
-                            <View style={styles.suggestionTags}>
-                                {visibleContextSuggestions.map(tag => {
-                                    const isActive = Boolean(editedTask.contexts?.includes(tag));
+                        {contextTokenSuggestions.length > 0 && (
+                            <View style={[styles.tokenSuggestionsMenu, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
+                                {contextTokenSuggestions.map((token, index) => (
+                                    <TouchableOpacity
+                                        key={token}
+                                        style={[
+                                            styles.tokenSuggestionItem,
+                                            index === contextTokenSuggestions.length - 1 ? styles.tokenSuggestionItemLast : null,
+                                        ]}
+                                        onPress={() => applyContextSuggestion(token)}
+                                    >
+                                        <Text style={[styles.tokenSuggestionText, { color: tc.text }]}>{token}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                        {frequentContextSuggestions.length > 0 && (
+                            <View style={styles.quickTokensRow}>
+                                {frequentContextSuggestions.map((token) => {
+                                    const isActive = selectedContextTokens.has(token);
                                     return (
                                         <TouchableOpacity
-                                            key={tag}
-                                            style={getSuggestionChipStyle(isActive)}
-                                            onPress={() => toggleContext(tag)}
+                                            key={token}
+                                            style={getQuickTokenChipStyle(isActive)}
+                                            onPress={() => toggleQuickContextToken(token)}
                                         >
-                                            <Text style={getSuggestionTextStyle(isActive)}>{tag}</Text>
+                                            <Text style={getQuickTokenTextStyle(isActive)}>{token}</Text>
                                         </TouchableOpacity>
                                     );
                                 })}
-                                {!showAllContexts && suggestedTags.length > MAX_VISIBLE_SUGGESTIONS && (
-                                    <TouchableOpacity
-                                        style={getSuggestionChipStyle(false)}
-                                        onPress={() => setShowAllContexts(true)}
-                                    >
-                                        <Text style={getSuggestionTextStyle(false)}>
-                                            +{suggestedTags.length - MAX_VISIBLE_SUGGESTIONS}
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
                             </View>
-                        </View>
+                        )}
                     </View>
                 );
             case 'tags':
@@ -1749,45 +1874,46 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                         <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.tagsLabel')}</Text>
                         <TextInput
                             style={[styles.input, inputStyle]}
-                            value={editedTask.tags?.join(', ')}
-                            onChangeText={(text) => setEditedTask(prev => ({
-                                ...prev,
-                                tags: text.split(',').map(t => t.trim()).filter(Boolean)
-                            }))}
+                            value={tagInputDraft}
+                            onChangeText={updateTagInput}
+                            onFocus={() => setIsTagInputFocused(true)}
+                            onBlur={commitTagDraft}
                             placeholder="#urgent, #idea"
                             autoCapitalize="none"
                             placeholderTextColor={tc.secondaryText}
                         />
-                        <View style={styles.suggestionsContainer}>
-                            <View style={styles.suggestionTags}>
-                                {visibleTagSuggestions.map(tag => {
-                                    const isActive = Boolean(editedTask.tags?.includes(tag));
+                        {tagTokenSuggestions.length > 0 && (
+                            <View style={[styles.tokenSuggestionsMenu, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
+                                {tagTokenSuggestions.map((token, index) => (
+                                    <TouchableOpacity
+                                        key={token}
+                                        style={[
+                                            styles.tokenSuggestionItem,
+                                            index === tagTokenSuggestions.length - 1 ? styles.tokenSuggestionItemLast : null,
+                                        ]}
+                                        onPress={() => applyTagSuggestion(token)}
+                                    >
+                                        <Text style={[styles.tokenSuggestionText, { color: tc.text }]}>{token}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                        {frequentTagSuggestions.length > 0 && (
+                            <View style={styles.quickTokensRow}>
+                                {frequentTagSuggestions.map((token) => {
+                                    const isActive = selectedTagTokens.has(token);
                                     return (
                                         <TouchableOpacity
-                                            key={tag}
-                                            style={getSuggestionChipStyle(isActive)}
-                                            onPress={() => {
-                                                const current = editedTask.tags || [];
-                                                const newTags = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
-                                                setEditedTask(prev => ({ ...prev, tags: newTags }));
-                                            }}
+                                            key={token}
+                                            style={getQuickTokenChipStyle(isActive)}
+                                            onPress={() => toggleQuickTagToken(token)}
                                         >
-                                            <Text style={getSuggestionTextStyle(isActive)}>{tag}</Text>
+                                            <Text style={getQuickTokenTextStyle(isActive)}>{token}</Text>
                                         </TouchableOpacity>
                                     );
                                 })}
-                                {!showAllTags && suggestedHashtags.length > MAX_VISIBLE_SUGGESTIONS && (
-                                    <TouchableOpacity
-                                        style={getSuggestionChipStyle(false)}
-                                        onPress={() => setShowAllTags(true)}
-                                    >
-                                        <Text style={getSuggestionTextStyle(false)}>
-                                            +{suggestedHashtags.length - MAX_VISIBLE_SUGGESTIONS}
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
                             </View>
-                        </View>
+                        )}
                     </View>
                 );
             case 'timeEstimate':

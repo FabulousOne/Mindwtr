@@ -88,25 +88,39 @@ export const styles = StyleSheet.create({
     startBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
     doneBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
     doneBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-    suggestionsContainer: { marginTop: 12 },
-    suggestionLabel: { fontSize: 12, color: '#888', marginBottom: 8 },
-    suggestionTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    suggestionChip: {
+    tokenSuggestionsMenu: {
+        marginTop: 8,
+        borderRadius: 10,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    tokenSuggestionItem: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(148, 163, 184, 0.2)',
+    },
+    tokenSuggestionItemLast: {
+        borderBottomWidth: 0,
+    },
+    tokenSuggestionText: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    quickTokensRow: {
+        marginTop: 10,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    quickTokenChip: {
         paddingHorizontal: 10,
-        paddingVertical: 5,
+        paddingVertical: 6,
         borderRadius: 14,
         borderWidth: 1,
     },
-    suggestionChipActive: {
-        backgroundColor: '#e8f2ff',
-        borderColor: '#007AFF',
-    },
-    suggestionText: {
+    quickTokenText: {
         fontSize: 13,
-        color: '#555',
-    },
-    suggestionTextActive: {
-        color: '#007AFF',
         fontWeight: '500',
     },
     checklistContainer: {
