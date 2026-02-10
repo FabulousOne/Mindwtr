@@ -447,13 +447,13 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
             stats.timestampAdjustmentIds.push(item.id);
         }
         if (stats.timestampAdjustments <= 5) {
-            logWarn('Normalized updatedAt before createdAt', {
+            logWarn('Normalized createdAt after updatedAt', {
                 scope: 'sync',
                 category: 'sync',
                 context: { id: item.id, createdAt: item.createdAt, updatedAt: item.updatedAt },
             });
         }
-        return { ...item, updatedAt: item.createdAt } as Item;
+        return { ...item, createdAt: item.updatedAt } as Item;
     };
 
     for (const id of allIds) {

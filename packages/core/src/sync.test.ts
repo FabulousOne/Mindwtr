@@ -433,6 +433,19 @@ describe('Sync Logic', () => {
             expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:04:00.000Z');
         });
 
+        it('normalizes invalid createdAt without rewriting updatedAt', () => {
+            const localProject: Project = {
+                ...createMockProject('p1', '2023-01-02T00:01:00.000Z'),
+                createdAt: '2023-01-02T00:05:00.000Z',
+            };
+            const { data, stats } = mergeAppDataWithStats(mockAppData([], [localProject]), mockAppData());
+
+            expect(data.projects).toHaveLength(1);
+            expect(data.projects[0].updatedAt).toBe('2023-01-02T00:01:00.000Z');
+            expect(data.projects[0].createdAt).toBe('2023-01-02T00:01:00.000Z');
+            expect(stats.projects.timestampAdjustments).toBe(1);
+        });
+
         it('should revive item if update is newer than deletion', () => {
             // This case implies "undo delete" or "re-edit" happened after delete on another device
             const local = mockAppData([createMockTask('1', '2023-01-01', '2023-01-01')]); // Deleted
