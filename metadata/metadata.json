@@ -30,7 +30,7 @@
           "完全离线可用，无需互联网连接",
           "完全开源，安全透明"
         ],
-        "ReleaseNotes": "• 修复了 0.6.10 中反馈的 Android 启动崩溃问题，并加强了应用初始化稳定性。\n• 修复了由旧通知响应导致的启动后误跳转到「回顾」页面问题。\n• 提升附件清理与跨设备删除同步可靠性，并新增按 Area 分组的参考资料视图。",
+        "ReleaseNotes": "• 修复了 Play 商店 Android 发行版启动时的 `undefined is not a function` 崩溃问题。\n• 提升了原生底部标签栏启动稳定性。\n• 为 Linux 仓库发布资产下载增加了 CI 重试机制。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "• Fixed Android startup crashes reported in 0.6.10 and hardened app initialization reliability.\n• Fixed unwanted launch-to-Review behavior caused by stale notification responses.\n• Improved cross-device attachment cleanup/deletion sync and added area-grouped References.",
+        "ReleaseNotes": "• Fixed a Play Store Android startup crash (`undefined is not a function`) in release builds.\n• Improved native tab bar startup stability.\n• Added retry handling for Linux repo release-asset download in CI.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -130,7 +130,7 @@
           "No requiere conexión a internet para funcionar",
           "Código abierto y transparente"
         ],
-        "ReleaseNotes": "• Se corrigieron fallos de inicio en Android reportados en 0.6.10 y se reforzó la estabilidad de inicialización.\n• Se corrigió la apertura no deseada en Review causada por respuestas antiguas de notificaciones.\n• Se mejoró la fiabilidad de limpieza/sincronización de adjuntos y se añadieron referencias agrupadas por Área.",
+        "ReleaseNotes": "• Se corrigió un fallo de inicio en Android de Play Store (`undefined is not a function`) en builds de release.\n• Se mejoró la estabilidad de inicio de la barra de pestañas nativa.\n• Se añadió reintento en CI para la descarga de assets del repositorio Linux.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
