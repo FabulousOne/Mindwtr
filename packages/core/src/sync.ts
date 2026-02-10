@@ -514,12 +514,13 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
                 if (Number.isFinite(deletedTimeRaw)) return deletedTimeRaw;
                 invalidDeletedAtWarnings += 1;
                 if (invalidDeletedAtWarnings <= 5) {
-                    logWarn('Invalid deletedAt timestamp during merge; falling back to updatedAt', {
+                    logWarn('Invalid deletedAt timestamp during merge; treating deletion as older than live updates', {
                         scope: 'sync',
                         category: 'sync',
                         context: { id: item.id, deletedAt: item.deletedAt },
                     });
                 }
+                return Number.NEGATIVE_INFINITY;
             }
             const updatedTimeRaw = item.updatedAt ? new Date(item.updatedAt).getTime() : NaN;
             return Number.isFinite(updatedTimeRaw) ? updatedTimeRaw : 0;

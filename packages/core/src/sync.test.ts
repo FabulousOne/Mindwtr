@@ -408,7 +408,7 @@ describe('Sync Logic', () => {
             expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:05:00.000Z');
         });
 
-        it('falls back to updatedAt when deletedAt is invalid', () => {
+        it('treats invalid deletedAt as older than a valid live update', () => {
             const local = mockAppData([
                 createMockTask('1', '2023-01-02T00:06:00.000Z', 'invalid-date'),
             ]);
@@ -419,8 +419,8 @@ describe('Sync Logic', () => {
             const merged = mergeAppData(local, incoming);
 
             expect(merged.tasks).toHaveLength(1);
-            expect(merged.tasks[0].deletedAt).toBe('invalid-date');
-            expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:06:00.000Z');
+            expect(merged.tasks[0].deletedAt).toBeUndefined();
+            expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:05:00.000Z');
         });
 
         it('prefers newer item when timestamps are within skew threshold', () => {
