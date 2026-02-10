@@ -72,8 +72,74 @@ jobs:
       - name: Build FOSS Android APK (Gradle, arm64-v8a only)
         working-directory: apps/mobile
         run: |
-          FOSS_BUILD=1 SKIP_FDROID_PREP=1 ARCHS=arm64-v8a bash ./scripts/android_build.sh
+          UNSIGNED_APK=1 FOSS_BUILD=1 SKIP_FDROID_PREP=1 ARCHS=arm64-v8a bash ./scripts/android_build.sh
           ls -la ./build
+
+      - name: Sign FOSS APK with release key
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for required in \
+            ANDROID_RELEASE_KEYSTORE_BASE64 \
+            ANDROID_RELEASE_KEY_ALIAS \
+            ANDROID_RELEASE_STORE_PASSWORD \
+            ANDROID_RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!required:-}" ]]; then
+              echo "::error::Missing required secret: ${required}" >&2
+              exit 1
+            fi
+          done
+
+          APK_PATH="$(ls apps/mobile/build/mindwtr-*-arm64-v8a-foss.apk | head -1)"
+          if [[ -z "${APK_PATH}" ]]; then
+            echo "No arm64 FOSS APK produced for signing" >&2
+            exit 1
+          fi
+
+          APKSIGNER_BIN="$(command -v apksigner || true)"
+          ZIPALIGN_BIN="$(command -v zipalign || true)"
+          if [[ -z "${APKSIGNER_BIN}" ]]; then
+            APKSIGNER_BIN="$(ls "${ANDROID_HOME}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)"
+          fi
+          if [[ -z "${ZIPALIGN_BIN}" ]]; then
+            ZIPALIGN_BIN="$(ls "${ANDROID_HOME}"/build-tools/*/zipalign 2>/dev/null | sort -V | tail -1)"
+          fi
+          if [[ -z "${APKSIGNER_BIN}" || -z "${ZIPALIGN_BIN}" ]]; then
+            echo "apksigner/zipalign not found in Android SDK build-tools" >&2
+            exit 1
+          fi
+
+          KEYSTORE_PATH="${RUNNER_TEMP}/android-release.keystore"
+          printf '%s' "${ANDROID_RELEASE_KEYSTORE_BASE64}" | base64 --decode > "${KEYSTORE_PATH}"
+
+          UNSIGNED_APK="${RUNNER_TEMP}/mindwtr-foss-unsigned.apk"
+          ALIGNED_APK="${RUNNER_TEMP}/mindwtr-foss-aligned.apk"
+          SIGNED_APK="${RUNNER_TEMP}/mindwtr-foss-signed.apk"
+
+          cp "${APK_PATH}" "${UNSIGNED_APK}"
+          "${ZIPALIGN_BIN}" -f -p 4 "${UNSIGNED_APK}" "${ALIGNED_APK}"
+
+          "${APKSIGNER_BIN}" sign \
+            --ks "${KEYSTORE_PATH}" \
+            --ks-key-alias "${ANDROID_RELEASE_KEY_ALIAS}" \
+            --ks-pass "pass:${ANDROID_RELEASE_STORE_PASSWORD}" \
+            --key-pass "pass:${ANDROID_RELEASE_KEY_PASSWORD}" \
+            --out "${SIGNED_APK}" \
+            "${ALIGNED_APK}"
+
+          mv "${SIGNED_APK}" "${APK_PATH}"
+
+          SIG_REPORT="${RUNNER_TEMP}/mindwtr-foss-signature.txt"
+          "${APKSIGNER_BIN}" verify --verbose --print-certs "${APK_PATH}" | tee "${SIG_REPORT}"
+          if grep -q "CN=Android Debug" "${SIG_REPORT}"; then
+            echo "Debug certificate detected in final APK signer chain" >&2
+            exit 1
+          fi
+          echo "FOSS APK signed with release key."
 
       - name: Verify FOSS permission cleanup
         run: |
