@@ -539,6 +539,12 @@ function handleNotificationResponse(api: NotificationsApi, response: Notificatio
   }
 }
 
+async function clearLastNotificationResponse(api: NotificationsApi): Promise<void> {
+  const clearFn = (api as unknown as { clearLastNotificationResponseAsync?: () => Promise<void> }).clearLastNotificationResponseAsync;
+  if (typeof clearFn !== 'function') return;
+  await clearFn().catch((error) => logNotificationError('Failed to clear last notification response', error));
+}
+
 export async function startMobileNotifications() {
   if (started) return;
   started = true;
@@ -627,12 +633,14 @@ export async function startMobileNotifications() {
   responseSubscription?.remove();
   responseSubscription = api.addNotificationResponseReceivedListener((response: NotificationResponse) => {
     handleNotificationResponse(api, response);
+    void clearLastNotificationResponse(api);
   });
   if (typeof api.getLastNotificationResponseAsync === 'function') {
     api.getLastNotificationResponseAsync()
       .then((response) => {
         if (!response) return;
         handleNotificationResponse(api, response as NotificationResponse);
+        void clearLastNotificationResponse(api);
       })
       .catch((error) => logNotificationError('Failed to read last notification response', error));
   }
