@@ -2,8 +2,8 @@ import { RefObject, useEffect, useState } from 'react';
 
 type UseDropdownPositionOptions = {
     open: boolean;
-    containerRef: RefObject<HTMLElement>;
-    dropdownRef: RefObject<HTMLElement>;
+    containerRef: RefObject<HTMLElement | null>;
+    dropdownRef: RefObject<HTMLElement | null>;
 };
 
 const MIN_LIST_HEIGHT = 120;

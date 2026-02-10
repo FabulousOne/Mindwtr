@@ -1,9 +1,9 @@
 import { useCallback, useMemo } from 'react';
-import type { Task, TaskEditorFieldId, TaskPriority, RecurrenceRule, TimeEstimate } from '@mindwtr/core';
+import type { AppData, Task, TaskEditorFieldId, TaskPriority, RecurrenceRule, TimeEstimate } from '@mindwtr/core';
 import { DEFAULT_TASK_EDITOR_HIDDEN, DEFAULT_TASK_EDITOR_ORDER } from './task-item-helpers';
 
 type UseTaskItemFieldLayoutParams = {
-    settings: Record<string, any> | undefined;
+    settings: AppData['settings'] | undefined;
     task: Task;
     editProjectId: string;
     editSectionId: string;

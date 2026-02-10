@@ -1,4 +1,4 @@
-import { useMemo, useState, memo, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useState, memo, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import {
     shallow,
     useTaskStore,
@@ -889,9 +889,9 @@ export const TaskItem = memo(function TaskItem({
                 <ConfirmModal
                     isOpen={showDeleteConfirm}
                     title={resolveText('common.delete', 'Delete task')}
-                    message={resolveText('list.confirmBatchDelete', 'Delete selected tasks?')}
+                    description={resolveText('list.confirmBatchDelete', 'Delete selected tasks?')}
                     confirmLabel={resolveText('common.delete', 'Delete')}
-                    destructive
+                    cancelLabel={t('common.cancel')}
                     onCancel={() => setShowDeleteConfirm(false)}
                     onConfirm={() => {
                         setShowDeleteConfirm(false);
