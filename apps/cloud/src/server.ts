@@ -164,6 +164,9 @@ function isAuthorizedToken(token: string, allowedTokens: Set<string> | null): bo
 }
 
 function toRateLimitRoute(pathname: string): string {
+    if (/^\/v1\/attachments\/.+/.test(pathname)) {
+        return '/v1/attachments/:path';
+    }
     if (/^\/v1\/tasks\/[^/]+\/(complete|archive)$/.test(pathname)) {
         return '/v1/tasks/:id/:action';
     }
@@ -370,19 +373,40 @@ export const __cloudTestUtils = {
     isPathWithinRoot,
 };
 
-async function main() {
+type CloudServerOptions = {
+    port?: number;
+    host?: string;
+    dataDir?: string;
+    windowMs?: number;
+    maxPerWindow?: number;
+    maxAttachmentPerWindow?: number;
+    maxBodyBytes?: number;
+    maxAttachmentBytes?: number;
+    allowedAuthTokens?: Set<string> | null;
+};
+
+type CloudServerHandle = {
+    stop: () => void;
+    port: number;
+};
+
+export async function startCloudServer(options: CloudServerOptions = {}): Promise<CloudServerHandle> {
     const flags = parseArgs(process.argv.slice(2));
-    const port = Number(flags.port || process.env.PORT || 8787);
-    const host = String(flags.host || process.env.HOST || '0.0.0.0');
-    const dataDir = String(process.env.MINDWTR_CLOUD_DATA_DIR || join(process.cwd(), 'data'));
+    const port = Number(options.port ?? flags.port ?? process.env.PORT ?? 8787);
+    const host = String(options.host ?? flags.host ?? process.env.HOST ?? '0.0.0.0');
+    const dataDir = String(options.dataDir ?? process.env.MINDWTR_CLOUD_DATA_DIR ?? join(process.cwd(), 'data'));
 
     const rateLimits = new Map<string, RateLimitState>();
-    const windowMs = Number(process.env.MINDWTR_CLOUD_RATE_WINDOW_MS || 60_000);
-    const maxPerWindow = Number(process.env.MINDWTR_CLOUD_RATE_MAX || 120);
-    const maxAttachmentPerWindow = Number(process.env.MINDWTR_CLOUD_ATTACHMENT_RATE_MAX || maxPerWindow);
-    const maxBodyBytes = Number(process.env.MINDWTR_CLOUD_MAX_BODY_BYTES || 2_000_000);
-    const maxAttachmentBytes = Number(process.env.MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES || 50_000_000);
-    const allowedAuthTokens = parseAllowedAuthTokens(process.env.MINDWTR_CLOUD_AUTH_TOKENS);
+    const windowMs = Number(options.windowMs ?? process.env.MINDWTR_CLOUD_RATE_WINDOW_MS ?? 60_000);
+    const maxPerWindow = Number(options.maxPerWindow ?? process.env.MINDWTR_CLOUD_RATE_MAX ?? 120);
+    const maxAttachmentPerWindow = Number(
+        options.maxAttachmentPerWindow ?? process.env.MINDWTR_CLOUD_ATTACHMENT_RATE_MAX ?? maxPerWindow
+    );
+    const maxBodyBytes = Number(options.maxBodyBytes ?? process.env.MINDWTR_CLOUD_MAX_BODY_BYTES ?? 2_000_000);
+    const maxAttachmentBytes = Number(
+        options.maxAttachmentBytes ?? process.env.MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES ?? 50_000_000
+    );
+    const allowedAuthTokens = options.allowedAuthTokens ?? parseAllowedAuthTokens(process.env.MINDWTR_CLOUD_AUTH_TOKENS);
     const encoder = new TextEncoder();
     const writeLocks = new Map<string, Promise<void>>();
     const withWriteLock = async <T>(key: string, fn: () => Promise<T>) => {
@@ -413,11 +437,11 @@ async function main() {
         });
     }
     if (!ensureWritableDir(dataDir)) {
-        process.exit(1);
+        throw new Error(`Cloud data directory is not writable: ${dataDir}`);
     }
     logInfo(`listening on http://${host}:${port}`);
 
-    Bun.serve({
+    const server = Bun.serve({
         hostname: host,
         port,
         async fetch(req) {
@@ -787,11 +811,23 @@ async function main() {
             }
         },
     });
+
+    return {
+        port: server.port,
+        stop: () => {
+            clearInterval(cleanupTimer);
+            try {
+                (server as { stop?: (closeIdleConnections?: boolean) => void }).stop?.(true);
+            } catch {
+                // Ignore stop errors during teardown.
+            }
+        },
+    };
 }
 
 const isMainModule = typeof Bun !== 'undefined' && (import.meta as ImportMeta & { main?: boolean }).main === true;
 if (isMainModule) {
-    main().catch((err) => {
+    startCloudServer().catch((err) => {
         logError('Failed to start server', err);
         process.exit(1);
     });

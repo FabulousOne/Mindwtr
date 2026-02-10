@@ -1,5 +1,8 @@
-import { describe, expect, test } from 'bun:test';
-import { __cloudTestUtils } from './server';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { mkdtempSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { __cloudTestUtils, startCloudServer } from './server';
 
 describe('cloud server utils', () => {
     test('parses bearer token and hashes it', () => {
@@ -88,5 +91,178 @@ describe('cloud server utils', () => {
         expect(__cloudTestUtils.isPathWithinRoot('/data/ns/attachments/file.txt', '/data/ns/attachments')).toBe(true);
         expect(__cloudTestUtils.isPathWithinRoot('/data/ns/attachments', '/data/ns/attachments')).toBe(true);
         expect(__cloudTestUtils.isPathWithinRoot('/data/ns/attachments-evil/file.txt', '/data/ns/attachments')).toBe(false);
+    });
+});
+
+describe('cloud server api', () => {
+    let dataDir = '';
+    let baseUrl = '';
+    let stopServer: (() => void) | null = null;
+
+    const authHeaders = {
+        Authorization: 'Bearer integration-token',
+    };
+
+    beforeEach(async () => {
+        dataDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-test-'));
+        const server = await startCloudServer({
+            host: '127.0.0.1',
+            port: 0,
+            dataDir,
+            windowMs: 10_000,
+            maxPerWindow: 1_000,
+            maxAttachmentPerWindow: 1_000,
+            allowedAuthTokens: new Set(['integration-token']),
+        });
+        baseUrl = `http://127.0.0.1:${server.port}`;
+        stopServer = server.stop;
+    });
+
+    afterEach(() => {
+        stopServer?.();
+        stopServer = null;
+        if (dataDir) {
+            rmSync(dataDir, { recursive: true, force: true });
+        }
+        dataDir = '';
+        baseUrl = '';
+    });
+
+    test('supports task CRUD and soft delete flow', async () => {
+        const createResponse = await fetch(`${baseUrl}/v1/tasks`, {
+            method: 'POST',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({ title: 'Cloud Task' }),
+        });
+        expect(createResponse.status).toBe(201);
+        const createdJson = await createResponse.json();
+        const taskId = createdJson.task.id as string;
+        expect(taskId).toBeTruthy();
+
+        const patchResponse = await fetch(`${baseUrl}/v1/tasks/${encodeURIComponent(taskId)}`, {
+            method: 'PATCH',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({ title: 'Updated Cloud Task' }),
+        });
+        expect(patchResponse.status).toBe(200);
+
+        const getResponse = await fetch(`${baseUrl}/v1/tasks/${encodeURIComponent(taskId)}`, {
+            headers: authHeaders,
+        });
+        expect(getResponse.status).toBe(200);
+        const getJson = await getResponse.json();
+        expect(getJson.task.title).toBe('Updated Cloud Task');
+
+        const deleteResponse = await fetch(`${baseUrl}/v1/tasks/${encodeURIComponent(taskId)}`, {
+            method: 'DELETE',
+            headers: authHeaders,
+        });
+        expect(deleteResponse.status).toBe(200);
+
+        const listDeleted = await fetch(`${baseUrl}/v1/tasks?deleted=1&all=1`, {
+            headers: authHeaders,
+        });
+        expect(listDeleted.status).toBe(200);
+        const deletedJson = await listDeleted.json();
+        const deletedTask = (deletedJson.tasks as Array<{ id: string; deletedAt?: string }>).find((task) => task.id === taskId);
+        expect(deletedTask?.deletedAt).toBeTruthy();
+    });
+
+    test('supports attachment upload/download/delete endpoints', async () => {
+        const payload = new TextEncoder().encode('attachment-bytes');
+        const putResponse = await fetch(`${baseUrl}/v1/attachments/folder/file.bin`, {
+            method: 'PUT',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/octet-stream',
+            },
+            body: payload,
+        });
+        expect(putResponse.status).toBe(200);
+
+        const getResponse = await fetch(`${baseUrl}/v1/attachments/folder/file.bin`, {
+            headers: authHeaders,
+        });
+        expect(getResponse.status).toBe(200);
+        const downloaded = new Uint8Array(await getResponse.arrayBuffer());
+        expect(Array.from(downloaded)).toEqual(Array.from(payload));
+
+        const deleteResponse = await fetch(`${baseUrl}/v1/attachments/folder/file.bin`, {
+            method: 'DELETE',
+            headers: authHeaders,
+        });
+        expect(deleteResponse.status).toBe(200);
+
+        const missingResponse = await fetch(`${baseUrl}/v1/attachments/folder/file.bin`, {
+            headers: authHeaders,
+        });
+        expect(missingResponse.status).toBe(404);
+    });
+
+    test('applies attachment endpoint rate limits', async () => {
+        stopServer?.();
+        const server = await startCloudServer({
+            host: '127.0.0.1',
+            port: 0,
+            dataDir,
+            windowMs: 60_000,
+            maxPerWindow: 1_000,
+            maxAttachmentPerWindow: 1,
+            allowedAuthTokens: new Set(['integration-token']),
+        });
+        baseUrl = `http://127.0.0.1:${server.port}`;
+        stopServer = server.stop;
+
+        const first = await fetch(`${baseUrl}/v1/attachments/rate/file1.bin`, {
+            method: 'PUT',
+            headers: authHeaders,
+            body: new TextEncoder().encode('a'),
+        });
+        expect(first.status).toBe(200);
+
+        const second = await fetch(`${baseUrl}/v1/attachments/rate/file2.bin`, {
+            method: 'PUT',
+            headers: authHeaders,
+            body: new TextEncoder().encode('b'),
+        });
+        expect(second.status).toBe(429);
+    });
+
+    test('serializes concurrent task writes without dropping records', async () => {
+        const requests: Array<Promise<Response>> = [];
+        for (let i = 0; i < 20; i += 1) {
+            requests.push(fetch(`${baseUrl}/v1/tasks`, {
+                method: 'POST',
+                headers: {
+                    ...authHeaders,
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({ title: `Task ${i}` }),
+            }));
+        }
+        const responses = await Promise.all(requests);
+        const createdIds = new Set<string>();
+        for (const response of responses) {
+            expect(response.status).toBe(201);
+            const createdJson = await response.json();
+            createdIds.add(String(createdJson.task?.id || ''));
+        }
+        expect(createdIds.size).toBe(20);
+
+        const tasksResponse = await fetch(`${baseUrl}/v1/tasks?all=1`, {
+            headers: authHeaders,
+        });
+        expect(tasksResponse.status).toBe(200);
+        const tasksJson = await tasksResponse.json();
+        const taskIds = new Set((tasksJson.tasks as Array<{ id: string }>).map((task) => task.id));
+        for (const id of createdIds) {
+            expect(taskIds.has(id)).toBe(true);
+        }
     });
 });
