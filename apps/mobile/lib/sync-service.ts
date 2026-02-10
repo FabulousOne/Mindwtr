@@ -176,6 +176,9 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
     let localSnapshotChangeAt = useTaskStore.getState().lastDataChangeAt;
     let networkWentOffline = false;
     let networkSubscription: { remove?: () => void } | null = null;
+    const requestAbortController = new AbortController();
+    const fetchWithAbort: typeof fetch = (input, init) =>
+      fetch(input, { ...(init || {}), signal: requestAbortController.signal });
     const ensureLocalSnapshotFresh = () => {
       if (useTaskStore.getState().lastDataChangeAt > localSnapshotChangeAt) {
         syncQueued = true;
@@ -185,10 +188,12 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
     const ensureNetworkStillAvailable = async () => {
       if (backend !== 'webdav' && backend !== 'cloud') return;
       if (networkWentOffline) {
+        requestAbortController.abort();
         throw new Error('Sync paused: offline state detected');
       }
       if (await shouldSkipSyncForOfflineState(backend)) {
         networkWentOffline = true;
+        requestAbortController.abort();
         throw new Error('Sync paused: offline state detected');
       }
     };
@@ -203,6 +208,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
           })();
           if (isAirplaneModeEnabled || !isInternetReachable) {
             networkWentOffline = true;
+            requestAbortController.abort();
           }
         });
       } catch (error) {
@@ -289,6 +295,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
                   username: webdavConfig.username,
                   password: webdavConfig.password,
                   timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+                  fetcher: fetchWithAbort,
                 }),
               WEBDAV_RETRY_OPTIONS
             );
@@ -297,6 +304,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
             return await cloudGetJson<AppData>(cloudConfig.url, {
               token: cloudConfig.token,
               timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+              fetcher: fetchWithAbort,
             });
           }
           if (!fileSyncPath) {
@@ -321,6 +329,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
                   username: webdavConfig.username,
                   password: webdavConfig.password,
                   timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+                  fetcher: fetchWithAbort,
                 }),
               WEBDAV_RETRY_OPTIONS
             );
@@ -328,7 +337,11 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
           }
           if (backend === 'cloud') {
             if (!cloudConfig?.url) throw new Error('Self-hosted URL not configured');
-            await cloudPutJson(cloudConfig.url, sanitized, { token: cloudConfig.token, timeoutMs: DEFAULT_SYNC_TIMEOUT_MS });
+            await cloudPutJson(cloudConfig.url, sanitized, {
+              token: cloudConfig.token,
+              timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+              fetcher: fetchWithAbort,
+            });
             return;
           }
           if (!fileSyncPath) throw new Error('No sync folder configured');
@@ -466,12 +479,14 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
                     username: webdavConfigValue.username,
                     password: webdavConfigValue.password,
                     timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+                    fetcher: fetchWithAbort,
                   });
                 } else if (isCloudBackend && cloudConfigValue) {
                   const baseSyncUrl = getCloudBaseUrl(cloudConfigValue.url);
                   await cloudDeleteFile(`${baseSyncUrl}/${attachment.cloudKey}`, {
                     token: cloudConfigValue.token,
                     timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+                    fetcher: fetchWithAbort,
                   });
                 } else if (fileBaseDir) {
                   const targetPath = `${fileBaseDir}/${attachment.cloudKey}`;
