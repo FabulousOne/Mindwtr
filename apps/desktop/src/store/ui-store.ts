@@ -7,8 +7,18 @@ interface UiState {
     isFocusMode: boolean;
     setFocusMode: (value: boolean) => void;
     toggleFocusMode: () => void;
-    toasts: Array<{ id: string; message: string; tone: 'success' | 'error' | 'info' }>;
-    showToast: (message: string, tone?: 'success' | 'error' | 'info', durationMs?: number) => void;
+    toasts: Array<{
+        id: string;
+        message: string;
+        tone: 'success' | 'error' | 'info';
+        action?: { label: string; onClick: () => void };
+    }>;
+    showToast: (
+        message: string,
+        tone?: 'success' | 'error' | 'info',
+        durationMs?: number,
+        action?: { label: string; onClick: () => void }
+    ) => void;
     dismissToast: (id: string) => void;
     listFilters: {
         tokens: string[];
@@ -40,9 +50,9 @@ export const useUiStore = create<UiState>((set) => ({
     setFocusMode: (value) => set({ isFocusMode: value }),
     toggleFocusMode: () => set((state) => ({ isFocusMode: !state.isFocusMode })),
     toasts: [],
-    showToast: (message, tone = 'info', durationMs = 3000) => {
+    showToast: (message, tone = 'info', durationMs = 3000, action) => {
         const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        set((state) => ({ toasts: [...state.toasts, { id, message, tone }] }));
+        set((state) => ({ toasts: [...state.toasts, { id, message, tone, action }] }));
         const timeoutId = window.setTimeout(() => {
             toastTimeouts.delete(id);
             set((state) => ({ toasts: state.toasts.filter((toast) => toast.id !== id) }));

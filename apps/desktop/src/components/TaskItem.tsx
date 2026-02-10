@@ -97,6 +97,7 @@ export const TaskItem = memo(function TaskItem({
         settings,
         duplicateTask,
         resetTaskChecklist,
+        restoreTask,
         highlightTaskId,
         setHighlightTask,
         addProject,
@@ -115,6 +116,7 @@ export const TaskItem = memo(function TaskItem({
             settings: state.settings,
             duplicateTask: state.duplicateTask,
             resetTaskChecklist: state.resetTaskChecklist,
+            restoreTask: state.restoreTask,
             highlightTaskId: state.highlightTaskId,
             setHighlightTask: state.setHighlightTask,
             addProject: state.addProject,
@@ -129,10 +131,12 @@ export const TaskItem = memo(function TaskItem({
         setSelectedProjectId,
         editingTaskId,
         setEditingTaskId,
+        showToast,
     } = useUiStore((state) => ({
         setSelectedProjectId: (value: string | null) => state.setProjectView({ selectedProjectId: value }),
         editingTaskId: state.editingTaskId,
         setEditingTaskId: state.setEditingTaskId,
+        showToast: state.showToast,
     }));
     const { t } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
@@ -1051,6 +1055,19 @@ export const TaskItem = memo(function TaskItem({
                     onConfirm={() => {
                         setShowDeleteConfirm(false);
                         void deleteTask(task.id);
+                        const restoreLabel = t('trash.restoreToInbox') === 'trash.restoreToInbox' ? 'Restore' : t('trash.restoreToInbox');
+                        const deletedMessage = t('task.aria.delete') === 'task.aria.delete' ? 'Task deleted' : t('task.aria.delete');
+                        showToast(
+                            deletedMessage,
+                            'info',
+                            5000,
+                            {
+                                label: restoreLabel,
+                                onClick: () => {
+                                    void restoreTask(task.id);
+                                },
+                            }
+                        );
                     }}
                 />
             )}
