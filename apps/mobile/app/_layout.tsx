@@ -96,7 +96,7 @@ function RootLayoutContent() {
         if (shouldShow) {
           lastSyncErrorShown.current = result.error;
           lastSyncErrorAt.current = nowMs;
-          Alert.alert('Sync failed', result.error);
+          Alert.alert('Sync failed', 'Please check your sync settings and try again.');
         }
       }
     })().finally(() => {
