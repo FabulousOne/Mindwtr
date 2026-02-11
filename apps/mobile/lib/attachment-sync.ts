@@ -453,8 +453,10 @@ const resolveSafSyncDir = async (syncUri: string): Promise<{ type: 'saf'; dirUri
   const prefix = prefixMatch[1];
   const treeMatch = syncUri.match(/\/tree\/([^/]+)/);
   let parentTreeUri: string | null = null;
+  let parentDocumentUri: string | null = null;
   if (treeMatch) {
     parentTreeUri = `${prefix}/tree/${treeMatch[1]}`;
+    parentDocumentUri = `${parentTreeUri}/document/${treeMatch[1]}`;
   } else {
     const docMatch = syncUri.match(/\/document\/([^/]+)/);
     if (!docMatch) return null;
@@ -466,32 +468,46 @@ const resolveSafSyncDir = async (syncUri: string): Promise<{ type: 'saf'; dirUri
     const lastSlash = path.lastIndexOf('/');
     const parentPath = lastSlash >= 0 ? path.slice(0, lastSlash) : '';
     const parentId = parentPath ? `${volume}${parentPath}` : volume;
-    parentTreeUri = `${prefix}/tree/${encodeURIComponent(parentId)}`;
+    const parentIdEncoded = encodeURIComponent(parentId);
+    parentTreeUri = `${prefix}/tree/${parentIdEncoded}`;
+    parentDocumentUri = `${parentTreeUri}/document/${parentIdEncoded}`;
   }
   if (!parentTreeUri) return null;
+  const directoryCandidates = parentDocumentUri ? [parentDocumentUri, parentTreeUri] : [parentTreeUri];
   let attachmentsDirUri: string | null = null;
-  try {
-    const entries = await StorageAccessFramework.readDirectoryAsync(parentTreeUri);
-    const decoded: Array<{ entry: string; decoded: string }> = entries.map((entry: string) => ({
-      entry,
-      decoded: decodeURIComponent(entry),
-    }));
-    const matchEntry = decoded.find((item) =>
-      item.decoded.endsWith(`/${ATTACHMENTS_DIR_NAME}`) || item.decoded.endsWith(`:${ATTACHMENTS_DIR_NAME}`)
-    );
-    attachmentsDirUri = matchEntry?.entry ?? null;
-  } catch (error) {
-    logAttachmentWarn('Failed to read SAF directory for attachments', error);
+  for (const candidate of directoryCandidates) {
+    try {
+      const entries = await StorageAccessFramework.readDirectoryAsync(candidate);
+      const decoded: Array<{ entry: string; decoded: string }> = entries.map((entry: string) => ({
+        entry,
+        decoded: decodeURIComponent(entry),
+      }));
+      const matchEntry = decoded.find((item) =>
+        item.decoded.endsWith(`/${ATTACHMENTS_DIR_NAME}`) || item.decoded.endsWith(`:${ATTACHMENTS_DIR_NAME}`)
+      );
+      attachmentsDirUri = matchEntry?.entry ?? null;
+      if (attachmentsDirUri) break;
+    } catch (error) {
+      // Continue to fallback URI variant before logging.
+      if (candidate === directoryCandidates[directoryCandidates.length - 1]) {
+        logAttachmentWarn('Failed to read SAF directory for attachments', error);
+      }
+    }
   }
   if (!attachmentsDirUri) {
-    try {
-      attachmentsDirUri = await StorageAccessFramework.makeDirectoryAsync(parentTreeUri, ATTACHMENTS_DIR_NAME);
-    } catch (error) {
-      logAttachmentWarn('Failed to create SAF attachments directory', error);
+    for (const candidate of directoryCandidates) {
+      try {
+        attachmentsDirUri = await StorageAccessFramework.makeDirectoryAsync(candidate, ATTACHMENTS_DIR_NAME);
+        if (attachmentsDirUri) break;
+      } catch (error) {
+        if (candidate === directoryCandidates[directoryCandidates.length - 1]) {
+          logAttachmentWarn('Failed to create SAF attachments directory', error);
+        }
+      }
     }
   }
   if (!attachmentsDirUri) return null;
-  return { type: 'saf', dirUri: parentTreeUri, attachmentsDirUri };
+  return { type: 'saf', dirUri: directoryCandidates[0], attachmentsDirUri };
 };
 
 const resolveFileSyncDir = async (

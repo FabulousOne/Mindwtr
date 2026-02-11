@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppData, Attachment, MergeStats, useTaskStore, webdavGetJson, webdavPutJson, cloudGetJson, cloudPutJson, flushPendingSave, performSyncCycle, findOrphanedAttachments, removeOrphanedAttachmentsFromData, webdavDeleteFile, cloudDeleteFile, CLOCK_SKEW_THRESHOLD_MS, appendSyncHistory, withRetry, normalizeWebdavUrl, normalizeCloudUrl, sanitizeAppDataForRemote, injectExternalCalendars as injectExternalCalendarsForSync, persistExternalCalendars as persistExternalCalendarsForSync, mergeAppData, cloneAppData } from '@mindwtr/core';
 import { mobileStorage } from './storage-adapter';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
-import { readSyncFile, writeSyncFile } from './storage-file';
+import { readSyncFile, resolveSyncFileUri, writeSyncFile } from './storage-file';
 import { getBaseSyncUrl, getCloudBaseUrl, syncCloudAttachments, syncFileAttachments, syncWebdavAttachments, cleanupAttachmentTempFiles } from './attachment-sync';
 import { getExternalCalendars, saveExternalCalendars } from './external-calendar';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -226,7 +226,19 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         if (!fileSyncPath) {
           return { success: true };
         }
-        if (!fileSyncPath.startsWith('content://') && !isSyncFilePath(fileSyncPath)) {
+        if (fileSyncPath.startsWith('content://')) {
+          try {
+            const resolvedPath = await resolveSyncFileUri(fileSyncPath, { createIfMissing: true });
+            if (resolvedPath && resolvedPath !== fileSyncPath) {
+              await AsyncStorage.setItem(SYNC_PATH_KEY, resolvedPath);
+              syncConfigCache.set(SYNC_PATH_KEY, { value: resolvedPath, readAt: Date.now() });
+              logSyncInfo('Normalized SAF sync path');
+              fileSyncPath = resolvedPath;
+            }
+          } catch (error) {
+            logSyncWarning('Failed to normalize SAF sync path', error);
+          }
+        } else if (!isSyncFilePath(fileSyncPath)) {
           const trimmed = fileSyncPath.replace(/\/+$/, '');
           fileSyncPath = `${trimmed}/${SYNC_FILE_NAME}`;
         }
