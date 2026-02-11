@@ -1,0 +1,3 @@
+- Se mejoro el area tactil de la barra inferior en iOS.
+- Se corrigio la duplicacion de notificaciones de resumen matutino/nocturno en Android.
+- Se mejoro la automatizacion de releases y el manejo de metadata para App Store.

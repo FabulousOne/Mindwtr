@@ -465,13 +465,19 @@ jobs:
 
             mkdir -p "$dst_dir"
 
-            if [ -f "$src_dir/full_description.txt" ]; then
+            if [ -f "$src_dir/description.txt" ]; then
+              cp "$src_dir/description.txt" "$dst_dir/description.txt"
+            elif [ -f "$src_dir/full_description.txt" ]; then
               cp "$src_dir/full_description.txt" "$dst_dir/description.txt"
             fi
-            if [ -f "$src_dir/title.txt" ]; then
+            if [ -f "$src_dir/name.txt" ]; then
+              cp "$src_dir/name.txt" "$dst_dir/name.txt"
+            elif [ -f "$src_dir/title.txt" ]; then
               cp "$src_dir/title.txt" "$dst_dir/name.txt"
             fi
-            if [ -f "$src_dir/short_description.txt" ]; then
+            if [ -f "$src_dir/subtitle.txt" ]; then
+              cp "$src_dir/subtitle.txt" "$dst_dir/subtitle.txt"
+            elif [ -f "$src_dir/short_description.txt" ]; then
               cp "$src_dir/short_description.txt" "$dst_dir/subtitle.txt"
             fi
             if [ -f "$src_dir/keywords.txt" ]; then

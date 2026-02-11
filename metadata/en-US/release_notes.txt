@@ -1,0 +1,3 @@
+- Improved iOS bottom tab bar touch-area behavior.
+- Fixed duplicate Morning/Evening digest notifications on Android.
+- Improved App Store release automation and metadata handling.
