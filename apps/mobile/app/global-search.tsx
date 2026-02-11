@@ -5,6 +5,7 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useLanguage } from '../contexts/language-context';
 import { useRouter } from 'expo-router';
 import { Search, X, Folder, CheckCircle, ChevronRight, SlidersHorizontal } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SearchScreen() {
     const { _allTasks, projects, areas, settings, updateSettings, setHighlightTask } = useTaskStore();
@@ -338,7 +339,7 @@ export default function SearchScreen() {
     const filtersActive = filtersOpen || activeChips.length > 0;
 
     return (
-        <View style={[styles.container, { backgroundColor: tc.bg }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['top']}>
             <View style={[styles.header, { borderBottomColor: tc.border }]}>
                 <Search size={20} color={tc.secondaryText} style={styles.searchIcon} />
                 <TextInput
@@ -561,7 +562,7 @@ export default function SearchScreen() {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 }
 
