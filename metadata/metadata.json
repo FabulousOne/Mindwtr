@@ -30,7 +30,7 @@
           "完全离线可用，无需互联网连接",
           "完全开源，安全透明"
         ],
-        "ReleaseNotes": "• 修复了 Play 商店 Android 发行版启动时的 `undefined is not a function` 崩溃问题。\n• 提升了原生底部标签栏启动稳定性。\n• 为 Linux 仓库发布资产下载增加了 CI 重试机制。",
+        "ReleaseNotes": "• 提升桌面端与移动端的同步可靠性与冲突处理安全性。\n• 强化云端附件安全：更严格的路径校验与附件接口限流。\n• 桌面端新增任务删除确认与撤销，改进无障碍标签；移动端优化触控点击区域。\n• 增加同步/云端集成测试覆盖，并重构大型模块以提升可维护性。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "• Fixed a Play Store Android startup crash (`undefined is not a function`) in release builds.\n• Improved native tab bar startup stability.\n• Added retry handling for Linux repo release-asset download in CI.",
+        "ReleaseNotes": "• Improved sync reliability and conflict safety across desktop and mobile.\n• Hardened cloud attachment security with safer path handling and attachment endpoint rate limits.\n• Added desktop task delete confirmation + undo, accessibility label improvements, and better mobile touch targets.\n• Expanded sync/cloud integration test coverage and refactored large sync/UI modules for maintainability.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -130,7 +130,7 @@
           "No requiere conexión a internet para funcionar",
           "Código abierto y transparente"
         ],
-        "ReleaseNotes": "• Se corrigió un fallo de inicio en Android de Play Store (`undefined is not a function`) en builds de release.\n• Se mejoró la estabilidad de inicio de la barra de pestañas nativa.\n• Se añadió reintento en CI para la descarga de assets del repositorio Linux.",
+        "ReleaseNotes": "• Se mejoró la fiabilidad del sync y la seguridad de resolución de conflictos en escritorio y móvil.\n• Se reforzó la seguridad de adjuntos en la nube con validación de rutas más estricta y límites de tasa en endpoints.\n• Se añadió confirmación + deshacer al borrar tareas en escritorio, mejoras de accesibilidad y mejores áreas táctiles en móvil.\n• Se amplió la cobertura de pruebas de sync/nube y se refactorizaron módulos grandes para mejor mantenibilidad.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
