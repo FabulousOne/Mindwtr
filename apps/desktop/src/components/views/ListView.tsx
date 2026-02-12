@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle, Folder } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { shallow, useTaskStore, TaskPriority, TimeEstimate, sortTasksBy, parseQuickAdd, matchesHierarchicalToken, safeParseDate, isTaskInActiveProject } from '@mindwtr/core';
+import { useTaskStore, TaskPriority, TimeEstimate, sortTasksBy, parseQuickAdd, matchesHierarchicalToken, safeParseDate, isTaskInActiveProject } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
@@ -38,48 +38,24 @@ const VIRTUAL_OVERSCAN = 600;
 
 export function ListView({ title, statusFilter }: ListViewProps) {
     const perf = usePerformanceMonitor('ListView');
-    const {
-        tasks,
-        projects,
-        areas,
-        settings,
-        updateSettings,
-        addTask,
-        addProject,
-        updateTask,
-        updateProject,
-        deleteTask,
-        moveTask,
-        batchMoveTasks,
-        batchDeleteTasks,
-        batchUpdateTasks,
-        queryTasks,
-        lastDataChangeAt,
-        highlightTaskId,
-        setHighlightTask,
-    } = useTaskStore(
-        (state) => ({
-            tasks: state.tasks,
-            projects: state.projects,
-            areas: state.areas,
-            settings: state.settings,
-            updateSettings: state.updateSettings,
-            addTask: state.addTask,
-            addProject: state.addProject,
-            updateTask: state.updateTask,
-            updateProject: state.updateProject,
-            deleteTask: state.deleteTask,
-            moveTask: state.moveTask,
-            batchMoveTasks: state.batchMoveTasks,
-            batchDeleteTasks: state.batchDeleteTasks,
-            batchUpdateTasks: state.batchUpdateTasks,
-            queryTasks: state.queryTasks,
-            lastDataChangeAt: state.lastDataChangeAt,
-            highlightTaskId: state.highlightTaskId,
-            setHighlightTask: state.setHighlightTask,
-        }),
-        shallow
-    );
+    const tasks = useTaskStore((state) => state.tasks);
+    const projects = useTaskStore((state) => state.projects);
+    const areas = useTaskStore((state) => state.areas);
+    const settings = useTaskStore((state) => state.settings);
+    const updateSettings = useTaskStore((state) => state.updateSettings);
+    const addTask = useTaskStore((state) => state.addTask);
+    const addProject = useTaskStore((state) => state.addProject);
+    const updateTask = useTaskStore((state) => state.updateTask);
+    const updateProject = useTaskStore((state) => state.updateProject);
+    const deleteTask = useTaskStore((state) => state.deleteTask);
+    const moveTask = useTaskStore((state) => state.moveTask);
+    const batchMoveTasks = useTaskStore((state) => state.batchMoveTasks);
+    const batchDeleteTasks = useTaskStore((state) => state.batchDeleteTasks);
+    const batchUpdateTasks = useTaskStore((state) => state.batchUpdateTasks);
+    const queryTasks = useTaskStore((state) => state.queryTasks);
+    const lastDataChangeAt = useTaskStore((state) => state.lastDataChangeAt);
+    const highlightTaskId = useTaskStore((state) => state.highlightTaskId);
+    const setHighlightTask = useTaskStore((state) => state.setHighlightTask);
     const { t } = useLanguage();
     const { registerTaskListScope } = useKeybindings();
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
