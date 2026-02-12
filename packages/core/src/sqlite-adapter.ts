@@ -167,16 +167,16 @@ export class SqliteAdapter {
         await this.client.run(
             'CREATE TABLE IF NOT EXISTS fts_lock (id INTEGER PRIMARY KEY, owner TEXT, acquiredAt INTEGER)'
         );
-        await this.client.run(
+        const row = await this.client.get<{ owner?: string }>(
             `INSERT INTO fts_lock (id, owner, acquiredAt)
              VALUES (1, ?, ?)
              ON CONFLICT(id) DO UPDATE SET
                owner = excluded.owner,
                acquiredAt = excluded.acquiredAt
-             WHERE fts_lock.acquiredAt < ?`,
+             WHERE fts_lock.acquiredAt < ?
+             RETURNING owner`,
             [owner, now, staleBefore]
         );
-        const row = await this.client.get<{ owner?: string }>('SELECT owner FROM fts_lock WHERE id = 1');
         return row?.owner === owner ? owner : null;
     }
 
