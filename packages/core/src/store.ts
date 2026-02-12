@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 export { shallow } from 'zustand/shallow';
 
 import type { AppData } from './types';
@@ -123,7 +123,7 @@ export const flushPendingSave = async (): Promise<void> => {
     }
 };
 
-export const useTaskStore = create<TaskStore>((set, get) => ({
+export const useTaskStore = createWithEqualityFn<TaskStore>()((set, get) => ({
     tasks: [],
     projects: [],
     sections: [],

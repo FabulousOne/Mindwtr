@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 import type { TaskPriority, TimeEstimate } from '@mindwtr/core';
 
 const toastTimeouts = new Map<string, number>();
@@ -45,7 +45,7 @@ interface UiState {
     setProjectView: (partial: Partial<UiState['projectView']>) => void;
 }
 
-export const useUiStore = create<UiState>((set) => ({
+export const useUiStore = createWithEqualityFn<UiState>()((set) => ({
     isFocusMode: false,
     setFocusMode: (value) => set({ isFocusMode: value }),
     toggleFocusMode: () => set((state) => ({ isFocusMode: !state.isFocusMode })),
