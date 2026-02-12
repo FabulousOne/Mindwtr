@@ -34,7 +34,7 @@ import { useTaskItemEditState } from './Task/useTaskItemEditState';
 import { useTaskItemProjectContext } from './Task/useTaskItemProjectContext';
 import { useTaskItemFieldLayout } from './Task/useTaskItemFieldLayout';
 import { useUiStore } from '../store/ui-store';
-import { logError } from '../lib/app-log';
+import { reportError } from '../lib/report-error';
 import { mergeMarkdownChecklist } from './Task/task-item-checklist';
 
 interface TaskItemProps {
@@ -545,7 +545,7 @@ export const TaskItem = memo(function TaskItem({
                 const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
                 resolvedProjectId = created?.id;
             } catch (error) {
-                void logError(error, { scope: 'task', step: 'quickAddProject' });
+                reportError('Failed to create project from quick add', error);
             }
         }
         if (!resolvedProjectId) {

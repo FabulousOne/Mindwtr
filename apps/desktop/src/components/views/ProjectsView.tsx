@@ -27,6 +27,7 @@ import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
 import { useUiStore } from '../../store/ui-store';
 import { AREA_FILTER_ALL, AREA_FILTER_NONE, projectMatchesAreaFilter } from '../../lib/area-filter';
+import { reportError } from '../../lib/report-error';
 import { useAreaSidebarState } from './projects/useAreaSidebarState';
 import { useProjectAttachmentActions } from './projects/useProjectAttachmentActions';
 import { SectionDropZone, getSectionContainerId, getSectionIdFromContainer, NO_SECTION_CONTAINER } from './projects/section-dnd';
@@ -900,11 +901,15 @@ export function ProjectsView() {
                         onChangeNewAreaColor={(event) => setNewAreaColor(event.target.value)}
                         newAreaName={newAreaName}
                         onChangeNewAreaName={(event) => setNewAreaName(event.target.value)}
-                        onCreateArea={() => {
+                        onCreateArea={async () => {
                             const name = newAreaName.trim();
                             if (!name) return;
-                            addArea(name, { color: newAreaColor });
-                            setNewAreaName('');
+                            try {
+                                await addArea(name, { color: newAreaColor });
+                                setNewAreaName('');
+                            } catch (error) {
+                                reportError('Failed to create area', error);
+                            }
                         }}
                         onSortByName={sortAreasByName}
                         onSortByColor={sortAreasByColor}
