@@ -685,12 +685,16 @@ function mergeAreas(local: Area[], incoming: Area[], nowIso: string): { merged: 
     const localNormalized = local.map((area) => normalizeAreaForMerge(area, nowIso));
     const incomingNormalized = incoming.map((area) => normalizeAreaForMerge(area, nowIso));
     const result = mergeEntitiesWithStats(localNormalized, incomingNormalized);
-    const merged = result.merged
-        .map((area, index) => ({
-            ...area,
-            order: Number.isFinite(area.order) ? area.order : index,
-        }))
-        .sort((a, b) => a.order - b.order);
+    let fallbackOrder = result.merged.reduce((maxOrder, area) => {
+        const order = Number.isFinite(area.order) ? area.order : -1;
+        return Math.max(maxOrder, order);
+    }, -1) + 1;
+    const merged = result.merged.map((area) => {
+        if (Number.isFinite(area.order)) return area;
+        const normalized = { ...area, order: fallbackOrder };
+        fallbackOrder += 1;
+        return normalized;
+    });
     return { merged, stats: result.stats };
 }
 

@@ -679,6 +679,24 @@ describe('Sync Logic', () => {
             expect(merged.areas).toHaveLength(1);
             expect(merged.areas[0].deletedAt).toBe('2023-01-03T00:00:00.000Z');
         });
+
+        it('does not globally re-sort areas after merge', () => {
+            const local: AppData = {
+                ...mockAppData(),
+                areas: [
+                    { ...createMockArea('a1', '2023-01-04T00:00:00.000Z'), order: 10 },
+                    { ...createMockArea('a2', '2023-01-04T00:00:00.000Z'), order: 0 },
+                ],
+            };
+            const incoming: AppData = {
+                ...mockAppData(),
+                areas: [],
+            };
+
+            const merged = mergeAppData(local, incoming);
+            expect(merged.areas.map((area) => area.id)).toEqual(['a1', 'a2']);
+            expect(merged.areas.map((area) => area.order)).toEqual([10, 0]);
+        });
     });
 
     describe('mergeAppDataWithStats', () => {
