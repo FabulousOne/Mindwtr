@@ -359,6 +359,7 @@ export function SwipeableTaskItem({
                                         event.stopPropagation();
                                         toggleFocus();
                                     }}
+                                    hitSlop={8}
                                     style={[
                                         styles.focusButton,
                                         { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)' }
@@ -462,6 +463,7 @@ export function SwipeableTaskItem({
                                 e.stopPropagation();
                                 setShowStatusMenu(true);
                             }}
+                            hitSlop={8}
                             style={[
                                 styles.statusBadge,
                                 { backgroundColor: statusColors.bg, borderColor: statusColors.border }
@@ -577,9 +579,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     focusButton: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
+        minWidth: 44,
+        minHeight: 44,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
         borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     focusButtonText: {
         fontSize: 16,
@@ -723,11 +729,13 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     statusBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+        minHeight: 44,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         borderRadius: 8,
         marginLeft: 12,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     statusText: {
         fontSize: 10,
