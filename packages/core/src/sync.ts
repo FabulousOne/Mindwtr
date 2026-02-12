@@ -354,7 +354,6 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
         nextSyncUpdatedAt.preferences = localPrefsAt;
     }
 
-    const shouldSync = (key: SettingsSyncGroup): boolean => mergedPrefs?.[key] === true;
     const isSameValue = (left: unknown, right: unknown): boolean => {
         if (left === right) return true;
         return JSON.stringify(left) === JSON.stringify(right);
@@ -382,7 +381,6 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
         apply: (value: T, incomingWins: boolean) => void,
         mergeValues?: (localValue: T, incomingValue: T, incomingWins: boolean) => T
     ) => {
-        if (!shouldSync(key)) return;
         const localAt = localSettings.syncPreferencesUpdatedAt?.[key];
         const incomingAt = incomingSettings.syncPreferencesUpdatedAt?.[key];
         const incomingWins = isIncomingNewer(localAt, incomingAt);

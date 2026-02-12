@@ -611,6 +611,60 @@ describe('Sync Logic', () => {
             expect(merged.settings.dateFormat).toBe('yyyy-MM-dd');
         });
 
+        it('merges language settings even when sync preferences are empty', () => {
+            const local: AppData = {
+                ...mockAppData(),
+                settings: {
+                    language: 'en',
+                    syncPreferences: {},
+                    syncPreferencesUpdatedAt: {
+                        language: '2024-01-01T00:00:00.000Z',
+                    },
+                },
+            };
+            const incoming: AppData = {
+                ...mockAppData(),
+                settings: {
+                    language: 'es',
+                    syncPreferences: {},
+                    syncPreferencesUpdatedAt: {
+                        language: '2024-01-02T00:00:00.000Z',
+                    },
+                },
+            };
+
+            const merged = mergeAppData(local, incoming);
+
+            expect(merged.settings.language).toBe('es');
+        });
+
+        it('merges settings for disabled preference groups instead of dropping them', () => {
+            const local: AppData = {
+                ...mockAppData(),
+                settings: {
+                    theme: 'dark',
+                    syncPreferences: { appearance: false },
+                    syncPreferencesUpdatedAt: {
+                        appearance: '2024-01-01T00:00:00.000Z',
+                    },
+                },
+            };
+            const incoming: AppData = {
+                ...mockAppData(),
+                settings: {
+                    theme: 'light',
+                    syncPreferences: { appearance: false },
+                    syncPreferencesUpdatedAt: {
+                        appearance: '2024-01-02T00:00:00.000Z',
+                    },
+                },
+            };
+
+            const merged = mergeAppData(local, incoming);
+
+            expect(merged.settings.theme).toBe('light');
+        });
+
         it('keeps area tombstones so deletions sync across devices', () => {
             const local: AppData = {
                 ...mockAppData(),
