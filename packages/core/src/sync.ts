@@ -574,7 +574,8 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
         const incomingDeleted = !!incomingItem.deletedAt;
         const revDiff = localRev - incomingRev;
         const revByDiff = localRevBy !== incomingRevBy;
-        const contentDiff = hasContentDifference(localItem, incomingItem);
+        const shouldCheckContentDiff = hasRevision && revDiff === 0 && !revByDiff && localDeleted === incomingDeleted;
+        const contentDiff = shouldCheckContentDiff ? hasContentDifference(localItem, incomingItem) : false;
 
         const differs = hasRevision
             ? revDiff !== 0 || revByDiff || localDeleted !== incomingDeleted || contentDiff
