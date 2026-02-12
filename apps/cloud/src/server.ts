@@ -42,6 +42,10 @@ const logInfo = (message: string, context?: Record<string, unknown>) => {
     writeLog({ ts: new Date().toISOString(), level: 'info', scope: 'cloud', message, context });
 };
 
+const logWarn = (message: string, context?: Record<string, unknown>) => {
+    writeLog({ ts: new Date().toISOString(), level: 'warn', scope: 'cloud', message, context });
+};
+
 const logError = (message: string, error?: unknown) => {
     const context: Record<string, unknown> = {};
     if (error instanceof Error) {
@@ -157,6 +161,17 @@ function parseAllowedAuthTokens(rawValue?: string): Set<string> | null {
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
     return tokens.length > 0 ? new Set(tokens) : null;
+}
+
+function resolveAllowedAuthTokensFromEnv(env: Record<string, string | undefined>): Set<string> | null {
+    const values = [
+        env.MINDWTR_CLOUD_AUTH_TOKENS,
+        env.MINDWTR_CLOUD_TOKEN, // legacy name kept for backward compatibility
+    ]
+        .map((value) => String(value || '').trim())
+        .filter((value) => value.length > 0);
+    if (values.length === 0) return null;
+    return parseAllowedAuthTokens(values.join(','));
 }
 
 function isAuthorizedToken(token: string, allowedTokens: Set<string> | null): boolean {
@@ -364,6 +379,7 @@ export const __cloudTestUtils = {
     getToken,
     tokenToKey,
     parseAllowedAuthTokens,
+    resolveAllowedAuthTokensFromEnv,
     isAuthorizedToken,
     toRateLimitRoute,
     validateAppData,
@@ -407,7 +423,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     const maxAttachmentBytes = Number(
         options.maxAttachmentBytes ?? process.env.MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES ?? 50_000_000
     );
-    const allowedAuthTokens = options.allowedAuthTokens ?? parseAllowedAuthTokens(process.env.MINDWTR_CLOUD_AUTH_TOKENS);
+    const allowedAuthTokens = options.allowedAuthTokens ?? resolveAllowedAuthTokensFromEnv(process.env);
     const encoder = new TextEncoder();
     const writeLocks = new Map<string, Promise<void>>();
     const withWriteLock = async <T>(key: string, fn: () => Promise<T>) => {
@@ -430,11 +446,17 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     }
 
     logInfo(`dataDir: ${dataDir}`);
+    const usingLegacyTokenVar = options.allowedAuthTokens === undefined
+        && !String(process.env.MINDWTR_CLOUD_AUTH_TOKENS || '').trim()
+        && String(process.env.MINDWTR_CLOUD_TOKEN || '').trim().length > 0;
+    if (usingLegacyTokenVar) {
+        logWarn('MINDWTR_CLOUD_TOKEN is deprecated; use MINDWTR_CLOUD_AUTH_TOKENS instead');
+    }
     if (allowedAuthTokens) {
         logInfo('token auth allowlist enabled', { allowedTokens: String(allowedAuthTokens.size) });
     } else {
         logInfo('token namespace mode enabled (no auth allowlist)', {
-            hint: 'set MINDWTR_CLOUD_AUTH_TOKENS to enforce bearer authentication',
+            hint: 'set MINDWTR_CLOUD_AUTH_TOKENS to enforce bearer authentication (or legacy MINDWTR_CLOUD_TOKEN)',
         });
     }
     if (!ensureWritableDir(dataDir)) {

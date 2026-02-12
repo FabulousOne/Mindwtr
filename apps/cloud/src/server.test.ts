@@ -23,6 +23,28 @@ describe('cloud server utils', () => {
         expect(__cloudTestUtils.isAuthorizedToken('any', null)).toBe(true);
     });
 
+    test('resolves auth tokens from both current and legacy env var names', () => {
+        const primaryOnly = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
+            MINDWTR_CLOUD_AUTH_TOKENS: 'alpha,beta',
+        });
+        expect(primaryOnly).not.toBeNull();
+        expect(primaryOnly?.has('alpha')).toBe(true);
+        expect(primaryOnly?.has('beta')).toBe(true);
+
+        const legacyOnly = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
+            MINDWTR_CLOUD_TOKEN: 'legacy-token',
+        });
+        expect(legacyOnly).not.toBeNull();
+        expect(legacyOnly?.has('legacy-token')).toBe(true);
+
+        const combined = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
+            MINDWTR_CLOUD_AUTH_TOKENS: 'new-token',
+            MINDWTR_CLOUD_TOKEN: 'legacy-token',
+        });
+        expect(combined?.has('new-token')).toBe(true);
+        expect(combined?.has('legacy-token')).toBe(true);
+    });
+
     test('rejects invalid app data payload', () => {
         const result = __cloudTestUtils.validateAppData({ tasks: 'invalid', projects: [] });
         expect(result.ok).toBe(false);
