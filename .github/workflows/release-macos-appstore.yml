@@ -446,6 +446,7 @@ jobs:
           if ! api_get "$REVIEW_JSON_FILE" -G \
             -H "Authorization: Bearer ${ASC_TOKEN}" \
             --data-urlencode "filter[appStoreState]=WAITING_FOR_REVIEW,IN_REVIEW" \
+            --data-urlencode "filter[platform]=MAC_OS" \
             --data-urlencode "limit=1" \
             "https://api.appstoreconnect.apple.com/v1/apps/${APPSTORE_APP_ID_RESOLVED}/appStoreVersions"; then
             echo "::warning::submit_for_review requested, but review-state lookup failed. Disabling review submission."
@@ -457,7 +458,7 @@ jobs:
           ACTIVE_REVIEW_VERSION="$(jq -r '.data[0].attributes.versionString // empty' "$REVIEW_JSON_FILE")"
           ACTIVE_REVIEW_STATE="$(jq -r '.data[0].attributes.appStoreState // empty' "$REVIEW_JSON_FILE")"
           if [ -n "${ACTIVE_REVIEW_ID}" ]; then
-            echo "::warning::Found existing App Store submission in state ${ACTIVE_REVIEW_STATE:-unknown} (version ${ACTIVE_REVIEW_VERSION:-unknown}). Upload will proceed, but review submission is disabled."
+            echo "::warning::Found existing macOS App Store submission in state ${ACTIVE_REVIEW_STATE:-unknown} (version ${ACTIVE_REVIEW_VERSION:-unknown}). Upload will proceed, but review submission is disabled."
             echo "EFFECTIVE_SUBMIT_FOR_REVIEW=false" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -508,7 +509,7 @@ jobs:
                 pkg: ENV.fetch("PKG_PATH"),
                 metadata_path: ENV.fetch("FASTLANE_METADATA_PATH"),
                 skip_screenshots: true,
-                skip_app_version_update: true,
+                skip_app_version_update: false,
                 force: true,
                 run_precheck_before_submit: false,
                 submit_for_review: ENV.fetch("SUBMIT_FOR_REVIEW", "false") == "true",
