@@ -132,6 +132,19 @@ const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'attachments',
     'checklist',
 ];
+const DEFAULT_TASK_EDITOR_VISIBLE: TaskEditorFieldId[] = [
+    'status',
+    'project',
+    'section',
+    'area',
+    'description',
+    'textDirection',
+    'checklist',
+    'contexts',
+    'dueDate',
+    'priority',
+    'timeEstimate',
+];
 
 
 
@@ -1154,6 +1167,15 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     const priorityOptions: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 
     const savedOrder = useMemo(() => settings.gtd?.taskEditor?.order ?? [], [settings.gtd?.taskEditor?.order]);
+    const savedHidden = useMemo(() => {
+        const featureHiddenFields = new Set<TaskEditorFieldId>();
+        if (!prioritiesEnabled) featureHiddenFields.add('priority');
+        if (!timeEstimatesEnabled) featureHiddenFields.add('timeEstimate');
+        const defaultHidden = DEFAULT_TASK_EDITOR_ORDER.filter(
+            (fieldId) => !DEFAULT_TASK_EDITOR_VISIBLE.includes(fieldId) || featureHiddenFields.has(fieldId)
+        );
+        return settings.gtd?.taskEditor?.hidden ?? defaultHidden;
+    }, [prioritiesEnabled, settings.gtd?.taskEditor?.hidden, timeEstimatesEnabled]);
     const isReference = (editedTask.status ?? task?.status) === 'reference';
     const availableStatusOptions = useMemo(
         () => (isReference ? STATUS_OPTIONS : STATUS_OPTIONS.filter((status) => status !== 'reference')),
@@ -1172,6 +1194,13 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         const missing = DEFAULT_TASK_EDITOR_ORDER.filter((id) => !normalized.includes(id));
         return [...normalized, ...missing].filter((id) => !disabledFields.has(id));
     }, [savedOrder, disabledFields]);
+    const hiddenSet = useMemo(() => {
+        const known = new Set(taskEditorOrder);
+        const next = new Set(savedHidden.filter((id) => known.has(id)));
+        if (settings.features?.priorities === false) next.add('priority');
+        if (settings.features?.timeEstimates === false) next.add('timeEstimate');
+        return next;
+    }, [savedHidden, settings.features?.priorities, settings.features?.timeEstimates, taskEditorOrder]);
 
     const orderFields = useCallback(
         (fields: TaskEditorFieldId[]) => {
@@ -1191,27 +1220,105 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         'timeEstimate',
         'checklist',
     ]), []);
-    const filterReferenceFields = useCallback(
-        (fields: TaskEditorFieldId[]) => (
-            isReference ? fields.filter((fieldId) => !referenceHiddenFields.has(fieldId)) : fields
-        ),
-        [isReference, referenceHiddenFields]
+    const hasValue = useCallback((fieldId: TaskEditorFieldId) => {
+        switch (fieldId) {
+            case 'status':
+                return (editedTask.status ?? task?.status) !== 'inbox';
+            case 'project':
+                return Boolean(editedTask.projectId ?? task?.projectId);
+            case 'section':
+                return Boolean(editedTask.sectionId ?? task?.sectionId);
+            case 'area':
+                return Boolean(editedTask.areaId ?? task?.areaId);
+            case 'priority':
+                if (!prioritiesEnabled) return false;
+                return Boolean(editedTask.priority ?? task?.priority);
+            case 'contexts':
+                return Boolean(contextInputDraft.trim());
+            case 'description':
+                return Boolean(descriptionDraft.trim());
+            case 'textDirection': {
+                const direction = editedTask.textDirection ?? task?.textDirection;
+                return direction !== undefined && direction !== 'auto';
+            }
+            case 'tags':
+                return Boolean(tagInputDraft.trim());
+            case 'timeEstimate':
+                if (!timeEstimatesEnabled) return false;
+                return Boolean(editedTask.timeEstimate ?? task?.timeEstimate);
+            case 'recurrence':
+                return Boolean(editedTask.recurrence ?? task?.recurrence);
+            case 'startTime':
+                return Boolean(editedTask.startTime ?? task?.startTime);
+            case 'dueDate':
+                return Boolean(editedTask.dueDate ?? task?.dueDate);
+            case 'reviewAt':
+                return Boolean(editedTask.reviewAt ?? task?.reviewAt);
+            case 'attachments':
+                return visibleAttachments.length > 0;
+            case 'checklist':
+                return (editedTask.checklist ?? task?.checklist ?? []).length > 0;
+            default:
+                return false;
+        }
+    }, [
+        contextInputDraft,
+        descriptionDraft,
+        editedTask.areaId,
+        editedTask.checklist,
+        editedTask.dueDate,
+        editedTask.priority,
+        editedTask.projectId,
+        editedTask.recurrence,
+        editedTask.reviewAt,
+        editedTask.sectionId,
+        editedTask.startTime,
+        editedTask.status,
+        editedTask.textDirection,
+        editedTask.timeEstimate,
+        prioritiesEnabled,
+        tagInputDraft,
+        task?.areaId,
+        task?.checklist,
+        task?.dueDate,
+        task?.priority,
+        task?.projectId,
+        task?.recurrence,
+        task?.reviewAt,
+        task?.sectionId,
+        task?.startTime,
+        task?.status,
+        task?.textDirection,
+        task?.timeEstimate,
+        timeEstimatesEnabled,
+        visibleAttachments.length,
+    ]);
+    const isFieldVisible = useCallback(
+        (fieldId: TaskEditorFieldId) => {
+            if (isReference && referenceHiddenFields.has(fieldId)) return false;
+            return !hiddenSet.has(fieldId) || hasValue(fieldId);
+        },
+        [hasValue, hiddenSet, isReference, referenceHiddenFields]
+    );
+    const filterVisibleFields = useCallback(
+        (fields: TaskEditorFieldId[]) => fields.filter(isFieldVisible),
+        [isFieldVisible]
     );
     const alwaysFields = useMemo(
-        () => filterReferenceFields(orderFields(['status', 'project', 'section', 'area', 'dueDate'])),
-        [filterReferenceFields, orderFields]
+        () => filterVisibleFields(orderFields(['status', 'project', 'section', 'area', 'dueDate'])),
+        [filterVisibleFields, orderFields]
     );
     const schedulingFields = useMemo(
-        () => filterReferenceFields(orderFields(['startTime', 'recurrence', 'reviewAt'])),
-        [filterReferenceFields, orderFields]
+        () => filterVisibleFields(orderFields(['startTime', 'recurrence', 'reviewAt'])),
+        [filterVisibleFields, orderFields]
     );
     const organizationFields = useMemo(
-        () => filterReferenceFields(orderFields(['contexts', 'tags', 'priority', 'timeEstimate'])),
-        [filterReferenceFields, orderFields]
+        () => filterVisibleFields(orderFields(['contexts', 'tags', 'priority', 'timeEstimate'])),
+        [filterVisibleFields, orderFields]
     );
     const detailsFields = useMemo(
-        () => filterReferenceFields(orderFields(['description', 'textDirection', 'checklist', 'attachments'])),
-        [filterReferenceFields, orderFields]
+        () => filterVisibleFields(orderFields(['description', 'textDirection', 'checklist', 'attachments'])),
+        [filterVisibleFields, orderFields]
     );
 
     const mergedTask = useMemo(() => ({
