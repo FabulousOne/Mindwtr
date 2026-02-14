@@ -1,6 +1,7 @@
 const { withAndroidManifest } = require('@expo/config-plugins');
 
 const MLKIT_ACTIVITY = 'com.google.mlkit.vision.codescanner.internal.GmsBarcodeScanningDelegateActivity';
+const MAIN_ACTIVITY = '.MainActivity';
 const GMS_MODULE_DEPENDENCIES_SERVICE = 'com.google.android.gms.metadata.ModuleDependencies';
 const PERMISSIONS_TO_REMOVE = [
   'android.permission.CAMERA',
@@ -25,13 +26,39 @@ module.exports = function withAndroidManifestFixes(config) {
     if (!application) {
       return config;
     }
+    if (!application.$) {
+      application.$ = {};
+    }
+    application.$['android:resizeableActivity'] = 'true';
+
+    const existingSupportsScreens = manifest.manifest['supports-screens']?.[0]?.$ ?? {};
+    manifest.manifest['supports-screens'] = [
+      {
+        $: {
+          ...existingSupportsScreens,
+          'android:smallScreens': 'true',
+          'android:normalScreens': 'true',
+          'android:largeScreens': 'true',
+          'android:xlargeScreens': 'true',
+          'android:anyDensity': 'true',
+          'android:resizeable': 'true',
+        },
+      },
+    ];
 
     if (!Array.isArray(application.activity)) {
       application.activity = [];
     }
 
+    let didUpdateMainActivity = false;
     let didUpdateMlkit = false;
     application.activity.forEach((activity) => {
+      if (activity.$ && activity.$['android:name'] === MAIN_ACTIVITY) {
+        // Explicitly allow both portrait and landscape on tablets/Chromebooks.
+        activity.$['android:screenOrientation'] = 'fullUser';
+        activity.$['android:resizeableActivity'] = 'true';
+        didUpdateMainActivity = true;
+      }
       if (activity.$ && activity.$['android:name'] === MLKIT_ACTIVITY) {
         // Remove forced orientation for large screens.
         delete activity.$['android:screenOrientation'];
@@ -46,6 +73,17 @@ module.exports = function withAndroidManifestFixes(config) {
         didUpdateMlkit = true;
       }
     });
+
+    if (!didUpdateMainActivity) {
+      application.activity.push({
+        $: {
+          'android:name': MAIN_ACTIVITY,
+          'android:screenOrientation': 'fullUser',
+          'android:resizeableActivity': 'true',
+          'tools:node': 'merge',
+        },
+      });
+    }
 
     if (!didUpdateMlkit && application.activity.length > 0) {
       application.activity.push({
