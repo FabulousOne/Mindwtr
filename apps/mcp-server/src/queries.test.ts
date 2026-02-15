@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { addTask, listTasks, parseQuickAdd, type Project } from './queries.js';
+import { addTask, deleteTask, listTasks, parseQuickAdd, updateTask, type Project } from './queries.js';
 import type { DbClient } from './db.js';
 
 const createMockDb = (rows: any[] = []): { db: DbClient; calls: { sql: string; params: any[] }[] } => {
@@ -88,5 +88,46 @@ describe('mcp queries', () => {
         expect(created.projectId).toBe('p1');
         const projectLookup = calls.find((call) => call.sql.startsWith('SELECT id, title FROM projects WHERE deletedAt IS NULL'));
         expect(projectLookup).toBeTruthy();
+    });
+
+    test('wraps addTask in a transaction', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const { db, calls } = createMockDb([{ id: 'p1', title: 'Home', createdAt: now, updatedAt: now }]);
+
+        addTask(db, { title: 'Task in tx' });
+
+        expect(calls.some((call) => call.sql === 'BEGIN IMMEDIATE')).toBe(true);
+        expect(calls.some((call) => call.sql === 'COMMIT')).toBe(true);
+    });
+
+    test('rolls back addTask transaction on error', () => {
+        const { db, calls } = createMockDb([]);
+
+        expect(() => addTask(db, { title: '   ' })).toThrow('Task title is required.');
+
+        expect(calls.some((call) => call.sql === 'BEGIN IMMEDIATE')).toBe(true);
+        expect(calls.some((call) => call.sql === 'ROLLBACK')).toBe(true);
+    });
+
+    test('wraps updateTask and deleteTask in transactions', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const { db, calls } = createMockDb([
+            {
+                id: 't1',
+                title: 'Task',
+                status: 'inbox',
+                createdAt: now,
+                updatedAt: now,
+                isFocusedToday: 0,
+            },
+        ]);
+
+        updateTask(db, { id: 't1', title: 'Updated' });
+        deleteTask(db, { id: 't1' });
+
+        const beginCount = calls.filter((call) => call.sql === 'BEGIN IMMEDIATE').length;
+        const commitCount = calls.filter((call) => call.sql === 'COMMIT').length;
+        expect(beginCount).toBe(2);
+        expect(commitCount).toBe(2);
     });
 });
