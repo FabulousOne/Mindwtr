@@ -240,4 +240,36 @@ describeBun('SqliteAdapter', () => {
         expect(areaColumnNames).toContain('rev');
         expect(areaColumnNames).toContain('revBy');
     });
+
+    it('rejects invalid task status values at the database layer', async () => {
+        await adapter.ensureSchema();
+
+        expect(() =>
+            db.query(`
+                INSERT INTO tasks (id, title, status, createdAt, updatedAt)
+                VALUES ('bad-status', 'Bad status', 'active', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
+            `).run()
+        ).toThrow(/invalid_task_status/i);
+    });
+
+    it('rejects malformed json fields at the database layer', async () => {
+        await adapter.ensureSchema();
+
+        expect(() =>
+            db.query(`
+                INSERT INTO tasks (id, title, status, tags, createdAt, updatedAt)
+                VALUES ('bad-json', 'Bad json', 'next', '{invalid', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
+            `).run()
+        ).toThrow(/invalid_tasks_tags_json/i);
+    });
+
+    it('creates composite indexes used by sync queries', async () => {
+        await adapter.ensureSchema();
+
+        const indexes = db.query(`PRAGMA index_list(tasks)`).all() as Array<{ name: string }>;
+        const names = new Set(indexes.map((index) => index.name));
+
+        expect(names.has('idx_tasks_project_status_updatedAt')).toBe(true);
+        expect(names.has('idx_tasks_area_deletedAt')).toBe(true);
+    });
 });
