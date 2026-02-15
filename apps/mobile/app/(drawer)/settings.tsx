@@ -282,6 +282,7 @@ export default function SettingsPage() {
     const aiProvider = (settings.ai?.provider ?? 'openai') as AIProviderId;
     const aiEnabled = settings.ai?.enabled === true;
     const aiModel = settings.ai?.model ?? getDefaultAIConfig(aiProvider).model;
+    const aiBaseUrl = settings.ai?.baseUrl ?? '';
     const aiReasoningEffort = (settings.ai?.reasoningEffort ?? DEFAULT_REASONING_EFFORT) as AIReasoningEffort;
     const aiThinkingBudget = settings.ai?.thinkingBudget ?? getDefaultAIConfig(aiProvider).thinkingBudget ?? 0;
     const aiModelOptions = getModelOptions(aiProvider);
@@ -2122,6 +2123,25 @@ export default function SettingsPage() {
                                             </TouchableOpacity>
                                         ))}
                                     </View>
+                                </View>
+                                <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.aiBaseUrl')}</Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {t('settings.aiBaseUrlHint')}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                                    <TextInput
+                                        value={aiBaseUrl}
+                                        onChangeText={(value) => updateAISettings({ baseUrl: value })}
+                                        placeholder={t('settings.aiBaseUrlPlaceholder')}
+                                        placeholderTextColor={tc.secondaryText}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        style={[styles.textInput, { borderColor: tc.border, color: tc.text }]}
+                                    />
                                 </View>
                             </>
                         )}

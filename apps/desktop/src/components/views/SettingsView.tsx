@@ -201,6 +201,7 @@ export function SettingsView() {
         aiEnabled,
         aiProvider,
         aiModel,
+        aiBaseUrl,
         aiModelOptions,
         aiCopilotModel,
         aiCopilotOptions,
@@ -895,6 +896,7 @@ export function SettingsView() {
                     aiEnabled={aiEnabled}
                     aiProvider={aiProvider}
                     aiModel={aiModel}
+                    aiBaseUrl={aiBaseUrl}
                     aiModelOptions={aiModelOptions}
                     aiCopilotModel={aiCopilotModel}
                     aiCopilotOptions={aiCopilotOptions}

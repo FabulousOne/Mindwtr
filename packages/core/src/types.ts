@@ -237,6 +237,7 @@ export interface AppData {
             enabled?: boolean;
             provider?: 'gemini' | 'openai' | 'anthropic';
             apiKey?: string;
+            baseUrl?: string;
             model?: string;
             reasoningEffort?: 'low' | 'medium' | 'high';
             thinkingBudget?: number;
