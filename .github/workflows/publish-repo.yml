@@ -19,7 +19,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: publish-repo-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
