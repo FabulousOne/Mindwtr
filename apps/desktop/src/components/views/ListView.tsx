@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle, Folder } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useTaskStore, TaskPriority, TimeEstimate, sortTasksBy, parseQuickAdd, matchesHierarchicalToken, safeParseDate, isTaskInActiveProject } from '@mindwtr/core';
+import { useTaskStore, TaskPriority, TimeEstimate, sortTasksBy, parseQuickAdd, matchesHierarchicalToken, safeParseDate, isTaskInActiveProject, extractWaitingPerson } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
@@ -87,6 +87,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const [contextPromptOpen, setContextPromptOpen] = useState(false);
     const [contextPromptMode, setContextPromptMode] = useState<'add' | 'remove'>('add');
     const [contextPromptIds, setContextPromptIds] = useState<string[]>([]);
+    const [selectedWaitingPerson, setSelectedWaitingPerson] = useState('');
     const lastFilterKeyRef = useRef<string>('');
     const addInputRef = useRef<HTMLInputElement>(null);
     const listScrollRef = useRef<HTMLDivElement>(null);
@@ -216,6 +217,32 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     }, [statusFilter, queryTasks, lastDataChangeAt, tasks]);
 
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
+    const waitingPeople = useMemo(() => {
+        if (statusFilter !== 'waiting') return [];
+        const people = new Map<string, string>();
+        for (const task of baseTasks) {
+            if (task.deletedAt || task.status !== 'waiting') continue;
+            if (!isTaskInActiveProject(task, projectMap)) continue;
+            if (!taskMatchesAreaFilter(task, resolvedAreaFilter, projectMap, areaById)) continue;
+            const person = extractWaitingPerson(task.description);
+            if (!person) continue;
+            const key = person.toLowerCase();
+            if (!people.has(key)) people.set(key, person);
+        }
+        return [...people.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    }, [areaById, baseTasks, projectMap, resolvedAreaFilter, statusFilter]);
+
+    useEffect(() => {
+        if (statusFilter !== 'waiting' && selectedWaitingPerson) {
+            setSelectedWaitingPerson('');
+            return;
+        }
+        if (!selectedWaitingPerson) return;
+        const selectedKey = selectedWaitingPerson.toLowerCase();
+        const exists = waitingPeople.some((person) => person.toLowerCase() === selectedKey);
+        if (!exists) setSelectedWaitingPerson('');
+    }, [selectedWaitingPerson, statusFilter, waitingPeople]);
+
     const filteredTasks = useMemo(() => {
         perf.trackUseMemo();
         return perf.measure('filteredTasks', () => {
@@ -258,6 +285,10 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                 }
                 if (activePriorities.length > 0 && (!t.priority || !activePriorities.includes(t.priority))) return false;
                 if (activeTimeEstimates.length > 0 && (!t.timeEstimate || !activeTimeEstimates.includes(t.timeEstimate))) return false;
+                if (statusFilter === 'waiting' && selectedWaitingPerson) {
+                    const person = extractWaitingPerson(t.description);
+                    if (!person || person.toLowerCase() !== selectedWaitingPerson.toLowerCase()) return false;
+                }
                 return true;
             });
 
@@ -267,7 +298,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
 
             return sortTasksBy(filtered, sortBy);
         });
-    }, [baseTasks, statusFilter, selectedTokens, activePriorities, activeTimeEstimates, sequentialProjectFirstTasks, projectMap, sortBy, sortByProjectOrder, resolvedAreaFilter, areaById]);
+    }, [baseTasks, statusFilter, selectedTokens, activePriorities, activeTimeEstimates, sequentialProjectFirstTasks, projectMap, sortBy, sortByProjectOrder, resolvedAreaFilter, areaById, selectedWaitingPerson]);
     const resolveText = useCallback((key: string, fallback: string) => {
         const value = t(key);
         return value === key ? fallback : value;
@@ -360,6 +391,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             selectedTokens.join('|'),
             selectedPriorities.join('|'),
             selectedTimeEstimates.join('|'),
+            selectedWaitingPerson,
             resolvedAreaFilter,
         ].join('::');
         if (lastFilterKeyRef.current !== filterKey) {
@@ -393,6 +425,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         selectedTokens,
         selectedPriorities,
         selectedTimeEstimates,
+        selectedWaitingPerson,
         prioritiesEnabled,
         timeEstimatesEnabled,
         exitSelectionMode,
@@ -591,6 +624,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const showFilters = ['next', 'all'].includes(statusFilter);
     const isInbox = statusFilter === 'inbox';
     const isNextView = statusFilter === 'next';
+    const isWaitingView = statusFilter === 'waiting';
     const NEXT_WARNING_THRESHOLD = 15;
     const priorityOptions: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
     const timeEstimateOptions: TimeEstimate[] = ['5min', '10min', '15min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
@@ -605,8 +639,9 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             ...selectedTokens,
             ...(prioritiesEnabled ? selectedPriorities.map((priority) => t(`priority.${priority}`)) : []),
             ...(timeEstimatesEnabled ? selectedTimeEstimates.map(formatEstimate) : []),
+            ...(selectedWaitingPerson ? [`${t('process.delegateWhoLabel')}: ${selectedWaitingPerson}`] : []),
         ];
-    }, [selectedTokens, selectedPriorities, selectedTimeEstimates, prioritiesEnabled, timeEstimatesEnabled, t]);
+    }, [selectedTokens, selectedPriorities, selectedTimeEstimates, prioritiesEnabled, timeEstimatesEnabled, selectedWaitingPerson, t]);
     const hasFilters = filterSummary.length > 0;
     const filterSummaryLabel = filterSummary.slice(0, 3).join(', ');
     const filterSummarySuffix = filterSummary.length > 3 ? ` +${filterSummary.length - 3}` : '';
@@ -817,6 +852,33 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                 isProcessing={isProcessing}
                 setIsProcessing={setIsProcessing}
             />
+
+            {isWaitingView && !isProcessing && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                    <span className="text-xs font-medium text-muted-foreground">{t('process.delegateWhoLabel')}</span>
+                    <select
+                        value={selectedWaitingPerson}
+                        onChange={(event) => setSelectedWaitingPerson(event.target.value)}
+                        className="text-xs bg-background text-foreground border border-border rounded px-2 py-1 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    >
+                        <option value="">{t('common.all')}</option>
+                        {waitingPeople.map((person) => (
+                            <option key={person} value={person}>
+                                {person}
+                            </option>
+                        ))}
+                    </select>
+                    {selectedWaitingPerson && (
+                        <button
+                            type="button"
+                            onClick={() => setSelectedWaitingPerson('')}
+                            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                        >
+                            {t('common.clear')}
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Filters */}
             {showFilters && !isProcessing && (

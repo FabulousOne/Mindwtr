@@ -44,6 +44,8 @@ const shouldIncrementPushCount = (oldDueDate?: string, newDueDate?: string): boo
     return newTime > oldTime;
 };
 
+const WAITING_FOR_LINE_REGEX = /^\s*waiting\s+for\s*[:：]\s*(.+?)\s*$/i;
+
 export function rescheduleTask(task: Task, newDueDate?: string): Task {
     const next: Task = { ...task, dueDate: newDueDate };
     if (shouldIncrementPushCount(task.dueDate, newDueDate)) {
@@ -52,6 +54,18 @@ export function rescheduleTask(task: Task, newDueDate?: string): Task {
         next.pushCount = task.pushCount;
     }
     return next;
+}
+
+export function extractWaitingPerson(description?: string): string | null {
+    if (!description) return null;
+    const lines = description.split(/\r?\n/);
+    for (const line of lines) {
+        const match = line.match(WAITING_FOR_LINE_REGEX);
+        if (!match) continue;
+        const person = match[1]?.trim();
+        if (person) return person;
+    }
+    return null;
 }
 
 /**
