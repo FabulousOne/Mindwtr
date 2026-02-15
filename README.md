@@ -288,6 +288,7 @@ You can help in several ways:
 
 - 📦 Add to Flathub
 - 📱 Improve iOS experience
+- 🔗 Obsidian integration (task deep links)
 - ✉️ Email to Inbox
 
 ## Documentation
