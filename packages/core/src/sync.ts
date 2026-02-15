@@ -629,10 +629,10 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
 
             const deletedTimeRaw = new Date(item.deletedAt).getTime();
             if (!Number.isFinite(deletedTimeRaw)) {
-                const fallbackDeletedTime = Date.now();
+                const fallbackDeletedTime = updatedTime;
                 invalidDeletedAtWarnings += 1;
                 if (invalidDeletedAtWarnings <= 5) {
-                    logWarn('Invalid deletedAt timestamp during merge; using conservative current-time fallback', {
+                    logWarn('Invalid deletedAt timestamp during merge; using updatedAt fallback', {
                         scope: 'sync',
                         category: 'sync',
                         context: { id: item.id, deletedAt: item.deletedAt, updatedAt: item.updatedAt, fallbackDeletedTime },

@@ -514,8 +514,8 @@ describe('Sync Logic', () => {
             const merged = mergeAppData(local, incoming);
 
             expect(merged.tasks).toHaveLength(1);
-            expect(merged.tasks[0].deletedAt).toBe('invalid-date');
-            expect(merged.tasks[0].updatedAt).toBe('2023-01-01T00:00:00.000Z');
+            expect(merged.tasks[0].deletedAt).toBeUndefined();
+            expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:00:00.000Z');
         });
 
         it('uses max(deletedAt, updatedAt) for delete operation time', () => {
