@@ -72,7 +72,7 @@ jobs:
 
           VERSION="${{ steps.version.outputs.version }}"
           run_bump_cask_pr() {
-            brew bump-cask-pr mindwtr --version "$VERSION" --verbose --no-browse 2>&1
+            HOMEBREW_NO_INSTALL_FROM_API=1 brew bump-cask-pr homebrew/cask/mindwtr --version "$VERSION" --verbose --no-browse 2>&1
           }
 
           set +e
