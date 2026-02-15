@@ -69,6 +69,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const listFilters = useUiStore((state) => state.listFilters);
     const setListFilters = useUiStore((state) => state.setListFilters);
     const resetListFilters = useUiStore((state) => state.resetListFilters);
+    const showToast = useUiStore((state) => state.showToast);
     const showListDetails = useUiStore((state) => state.listOptions.showDetails);
     const setListOptions = useUiStore((state) => state.setListOptions);
     const setProjectView = useUiStore((state) => state.setProjectView);
@@ -334,8 +335,11 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     }, [setProjectView]);
     const handleReactivateProject = useCallback((projectId: string) => {
         updateProject(projectId, { status: 'active' })
-            .catch((error) => reportError('Failed to reactivate project', error));
-    }, [updateProject]);
+            .catch((error) => {
+                reportError('Failed to reactivate project', error);
+                showToast(t('projects.reactivateFailed') || 'Failed to reactivate project', 'error');
+            });
+    }, [showToast, t, updateProject]);
 
     const shouldVirtualize = !isReferenceAreaGrouping && filteredTasks.length > VIRTUALIZATION_THRESHOLD;
     const rowVirtualizer = useVirtualizer({
@@ -503,9 +507,14 @@ export function ListView({ title, statusFilter }: ListViewProps) {
 
     const handleBatchMove = useCallback(async (newStatus: TaskStatus) => {
         if (selectedIdsArray.length === 0) return;
-        await batchMoveTasks(selectedIdsArray, newStatus);
-        exitSelectionMode();
-    }, [batchMoveTasks, selectedIdsArray, exitSelectionMode]);
+        try {
+            await batchMoveTasks(selectedIdsArray, newStatus);
+            exitSelectionMode();
+        } catch (error) {
+            reportError('Failed to batch move tasks', error);
+            showToast(t('bulk.moveFailed') || 'Failed to update selected tasks', 'error');
+        }
+    }, [batchMoveTasks, selectedIdsArray, exitSelectionMode, showToast, t]);
 
     const handleBatchDelete = useCallback(async () => {
         if (selectedIdsArray.length === 0) return;
@@ -515,10 +524,13 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         try {
             await batchDeleteTasks(selectedIdsArray);
             exitSelectionMode();
+        } catch (error) {
+            reportError('Failed to batch delete tasks', error);
+            showToast(t('bulk.deleteFailed') || 'Failed to delete selected tasks', 'error');
         } finally {
             setIsBatchDeleting(false);
         }
-    }, [batchDeleteTasks, selectedIdsArray, exitSelectionMode]);
+    }, [batchDeleteTasks, selectedIdsArray, exitSelectionMode, showToast, t]);
 
     const handleBatchAddTag = useCallback(async () => {
         if (selectedIdsArray.length === 0) return;
@@ -542,7 +554,8 @@ export function ListView({ title, statusFilter }: ListViewProps) {
 
     const handleAddTask = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (newTaskTitle.trim()) {
+        if (!newTaskTitle.trim()) return;
+        try {
             const { title: parsedTitle, props, projectTitle } = parseQuickAdd(newTaskTitle, projects, new Date(), areas);
             const finalTitle = parsedTitle || newTaskTitle;
             const initialProps: Partial<Task> = { ...props };
@@ -569,6 +582,9 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             await addTask(finalTitle, initialProps);
             setNewTaskTitle('');
             resetCopilot();
+        } catch (error) {
+            reportError('Failed to add task from quick add', error);
+            showToast(t('task.addFailed') || 'Failed to add task', 'error');
         }
     };
 
@@ -705,6 +721,14 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                         }}
                         t={t}
                     />
+
+                    {(isProcessing || isBatchDeleting) && (
+                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                            {isBatchDeleting
+                                ? (t('bulk.deleting') || 'Deleting selected tasks...')
+                                : (t('common.loading') || 'Loading...')}
+                        </div>
+                    )}
 
                     {selectionMode && selectedIdsArray.length > 0 && (
                         <ListBulkActions

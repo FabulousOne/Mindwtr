@@ -64,6 +64,7 @@ export function ProjectsView() {
     const { t } = useLanguage();
     const selectedProjectId = useUiStore((state) => state.projectView.selectedProjectId);
     const setProjectView = useUiStore((state) => state.setProjectView);
+    const showToast = useUiStore((state) => state.showToast);
     const setSelectedProjectId = useCallback(
         (value: string | null) => setProjectView({ selectedProjectId: value }),
         [setProjectView]
@@ -91,6 +92,7 @@ export function ProjectsView() {
     const [projectTaskTitle, setProjectTaskTitle] = useState('');
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [isProjectDeleting, setIsProjectDeleting] = useState(false);
+    const [isAreaCreating, setIsAreaCreating] = useState(false);
     const ALL_AREAS = AREA_FILTER_ALL;
     const NO_AREA = AREA_FILTER_NONE;
     const ALL_TAGS = '__all__';
@@ -238,6 +240,9 @@ export function ProjectsView() {
             );
             setNewProjectTitle('');
             setIsCreating(false);
+        } catch (error) {
+            reportError('Failed to create project', error);
+            showToast(t('projects.createFailed') || 'Failed to create project', 'error');
         } finally {
             setIsCreatingProject(false);
         }
@@ -608,37 +613,48 @@ export function ProjectsView() {
 
     const handleArchiveProject = async () => {
         if (!selectedProject) return;
-        const confirmed = isTauriRuntime()
-            ? await import('@tauri-apps/plugin-dialog').then(({ confirm }) =>
-                confirm(t('projects.archiveConfirm'), {
-                    title: t('projects.title'),
-                    kind: 'warning',
-                }),
-            )
-            : window.confirm(t('projects.archiveConfirm'));
-        if (confirmed) {
-            updateProject(selectedProject.id, { status: 'archived' });
+        try {
+            const confirmed = isTauriRuntime()
+                ? await import('@tauri-apps/plugin-dialog').then(({ confirm }) =>
+                    confirm(t('projects.archiveConfirm'), {
+                        title: t('projects.title'),
+                        kind: 'warning',
+                    }),
+                )
+                : window.confirm(t('projects.archiveConfirm'));
+            if (confirmed) {
+                await Promise.resolve(updateProject(selectedProject.id, { status: 'archived' }));
+            }
+        } catch (error) {
+            reportError('Failed to archive project', error);
+            showToast(t('projects.archiveFailed') || 'Failed to archive project', 'error');
         }
     };
 
     const handleDeleteProject = async () => {
         if (!selectedProject) return;
-        const confirmed = isTauriRuntime()
-            ? await import('@tauri-apps/plugin-dialog').then(({ confirm }) =>
-                confirm(t('projects.deleteConfirm'), {
-                    title: t('projects.title'),
-                    kind: 'warning',
-                }),
-            )
-            : window.confirm(t('projects.deleteConfirm'));
-        if (confirmed) {
-            setIsProjectDeleting(true);
-            try {
-                await Promise.resolve(deleteProject(selectedProject.id));
-                setSelectedProjectId(null);
-            } finally {
-                setIsProjectDeleting(false);
+        try {
+            const confirmed = isTauriRuntime()
+                ? await import('@tauri-apps/plugin-dialog').then(({ confirm }) =>
+                    confirm(t('projects.deleteConfirm'), {
+                        title: t('projects.title'),
+                        kind: 'warning',
+                    }),
+                )
+                : window.confirm(t('projects.deleteConfirm'));
+            if (confirmed) {
+                setIsProjectDeleting(true);
+                try {
+                    await Promise.resolve(deleteProject(selectedProject.id));
+                    setSelectedProjectId(null);
+                } finally {
+                    setIsProjectDeleting(false);
+                }
             }
+        } catch (error) {
+            reportError('Failed to delete project', error);
+            showToast(t('projects.deleteFailed') || 'Failed to delete project', 'error');
+            setIsProjectDeleting(false);
         }
     };
     const resolveValidationMessage = (error?: string) => {
@@ -700,9 +716,14 @@ export function ProjectsView() {
             } else {
                 initialProps.sectionId = undefined;
             }
-            await addTask(finalTitle, initialProps);
+            try {
+                await addTask(finalTitle, initialProps);
+            } catch (error) {
+                reportError('Failed to add task to project', error);
+                showToast(t('projects.addTaskFailed') || 'Failed to add task', 'error');
+            }
         },
-        [addProject, addTask, projects, selectedProject]
+        [addProject, addTask, areas, projects, selectedProject, showToast, t]
     );
 
     return (
@@ -747,6 +768,11 @@ export function ProjectsView() {
                         <div className="flex flex-col h-full min-h-0 w-full max-w-[1100px] rounded-2xl border border-border/70 bg-card/40">
                             {selectedProject ? (
                                 <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-5 space-y-4">
+                                    {(isCreatingProject || isProjectDeleting || isAreaCreating) && (
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                                            {t('common.loading') || 'Loading...'}
+                                        </div>
+                                    )}
                                     <ProjectDetailsHeader
                                         project={selectedProject}
                                         projectColor={getProjectColorForTask(selectedProject)}
@@ -756,7 +782,12 @@ export function ProjectsView() {
                                         onResetTitle={handleResetProjectTitle}
                                         onDuplicate={() => handleDuplicateProject(selectedProject.id)}
                                         onArchive={handleArchiveProject}
-                                        onReactivate={() => updateProject(selectedProject.id, { status: 'active' })}
+                                        onReactivate={() => {
+                                            Promise.resolve(updateProject(selectedProject.id, { status: 'active' })).catch((error) => {
+                                                reportError('Failed to reactivate project', error);
+                                                showToast(t('projects.reactivateFailed') || 'Failed to reactivate project', 'error');
+                                            });
+                                        }}
                                         onDelete={handleDeleteProject}
                                         isDeleting={isProjectDeleting}
                                         projectProgress={projectProgress}
@@ -873,13 +904,18 @@ export function ProjectsView() {
                         onCreateArea={async () => {
                             const name = newAreaName.trim();
                             if (!name) return;
+                            setIsAreaCreating(true);
                             try {
                                 await addArea(name, { color: newAreaColor });
                                 setNewAreaName('');
                             } catch (error) {
                                 reportError('Failed to create area', error);
+                                showToast(t('projects.createAreaFailed') || 'Failed to create area', 'error');
+                            } finally {
+                                setIsAreaCreating(false);
                             }
                         }}
+                        isCreatingArea={isAreaCreating}
                         onSortByName={sortAreasByName}
                         onSortByColor={sortAreasByColor}
                         onClose={() => setShowAreaManager(false)}
@@ -979,17 +1015,25 @@ export function ProjectsView() {
                     onConfirm={async (value) => {
                         const name = value.trim();
                         if (!name) return;
-                        await addArea(name, { color: newAreaColor });
-                        const state = useTaskStore.getState();
-                        const matching = [...state.areas]
-                            .filter((area) => area.name.trim().toLowerCase() === name.toLowerCase())
-                            .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
-                        const created = matching[0];
-                        if (created && pendingAreaAssignProjectId) {
-                            updateProject(pendingAreaAssignProjectId, { areaId: created.id });
+                        setIsAreaCreating(true);
+                        try {
+                            await addArea(name, { color: newAreaColor });
+                            const state = useTaskStore.getState();
+                            const matching = [...state.areas]
+                                .filter((area) => area.name.trim().toLowerCase() === name.toLowerCase())
+                                .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+                            const created = matching[0];
+                            if (created && pendingAreaAssignProjectId) {
+                                await Promise.resolve(updateProject(pendingAreaAssignProjectId, { areaId: created.id }));
+                            }
+                        } catch (error) {
+                            reportError('Failed to create quick area', error);
+                            showToast(t('projects.createAreaFailed') || 'Failed to create area', 'error');
+                        } finally {
+                            setIsAreaCreating(false);
+                            setShowQuickAreaPrompt(false);
+                            setPendingAreaAssignProjectId(null);
                         }
-                        setShowQuickAreaPrompt(false);
-                        setPendingAreaAssignProjectId(null);
                     }}
                 />
             </div>
