@@ -2,6 +2,7 @@ import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Clock
 import type { Area, Attachment, Project, Task, TaskStatus, RecurrenceRule, RecurrenceStrategy } from '@mindwtr/core';
 import { getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, hasTimeComponent, safeFormatDate, stripMarkdown, resolveTaskTextDirection } from '@mindwtr/core';
 import { cn } from '../../lib/utils';
+import { getAttachmentDisplayTitle } from '../../lib/attachment-utils';
 import { MetadataBadge } from '../ui/MetadataBadge';
 import { AttachmentProgressIndicator } from '../AttachmentProgressIndicator';
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
@@ -325,24 +326,28 @@ export function TaskItemDisplay({
                                 <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
                                     <Paperclip className="w-3 h-3" aria-hidden="true" />
                                     <span className="sr-only">{t('attachments.title') || 'Attachments'}</span>
-                                    {visibleAttachments.map((attachment) => (
-                                        <div key={attachment.id} className="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    openAttachment(attachment);
-                                                }}
-                                                className="truncate hover:underline"
-                                                title={attachment.title}
-                                                aria-label={`${t('attachments.open') || 'Open'}: ${attachment.title}`}
-                                            >
-                                                {attachment.title}
-                                            </button>
-                                            <AttachmentProgressIndicator attachmentId={attachment.id} />
-                                        </div>
-                                    ))}
+                                    {visibleAttachments.map((attachment) => {
+                                        const displayTitle = getAttachmentDisplayTitle(attachment);
+                                        const fullTitle = attachment.kind === 'link' ? attachment.uri : attachment.title;
+                                        return (
+                                            <div key={attachment.id} className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        openAttachment(attachment);
+                                                    }}
+                                                    className="truncate hover:underline"
+                                                    title={fullTitle || displayTitle}
+                                                    aria-label={`${t('attachments.open') || 'Open'}: ${displayTitle}`}
+                                                >
+                                                    {displayTitle}
+                                                </button>
+                                                <AttachmentProgressIndicator attachmentId={attachment.id} />
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
 

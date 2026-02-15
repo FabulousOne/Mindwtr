@@ -979,7 +979,7 @@ export function ProjectsView() {
                 <PromptModal
                     isOpen={showLinkPrompt}
                     title={t('attachments.addLink')}
-                    description={t('attachments.linkPlaceholder')}
+                    description={t('attachments.linkInputHint')}
                     placeholder={t('attachments.linkPlaceholder')}
                     defaultValue=""
                     confirmLabel={t('common.save')}

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, Alert, Pressable, ScrollView, SectionList, Dimensions, Platform, Keyboard, ActionSheetIOS } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Area, Attachment, generateUUID, Project, PRESET_TAGS, Task, TaskStatus, useTaskStore, validateAttachmentForUpload } from '@mindwtr/core';
+import { Area, Attachment, generateUUID, getAttachmentDisplayTitle, normalizeLinkAttachmentInput, Project, PRESET_TAGS, Task, TaskStatus, useTaskStore, validateAttachmentForUpload } from '@mindwtr/core';
 import { Trash2 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -875,14 +875,14 @@ export default function ProjectsScreen() {
 
   const confirmAddProjectLink = () => {
     if (!selectedProject) return;
-    const url = linkInput.trim();
-    if (!url) return;
+    const normalized = normalizeLinkAttachmentInput(linkInput);
+    if (!normalized.uri) return;
     const now = new Date().toISOString();
     const attachment: Attachment = {
       id: generateUUID(),
-      kind: 'link',
-      title: url,
-      uri: url,
+      kind: normalized.kind,
+      title: normalized.title,
+      uri: normalized.uri,
       createdAt: now,
       updatedAt: now,
     };
@@ -1359,7 +1359,7 @@ export default function ProjectsScreen() {
                                     disabled={isDownloading}
                                   >
                                     <Text style={[styles.attachmentTitle, { color: tc.tint }]} numberOfLines={1}>
-                                      {attachment.title}
+                                      {getAttachmentDisplayTitle(attachment)}
                                     </Text>
                                     <AttachmentProgressIndicator attachmentId={attachment.id} />
                                   </TouchableOpacity>
@@ -1478,6 +1478,9 @@ export default function ProjectsScreen() {
               autoCapitalize="none"
               autoCorrect={false}
             />
+            <Text style={[styles.linkModalHint, { color: tc.secondaryText }]}>
+              {t('attachments.linkInputHint')}
+            </Text>
             <View style={styles.linkModalButtons}>
               <TouchableOpacity
                 onPress={() => {
@@ -2164,6 +2167,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
+  },
+  linkModalHint: {
+    fontSize: 12,
+    marginTop: 8,
   },
   linkModalButtons: {
     flexDirection: 'row',

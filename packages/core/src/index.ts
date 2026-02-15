@@ -28,6 +28,7 @@ export * from './webdav';
 export * from './cloud';
 export * from './retry-utils';
 export * from './attachment-hash';
+export * from './attachment-link-utils';
 export * from './attachment-validation';
 export * from './attachment-progress';
 export * from './attachment-cleanup';

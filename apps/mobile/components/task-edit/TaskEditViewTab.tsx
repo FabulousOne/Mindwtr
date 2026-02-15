@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { getAttachmentDisplayTitle } from '@mindwtr/core';
 import type {
   Attachment,
   Area,
@@ -195,7 +196,7 @@ export function TaskEditViewTab({
                   return (
                     <View>
                       <Text style={[styles.viewAttachmentText, { color: tc.text }]} numberOfLines={2}>
-                        {attachment.title}
+                        {getAttachmentDisplayTitle(attachment)}
                       </Text>
                       {isDownloading ? (
                         <Text style={[styles.viewAttachmentSubtext, { color: tc.secondaryText }]}>

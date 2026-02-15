@@ -26,6 +26,8 @@ import {
     safeParseDate,
     safeParseDueDate,
     resolveTextDirection,
+    getAttachmentDisplayTitle,
+    normalizeLinkAttachmentInput,
     validateAttachmentForUpload,
     parseQuickAdd,
 } from '@mindwtr/core';
@@ -782,14 +784,14 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     };
 
     const confirmAddLink = () => {
-        const url = linkInput.trim();
-        if (!url) return;
+        const normalized = normalizeLinkAttachmentInput(linkInput);
+        if (!normalized.uri) return;
         const now = new Date().toISOString();
         const attachment: Attachment = {
             id: generateUUID(),
-            kind: 'link',
-            title: url,
-            uri: url,
+            kind: normalized.kind,
+            title: normalized.title,
+            uri: normalized.uri,
             createdAt: now,
             updatedAt: now,
         };
@@ -2395,6 +2397,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                         ) : (
                             <View style={[styles.attachmentsList, { borderColor: tc.border, backgroundColor: tc.cardBg }]}>
                                 {visibleAttachments.map((attachment) => {
+                                    const displayTitle = getAttachmentDisplayTitle(attachment);
                                     const isMissing = attachment.kind === 'file'
                                         && (!attachment.uri || attachment.localStatus === 'missing');
                                     const canDownload = isMissing && Boolean(attachment.cloudKey);
@@ -2407,7 +2410,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                                 disabled={isDownloading}
                                             >
                                                 <Text style={[styles.attachmentTitle, { color: tc.tint }]} numberOfLines={1}>
-                                                    {attachment.title}
+                                                    {displayTitle}
                                                 </Text>
                                             </TouchableOpacity>
                                             {isDownloading ? (
@@ -2681,6 +2684,9 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                 autoCapitalize="none"
                                 autoCorrect={false}
                             />
+                            <Text style={[styles.modalLabel, { color: tc.secondaryText, marginTop: 8 }]}>
+                                {t('attachments.linkInputHint')}
+                            </Text>
                             <View style={styles.modalButtons}>
                                 <TouchableOpacity
                                     onPress={() => {
