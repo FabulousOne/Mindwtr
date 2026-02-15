@@ -2096,15 +2096,25 @@ export default function SettingsPage() {
                                 </View>
                             </View>
                             <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-                                <TouchableOpacity
-                                    style={[styles.dropdownButton, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
-                                    onPress={() => setModelPicker('model')}
-                                >
-                                    <Text style={[styles.dropdownValue, { color: tc.text }]} numberOfLines={1}>
-                                        {aiModel}
-                                    </Text>
-                                    <Text style={[styles.dropdownChevron, { color: tc.secondaryText }]}>▾</Text>
-                                </TouchableOpacity>
+                                <View style={styles.modelInputRow}>
+                                    <TextInput
+                                        value={aiModel}
+                                        onChangeText={(value) => updateAISettings({ model: value })}
+                                        placeholder={aiModelOptions[0]}
+                                        placeholderTextColor={tc.secondaryText}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        style={[styles.modelTextInput, { borderColor: tc.border, color: tc.text }]}
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.modelSuggestButton, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
+                                        onPress={() => setModelPicker('model')}
+                                    >
+                                        <Text style={[styles.modelSuggestButtonText, { color: tc.secondaryText }]}>
+                                            {localize('Suggestions', '建议')}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
 
                             <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
@@ -2116,15 +2126,25 @@ export default function SettingsPage() {
                                 </View>
                             </View>
                             <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-                                <TouchableOpacity
-                                    style={[styles.dropdownButton, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
-                                    onPress={() => setModelPicker('copilot')}
-                                >
-                                    <Text style={[styles.dropdownValue, { color: tc.text }]} numberOfLines={1}>
-                                        {aiCopilotModel}
-                                    </Text>
-                                    <Text style={[styles.dropdownChevron, { color: tc.secondaryText }]}>▾</Text>
-                                </TouchableOpacity>
+                                <View style={styles.modelInputRow}>
+                                    <TextInput
+                                        value={aiCopilotModel}
+                                        onChangeText={(value) => updateAISettings({ copilotModel: value })}
+                                        placeholder={aiCopilotOptions[0]}
+                                        placeholderTextColor={tc.secondaryText}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        style={[styles.modelTextInput, { borderColor: tc.border, color: tc.text }]}
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.modelSuggestButton, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
+                                        onPress={() => setModelPicker('copilot')}
+                                    >
+                                        <Text style={[styles.modelSuggestButtonText, { color: tc.secondaryText }]}>
+                                            {localize('Suggestions', '建议')}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
 
                         {aiProvider === 'openai' && (
@@ -4180,6 +4200,29 @@ const styles = StyleSheet.create({
     },
     dropdownChevron: {
         fontSize: 14,
+        fontWeight: '600',
+    },
+    modelInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    modelTextInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 14,
+    },
+    modelSuggestButton: {
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+    },
+    modelSuggestButtonText: {
+        fontSize: 12,
         fontWeight: '600',
     },
     pickerOverlay: {
