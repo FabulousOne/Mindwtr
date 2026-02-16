@@ -325,7 +325,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          FASTLANE_METADATA_DIR="$RUNNER_TEMP/fastlane_metadata"
+          export FASTLANE_METADATA_DIR="$RUNNER_TEMP/fastlane_metadata"
           scripts/ci/prepare-fastlane-metadata.sh
           echo "FASTLANE_METADATA_PATH=$FASTLANE_METADATA_DIR" >> "$GITHUB_ENV"
 
