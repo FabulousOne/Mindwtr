@@ -20,7 +20,7 @@ import { Archive, ArrowRight, Calendar, Check, CheckSquare, ChevronLeft, Layers,
 import { TaskItem } from '../../TaskItem';
 import { cn } from '../../../lib/utils';
 import { useLanguage } from '../../../contexts/language-context';
-import { buildAIConfig, loadAIKey } from '../../../lib/ai-config';
+import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../../../lib/ai-config';
 import { fetchExternalCalendarEvents } from '../../../lib/external-calendar-events';
 
 type ReviewStep = 'intro' | 'inbox' | 'ai' | 'calendar' | 'waiting' | 'projects' | 'someday' | 'completed';
@@ -237,7 +237,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
             return;
         }
         const apiKey = await loadAIKey(aiProvider);
-        if (!apiKey) {
+        if (isAIKeyRequired(settings) && !apiKey) {
             setAiError(t('ai.missingKeyBody'));
             return;
         }
