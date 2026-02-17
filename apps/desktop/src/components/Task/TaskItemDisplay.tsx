@@ -2,7 +2,7 @@ import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Clock
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Area, Attachment, Project, Task, TaskStatus, RecurrenceRule, RecurrenceStrategy } from '@mindwtr/core';
-import { getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, hasTimeComponent, safeFormatDate, resolveTaskTextDirection } from '@mindwtr/core';
+import { DEFAULT_AREA_COLOR, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, hasTimeComponent, safeFormatDate, resolveTaskTextDirection } from '@mindwtr/core';
 import { cn } from '../../lib/utils';
 import { getAttachmentDisplayTitle } from '../../lib/attachment-utils';
 import { MetadataBadge } from '../ui/MetadataBadge';
@@ -155,7 +155,7 @@ export function TaskItemDisplay({
                 <MetadataBadge
                     variant="project"
                     label={project.title}
-                    dotColor={projectColor || '#94a3b8'}
+                    dotColor={projectColor || DEFAULT_AREA_COLOR}
                 />
             );
         }
@@ -171,7 +171,7 @@ export function TaskItemDisplay({
                 <MetadataBadge
                     variant="project"
                     label={project.title}
-                    dotColor={projectColor || '#94a3b8'}
+                    dotColor={projectColor || DEFAULT_AREA_COLOR}
                 />
             </span>
         );
@@ -190,7 +190,7 @@ export function TaskItemDisplay({
                 <MetadataBadge
                     variant="project"
                     label={area.name}
-                    dotColor={area.color || '#94a3b8'}
+                    dotColor={area.color || DEFAULT_AREA_COLOR}
                 />
             )}
             {task.startTime && (

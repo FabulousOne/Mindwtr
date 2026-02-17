@@ -13,6 +13,7 @@ import {
   createAIProvider,
   type AIProviderId,
   type TaskSortBy,
+  DEFAULT_PROJECT_COLOR,
 } from '@mindwtr/core';
 
 import { TaskEditModal } from './task-edit-modal';
@@ -464,7 +465,7 @@ function TaskListComponent({
     if (!props.status) initialProps.status = defaultStatus;
     if (!props.projectId && projectId) initialProps.projectId = projectId;
     if (!initialProps.projectId && projectTitle) {
-      const created = await addProject(projectTitle, '#94a3b8');
+      const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
       if (!created) return;
       initialProps.projectId = created.id;
     }
@@ -492,7 +493,7 @@ function TaskListComponent({
     if (option.kind === 'create') {
       const title = option.value.trim();
       if (title) {
-        await addProject(title, '#94a3b8');
+        await addProject(title, DEFAULT_PROJECT_COLOR);
       }
     }
     if (trigger.type === 'project') {
@@ -674,7 +675,6 @@ function TaskListComponent({
       </View>
     );
   }, [getListItemKey, registerItemHeight, renderTask, themeColorsMemo.secondaryText, themeColorsMemo.text]);
-
   return (
     <View style={[styles.container, { backgroundColor: themeColorsMemo.bg }]}>
       {showHeader ? (

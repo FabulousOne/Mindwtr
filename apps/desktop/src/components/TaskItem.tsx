@@ -1,5 +1,6 @@
 import { useState, memo, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import {
+    DEFAULT_PROJECT_COLOR,
     Task,
     TaskEditorFieldId,
     type Recurrence,
@@ -325,7 +326,6 @@ export const TaskItem = memo(function TaskItem({
         setEditingTaskId(task.id);
     }, [effectiveReadOnly, isEditing, resetEditState, setEditingTaskId, task.id]);
 
-    const DEFAULT_PROJECT_COLOR = '#94a3b8';
     const handleCreateProject = useCallback(async (title: string) => {
         const trimmed = title.trim();
         if (!trimmed) return null;

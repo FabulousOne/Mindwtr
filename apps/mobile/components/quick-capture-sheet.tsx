@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import { Directory, File, Paths } from 'expo-file-system';
 
-import { parseQuickAdd, safeFormatDate, safeParseDate, type Attachment, type Task, type TaskPriority, generateUUID, PRESET_CONTEXTS, useTaskStore } from '@mindwtr/core';
+import { DEFAULT_PROJECT_COLOR, parseQuickAdd, safeFormatDate, safeParseDate, type Attachment, type Task, type TaskPriority, generateUUID, PRESET_CONTEXTS, useTaskStore } from '@mindwtr/core';
 import { useLanguage } from '../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -190,7 +190,7 @@ export function QuickCaptureSheet({
       Keyboard.dismiss();
       return;
     }
-    const created = await addProject(title, '#94a3b8');
+    const created = await addProject(title, DEFAULT_PROJECT_COLOR);
     if (!created) return;
     setProjectId(created.id);
     setShowProjectPicker(false);
@@ -398,7 +398,7 @@ export function QuickCaptureSheet({
     if (!initialPropsMerged.status) initialPropsMerged.status = 'inbox';
 
     if (!initialPropsMerged.projectId && projectTitle) {
-      const created = await addProject(projectTitle, '#94a3b8');
+      const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
       if (!created) return { title: finalTitle, props: initialPropsMerged };
       initialPropsMerged.projectId = created.id;
     }
@@ -498,7 +498,7 @@ export function QuickCaptureSheet({
         if (match) {
           updates.projectId = match.id;
         } else {
-          const created = await addProjectNow(trimmed, '#94a3b8');
+          const created = await addProjectNow(trimmed, DEFAULT_PROJECT_COLOR);
           if (!created) return;
           updates.projectId = created.id;
         }

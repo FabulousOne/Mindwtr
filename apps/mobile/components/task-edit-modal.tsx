@@ -30,6 +30,7 @@ import {
     normalizeLinkAttachmentInput,
     validateAttachmentForUpload,
     parseQuickAdd,
+    DEFAULT_PROJECT_COLOR,
 } from '@mindwtr/core';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -124,7 +125,6 @@ const STATUS_LABEL_FALLBACKS: Record<TaskStatus, string> = {
 };
 const QUICK_TOKEN_LIMIT = 6;
 const DEFAULT_CONTEXT_SUGGESTIONS = ['@home', '@work', '@errands', '@computer', '@phone'];
-const DEFAULT_PROJECT_COLOR = '#94a3b8';
 const getInitialWindowWidth = (): number => {
     const width = Dimensions?.get?.('window')?.width;
     return Number.isFinite(width) && width > 0 ? Math.round(width) : 1;
