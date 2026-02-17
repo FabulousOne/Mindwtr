@@ -124,6 +124,7 @@ const STATUS_LABEL_FALLBACKS: Record<TaskStatus, string> = {
 };
 const QUICK_TOKEN_LIMIT = 6;
 const DEFAULT_CONTEXT_SUGGESTIONS = ['@home', '@work', '@errands', '@computer', '@phone'];
+const DEFAULT_PROJECT_COLOR = '#94a3b8';
 const getInitialWindowWidth = (): number => {
     const width = Dimensions?.get?.('window')?.width;
     return Number.isFinite(width) && width > 0 ? Math.round(width) : 1;
@@ -531,7 +532,7 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
         let resolvedProjectId = parsedProps.projectId;
         if (!resolvedProjectId && projectTitle) {
             try {
-                const created = await addProject(projectTitle, '#94a3b8');
+                const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
                 resolvedProjectId = created?.id;
             } catch (error) {
                 logTaskError('Failed to create project from quick add', error);
@@ -2955,7 +2956,7 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
                             sectionId: projectId && prev.projectId === projectId ? prev.sectionId : undefined,
                         }));
                     }}
-                    onCreateProject={(title) => addProject(title, '#94a3b8')}
+                    onCreateProject={(title) => addProject(title, DEFAULT_PROJECT_COLOR)}
                 />
 
                 <TaskEditSectionPicker
@@ -2980,7 +2981,7 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
                     onSelectArea={(areaId) => {
                         setEditedTask(prev => ({ ...prev, areaId, projectId: undefined, sectionId: undefined }));
                     }}
-                    onCreateArea={(name) => addArea(name, { color: '#94a3b8' })}
+                    onCreateArea={(name) => addArea(name, { color: DEFAULT_PROJECT_COLOR })}
                 />
 
                 {aiModal && (
