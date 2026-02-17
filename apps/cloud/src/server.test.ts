@@ -329,6 +329,41 @@ describe('cloud server api', () => {
         expect(second.status).toBe(429);
     });
 
+    test('rate limits /v1/data by method and route', async () => {
+        stopServer?.();
+        const server = await startCloudServer({
+            host: '127.0.0.1',
+            port: 0,
+            dataDir,
+            windowMs: 60_000,
+            maxPerWindow: 1,
+            allowedAuthTokens: new Set(['integration-token']),
+        });
+        baseUrl = `http://127.0.0.1:${server.port}`;
+        stopServer = server.stop;
+
+        const getResponse = await fetch(`${baseUrl}/v1/data`, {
+            headers: authHeaders,
+        });
+        expect(getResponse.status).toBe(200);
+
+        const putResponse = await fetch(`${baseUrl}/v1/data`, {
+            method: 'PUT',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                tasks: [],
+                projects: [],
+                sections: [],
+                areas: [],
+                settings: {},
+            }),
+        });
+        expect(putResponse.status).toBe(200);
+    });
+
     test('serializes concurrent task writes without dropping records', async () => {
         const requests: Array<Promise<Response>> = [];
         for (let i = 0; i < 20; i += 1) {

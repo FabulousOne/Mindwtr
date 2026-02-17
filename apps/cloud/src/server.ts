@@ -754,8 +754,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 if (!token) return errorResponse('Unauthorized', 401);
                 if (!isAuthorizedToken(token, allowedAuthTokens)) return errorResponse('Unauthorized', 401);
                 const key = tokenToKey(token);
+                const dataRateKey = `${key}:${req.method}:${toRateLimitRoute(pathname)}`;
                 const now = Date.now();
-                const state = rateLimits.get(key);
+                const state = rateLimits.get(dataRateKey);
                 if (state && now < state.resetAt) {
                     state.count += 1;
                     if (state.count > maxPerWindow) {
@@ -766,7 +767,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         );
                     }
                 } else {
-                    rateLimits.set(key, { count: 1, resetAt: now + windowMs });
+                    rateLimits.set(dataRateKey, { count: 1, resetAt: now + windowMs });
                 }
                 const filePath = join(dataDir, `${key}.json`);
 
