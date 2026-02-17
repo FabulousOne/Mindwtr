@@ -219,7 +219,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
-    if: ${{ (startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_packages && (needs.release.result == 'success' || needs.release.result == 'skipped')) }}
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_packages && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
     steps:
       - name: Checkout release repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -482,7 +482,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    if: ${{ (startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success' && !contains(github.ref, '-')) || (github.event_name == 'workflow_dispatch' && inputs.run_bump_official_cask && (needs.release.result == 'success' || needs.release.result == 'skipped')) }}
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success' && !contains(github.ref, '-')) || (github.event_name == 'workflow_dispatch' && inputs.run_bump_official_cask && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
     steps:
       - name: Checkout release repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -562,7 +562,7 @@ jobs:
 
   update-linux-repos:
     needs: release
-    if: ${{ (startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_linux_repos && (needs.release.result == 'success' || needs.release.result == 'skipped')) }}
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_linux_repos && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
     permissions:
       contents: write
     uses: ./.github/workflows/publish-repo.yml
@@ -577,7 +577,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
-    if: ${{ ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success' && !contains(github.ref, '-')) || (github.event_name == 'workflow_dispatch' && inputs.run_publish_chocolatey && (needs.release.result == 'success' || needs.release.result == 'skipped'))) && vars.CHOCOLATEY_PUBLISH_ENABLED == 'true' }}
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success' && !contains(github.ref, '-')) || (github.event_name == 'workflow_dispatch' && inputs.run_publish_chocolatey && (needs.release.result == 'success' || needs.release.result == 'skipped'))) && vars.CHOCOLATEY_PUBLISH_ENABLED == 'true' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -701,7 +701,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    if: ${{ (startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_aur && (needs.release.result == 'success' || needs.release.result == 'skipped')) }}
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_aur && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -748,7 +748,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    if: ${{ (startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_aur_source && (needs.release.result == 'success' || needs.release.result == 'skipped')) }}
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_aur_source && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
     steps:
       - name: Configure SSH for AUR
         shell: bash
