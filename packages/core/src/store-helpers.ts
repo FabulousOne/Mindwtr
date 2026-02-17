@@ -203,39 +203,19 @@ export const sanitizeAppDataForStorage = (data: AppData): AppData => ({
     settings: stripSensitiveSettings(cloneSettings(data.settings)),
 });
 
-let projectOrderCacheVersion: number | null = null;
-let projectOrderCache: Map<string, number> | null = null;
-
 export const getNextProjectOrder = (
     projectId: string | undefined,
     tasks: Task[],
-    cacheKey?: number
+    _cacheKey?: number
 ): number | undefined => {
     if (!projectId) return undefined;
-    let cache = cacheKey !== undefined && projectOrderCacheVersion === cacheKey ? projectOrderCache : null;
-    if (!cache) {
-        cache = new Map<string, number>();
-        // Build a max-order index once per tasks array to avoid O(n) scans per project.
-        for (const task of tasks) {
-            if (!task.projectId || task.deletedAt) continue;
-            const order = Number.isFinite(task.orderNum) ? (task.orderNum as number) : -1;
-            const current = cache.get(task.projectId);
-            if (current === undefined) {
-                cache.set(task.projectId, Math.max(order, -1) + 1);
-            } else if (order >= current) {
-                cache.set(task.projectId, order + 1);
-            }
-        }
-        if (cacheKey !== undefined) {
-            projectOrderCacheVersion = cacheKey;
-            projectOrderCache = cache;
+    let maxOrder = -1;
+    for (const task of tasks) {
+        if (task.deletedAt || task.projectId !== projectId) continue;
+        const order = Number.isFinite(task.orderNum) ? (task.orderNum as number) : -1;
+        if (order > maxOrder) {
+            maxOrder = order;
         }
     }
-    const cached = cache.get(projectId);
-    if (cached !== undefined) {
-        cache.set(projectId, cached + 1);
-        return cached;
-    }
-    cache.set(projectId, 1);
-    return 0;
+    return maxOrder + 1;
 };
