@@ -500,6 +500,18 @@ jobs:
           ASC_KEY_PATH="$RUNNER_TEMP/macos-asc-key-fastlane-testflight.p8"
           bash scripts/ci/write-asc-private-key.sh "$IOS_ASC_PRIVATE_KEY" "$ASC_KEY_PATH"
 
+          WHAT_TO_TEST_FILE="metadata/en-US/release_notes.txt"
+          DEFAULT_WHAT_TO_TEST="Bug fixes, performance improvements, and sync stability updates."
+          WHAT_TO_TEST=""
+          if [ -f "$WHAT_TO_TEST_FILE" ]; then
+            WHAT_TO_TEST="$(tr '\n' ' ' < "$WHAT_TO_TEST_FILE" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+          fi
+          if [ -z "${WHAT_TO_TEST}" ]; then
+            WHAT_TO_TEST="$DEFAULT_WHAT_TO_TEST"
+          fi
+          export TESTFLIGHT_WHAT_TO_TEST="$WHAT_TO_TEST"
+          echo "Using TestFlight What to Test: ${TESTFLIGHT_WHAT_TO_TEST}"
+
           mkdir -p fastlane
           cat <<'EOF' > fastlane/Fastfile
           opt_out_usage
@@ -523,7 +535,8 @@ jobs:
               distribute_external: true,
               groups: [ENV.fetch("TESTFLIGHT_EXTERNAL_GROUP")],
               notify_external_testers: false,
-              skip_submission: true,
+              changelog: ENV.fetch("TESTFLIGHT_WHAT_TO_TEST"),
+              skip_submission: false,
               skip_waiting_for_build_processing: false,
               wait_processing_timeout_duration: 1800
             )
