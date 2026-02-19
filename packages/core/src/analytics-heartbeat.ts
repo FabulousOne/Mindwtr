@@ -11,6 +11,9 @@ export type SendDailyHeartbeatOptions = {
     platform?: string | null;
     channel?: string | null;
     appVersion?: string | null;
+    deviceClass?: string | null;
+    osMajor?: string | null;
+    locale?: string | null;
     storage: StorageLike;
     storageKey?: string;
     enabled?: boolean;
@@ -44,6 +47,9 @@ export async function sendDailyHeartbeat(options: SendDailyHeartbeatOptions): Pr
     const platform = trimValue(options.platform);
     const channel = trimValue(options.channel);
     const appVersion = trimValue(options.appVersion);
+    const deviceClass = trimValue(options.deviceClass);
+    const osMajor = trimValue(options.osMajor);
+    const locale = trimValue(options.locale);
 
     if (!endpoint || !distinctId || !platform || !channel || !appVersion) {
         return false;
@@ -65,17 +71,24 @@ export async function sendDailyHeartbeat(options: SendDailyHeartbeatOptions): Pr
         : null;
 
     try {
+        const payload: Record<string, string> = {
+            distinct_id: distinctId,
+            platform,
+            channel,
+            app_version: appVersion,
+            // Compatibility for servers that still expect `version`.
+            version: appVersion,
+        };
+        if (deviceClass) payload.device_class = deviceClass;
+        if (osMajor) payload.os_major = osMajor;
+        if (locale) payload.locale = locale;
+
         const response = await fetcher(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                distinct_id: distinctId,
-                platform,
-                channel,
-                app_version: appVersion,
-            }),
+            body: JSON.stringify(payload),
             ...(controller ? { signal: controller.signal } : {}),
         });
         if (!response.ok) return false;

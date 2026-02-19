@@ -40,6 +40,15 @@ describe('sendDailyHeartbeat', () => {
 
         expect(sent).toBe(true);
         expect(fetcher).toHaveBeenCalledTimes(1);
+        const call = fetcher.mock.calls[0]?.[1] as RequestInit;
+        const body = JSON.parse(String(call.body));
+        expect(body).toMatchObject({
+            distinct_id: 'device-123',
+            platform: 'ios',
+            channel: 'app-store',
+            app_version: '0.6.17',
+            version: '0.6.17',
+        });
         expect(store.dump()[HEARTBEAT_LAST_SENT_DAY_KEY]).toBe('2026-02-19');
     });
 
@@ -115,5 +124,32 @@ describe('sendDailyHeartbeat', () => {
         expect(disabled).toBe(false);
         expect(invalidUrl).toBe(false);
         expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    it('includes optional device fields when provided', async () => {
+        const store = createMemoryStore();
+        const fetcher = vi.fn().mockResolvedValue({ ok: true });
+
+        const sent = await sendDailyHeartbeat({
+            enabled: true,
+            endpointUrl: 'https://analytics.example.com/heartbeat',
+            distinctId: 'device-123',
+            platform: 'linux',
+            channel: 'aur-source',
+            appVersion: '0.6.17',
+            deviceClass: 'desktop',
+            osMajor: 'linux-6',
+            locale: 'en-US',
+            storage: store,
+            now: () => fixedDate,
+            fetcher,
+        });
+
+        expect(sent).toBe(true);
+        const call = fetcher.mock.calls[0]?.[1] as RequestInit;
+        const body = JSON.parse(String(call.body));
+        expect(body.device_class).toBe('desktop');
+        expect(body.os_major).toBe('linux-6');
+        expect(body.locale).toBe('en-US');
     });
 });

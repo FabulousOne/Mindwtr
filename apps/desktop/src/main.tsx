@@ -29,6 +29,30 @@ const detectDesktopPlatform = (): string => {
     return 'unknown';
 };
 
+const getDesktopLocale = (): string => {
+    const candidates = navigator.languages?.length ? navigator.languages : [navigator.language];
+    const locale = String(candidates?.[0] || '').trim();
+    return locale;
+};
+
+const getDesktopOsMajor = (platform: string): string => {
+    const userAgent = navigator.userAgent;
+    if (platform === 'windows') {
+        const match = userAgent.match(/windows nt\s+(\d+)/i);
+        if (match?.[1]) return `windows-${match[1]}`;
+        return 'windows';
+    }
+    if (platform === 'macos') {
+        const match = userAgent.match(/mac os x\s+(\d+)/i);
+        if (match?.[1]) return `macos-${match[1]}`;
+        return 'macos';
+    }
+    if (platform === 'linux') {
+        return 'linux';
+    }
+    return 'unknown';
+};
+
 const normalizeDesktopChannel = (value: string | null | undefined): string => {
     const normalized = String(value || '').trim().toLowerCase();
     switch (normalized) {
@@ -95,14 +119,18 @@ const sendDesktopHeartbeat = async (): Promise<void> => {
             getDesktopChannel(),
             getDesktopVersion(),
         ]);
+        const platform = detectDesktopPlatform();
         const distinctId = getOrCreateAnalyticsDistinctId();
         await sendDailyHeartbeat({
             enabled: true,
             endpointUrl: ANALYTICS_HEARTBEAT_URL,
             distinctId,
-            platform: detectDesktopPlatform(),
+            platform,
             channel,
             appVersion,
+            deviceClass: 'desktop',
+            osMajor: getDesktopOsMajor(platform),
+            locale: getDesktopLocale(),
             storage: localStorage,
         });
     } catch (error) {

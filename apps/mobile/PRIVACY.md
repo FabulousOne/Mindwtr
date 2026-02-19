@@ -13,7 +13,8 @@ We (the Mindwtr developer) do not operate analytics collection for user task con
 ## 2. Anonymous Usage Analytics (Heartbeat)
 In official non-FOSS builds, Mindwtr may send a small heartbeat event at most once per day to help us measure app health and adoption (for example DAU/MAU and distribution-channel usage).
 
-* **What may be sent:** platform (for example iOS/Android/macOS/Windows/Linux), app version, distribution channel (for example App Store/Play Store/winget/Homebrew), and an app-generated random identifier.
+* **What may be sent:** platform (for example iOS/Android/macOS/Windows/Linux), app version, distribution channel (for example App Store/Play Store/winget/Homebrew), coarse device class (for example phone/tablet/desktop), coarse OS major version (for example iOS 18 or Android 15), locale (for example en-US), and an app-generated random identifier.
+* **Country data:** country may be derived server-side from edge network metadata during request handling.
 * **What is not sent in the heartbeat payload:** task/project/note content, AI prompt content, email address, name, contacts, or files.
 * **Third-party analytics SDKs:** Mindwtr does not embed third-party analytics SDKs such as Google Analytics or Firebase.
 * **FOSS builds:** heartbeat analytics is disabled.

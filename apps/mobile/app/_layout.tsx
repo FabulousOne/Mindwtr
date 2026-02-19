@@ -68,6 +68,15 @@ const getCadenceForBackend = (backend: SyncBackend): AutoSyncCadence => {
 const parseBool = (value: unknown): boolean =>
   value === true || value === 1 || value === '1' || value === 'true';
 
+type PlatformExtras = typeof Platform & {
+  isPad?: boolean;
+  constants?: {
+    Release?: string;
+  };
+};
+
+const platformExtras = Platform as PlatformExtras;
+
 const getMobileAnalyticsChannel = async (isFossBuild: boolean): Promise<string> => {
   if (Platform.OS === 'ios') return 'app-store';
   if (Platform.OS !== 'android') return Platform.OS || 'mobile';
@@ -86,6 +95,34 @@ const getOrCreateAnalyticsDistinctId = async (): Promise<string> => {
   const generated = generateUUID();
   await AsyncStorage.setItem(ANALYTICS_DISTINCT_ID_KEY, generated);
   return generated;
+};
+
+const getMobileDeviceClass = (): string => {
+  if (Platform.OS === 'ios') return platformExtras.isPad === true ? 'tablet' : 'phone';
+  if (Platform.OS === 'android') return 'phone';
+  return 'desktop';
+};
+
+const getMobileOsMajor = (): string => {
+  if (Platform.OS === 'ios') {
+    const raw = String(Platform.Version ?? '');
+    const major = raw.match(/\d+/)?.[0];
+    return major ? `ios-${major}` : 'ios';
+  }
+  if (Platform.OS === 'android') {
+    const raw = String(platformExtras.constants?.Release ?? Platform.Version ?? '');
+    const major = raw.match(/\d+/)?.[0];
+    return major ? `android-${major}` : 'android';
+  }
+  return Platform.OS || 'mobile';
+};
+
+const getDeviceLocale = (): string => {
+  try {
+    return String(Intl.DateTimeFormat().resolvedOptions().locale || '').trim();
+  } catch {
+    return '';
+  }
 };
 
 // Initialize storage for mobile
@@ -405,6 +442,9 @@ function RootLayoutContent() {
               platform: Platform.OS,
               channel,
               appVersion,
+              deviceClass: getMobileDeviceClass(),
+              osMajor: getMobileOsMajor(),
+              locale: getDeviceLocale(),
               storage: AsyncStorage,
             });
           } catch (error) {
