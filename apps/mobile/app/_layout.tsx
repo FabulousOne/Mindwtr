@@ -158,6 +158,7 @@ function RootLayoutContent() {
   const settingsDateFormat = useTaskStore((state) => state.settings?.dateFormat);
   const lastSyncStatus = useTaskStore((state) => state.settings?.lastSyncStatus ?? 'idle');
   const lastSyncError = useTaskStore((state) => state.settings?.lastSyncError);
+  const [syncBackendForUi, setSyncBackendForUi] = useState<SyncBackend>('off');
   const appState = useRef(AppState.currentState);
   const lastAutoSyncAt = useRef(0);
   const syncDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,6 +187,7 @@ function RootLayoutContent() {
     }
     const rawBackend = await AsyncStorage.getItem(SYNC_BACKEND_KEY);
     const backend = resolveBackend(rawBackend);
+    setSyncBackendForUi((current) => (current === backend ? current : backend));
     syncBackendCacheRef.current = { backend, readAt: now };
     syncCadenceRef.current = getCadenceForBackend(backend);
     return syncCadenceRef.current;
@@ -543,6 +545,7 @@ function RootLayoutContent() {
 
   const isAppReady = isDataLoaded && themeReady && languageReady;
   const syncStatusBanner = useMemo(() => {
+    if (syncBackendForUi === 'off') return null;
     if (lastSyncStatus === 'idle' || lastSyncStatus === 'success') return null;
     if (lastSyncStatus === 'syncing') {
       return {
@@ -566,7 +569,7 @@ function RootLayoutContent() {
       borderColor: isDark ? '#991B1B' : '#FCA5A5',
       textColor: isDark ? '#FECACA' : '#991B1B',
     };
-  }, [isDark, lastSyncError, lastSyncStatus, t]);
+  }, [isDark, lastSyncError, lastSyncStatus, syncBackendForUi, t]);
 
   useEffect(() => {
     if (!isAppReady) return;

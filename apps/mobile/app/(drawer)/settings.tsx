@@ -3721,6 +3721,10 @@ export default function SettingsPage() {
                                     onPress={() => {
                                         AsyncStorage.setItem(SYNC_BACKEND_KEY, 'off').catch(logSettingsError);
                                         setSyncBackend('off');
+                                        void updateSettings({
+                                            lastSyncStatus: 'idle',
+                                            lastSyncError: undefined,
+                                        }).catch(logSettingsError);
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'off' ? tc.tint : tc.secondaryText }]}>
