@@ -364,4 +364,4 @@ Uses localStorage for data storage and includes offline support via service work
 
 - [[Architecture]]
 - [[Core API]]
-- [[Contributing]]
+- [Contributing (Repository Guide)](https://github.com/dongdongbh/Mindwtr/blob/main/docs/CONTRIBUTING.md)
