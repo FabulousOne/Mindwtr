@@ -1,4 +1,4 @@
-- Fixed stale sync error banner appearing when sync backend is Off.
-- Improved sync reliability with safer save coalescing, task restore behavior, and attachment metadata preservation.
-- Hardened cloud and MCP flows with stricter PATCH validation and consistent MCP error responses.
-- Added fail-safe task editing protections to avoid crashes from released audio players.
+- Fixed stale mobile sync banner (“Conflicts resolved”) showing unexpectedly.
+- Improved App Store upload reliability when no editable App Store version exists.
+- Standardized official-build heartbeat endpoint wiring across release pipelines.
+- Kept heartbeat behavior fully silent for users on mobile.

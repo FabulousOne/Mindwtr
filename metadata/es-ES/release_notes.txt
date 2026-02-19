@@ -1,4 +1,4 @@
-- Corregimos el banner de error de sync que aparecia aunque el backend estaba en Off.
-- Mejoramos la fiabilidad de sync con coalescing de guardado mas seguro, restauracion de tareas mas robusta y preservacion de metadatos de adjuntos.
-- Reforzamos flujos cloud y MCP con validacion PATCH mas estricta y respuestas de error MCP consistentes.
-- Agregamos protecciones fail-safe en la edicion de tareas para evitar cierres por reproductores de audio liberados.
+- Corregimos el banner de sync en mobile (“Conflicts resolved”) que aparecia de forma inesperada.
+- Mejoramos la fiabilidad de subida a App Store cuando no existe una version editable.
+- Estandarizamos la configuracion del endpoint de heartbeat en pipelines de release oficiales.
+- Mantuvimos el comportamiento de heartbeat totalmente silencioso para usuarios de mobile.

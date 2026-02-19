@@ -30,7 +30,7 @@
           "完全离线可用，无需互联网连接",
           "完全开源，安全透明"
         ],
-        "ReleaseNotes": "• 修复同步后端为 Off 时仍显示同步错误横幅的问题。\n• 提升同步可靠性：保存合并更稳健、任务恢复行为更安全，并保留附件元数据。\n• 强化 cloud 与 MCP 流程：PATCH 校验更严格，MCP 错误响应格式更一致。\n• 为任务编辑增加故障保护，避免音频播放器释放后导致崩溃。",
+        "ReleaseNotes": "• 修复 Winget 元数据，避免因依赖缺失导致安装失败。\n• 改进无可编辑版本时的 App Store 上传处理。\n• 统一官方非 FOSS 发布流水线中的心跳端点配置。\n• 保持移动端心跳行为对用户完全静默。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "• Fixed stale sync error banner appearing when sync backend is Off.\n• Improved sync reliability with safer save coalescing, task restore behavior, and attachment metadata preservation.\n• Hardened cloud and MCP flows with stricter PATCH validation and consistent MCP error responses.\n• Added fail-safe task editing protections to avoid crashes from released audio players.",
+        "ReleaseNotes": "• Fixed Winget package metadata to avoid missing-dependency install failures.\n• Improved App Store upload handling when no editable version is available.\n• Standardized heartbeat endpoint configuration across official non-FOSS release pipelines.\n• Kept mobile heartbeat behavior fully silent for users.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -130,7 +130,7 @@
           "No requiere conexión a internet para funcionar",
           "Código abierto y transparente"
         ],
-        "ReleaseNotes": "• Corregimos el banner de error de sync que aparecia aunque el backend estaba en Off.\n• Mejoramos la fiabilidad de sync con coalescing de guardado mas seguro, restauracion de tareas mas robusta y preservacion de metadatos de adjuntos.\n• Reforzamos flujos cloud y MCP con validacion PATCH mas estricta y respuestas de error MCP consistentes.\n• Agregamos protecciones fail-safe en la edicion de tareas para evitar cierres por reproductores de audio liberados.",
+        "ReleaseNotes": "• Corregimos metadatos de Winget para evitar fallos de instalacion por dependencias faltantes.\n• Mejoramos la subida a App Store cuando no hay una version editable disponible.\n• Estandarizamos la configuracion del endpoint de heartbeat en pipelines oficiales no FOSS.\n• Mantuvimos el comportamiento de heartbeat en mobile totalmente silencioso para usuarios.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
