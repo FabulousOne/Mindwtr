@@ -17,30 +17,11 @@ import {
   buildCaptureExtra,
   getCaptureFileExtension,
   getCaptureMimeType,
+  normalizeContextToken,
+  parseContextQueryTokens,
 } from './quick-capture-sheet.utils';
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
-const normalizeContextToken = (token: string): string => {
-  const trimmed = token.trim();
-  if (!trimmed) return '';
-  const stripped = trimmed.replace(/^[@＠]+/, '');
-  if (!stripped) return '';
-  return `@${stripped}`;
-};
-const parseContextQueryTokens = (value: string): string[] => {
-  const parts = value.split(',');
-  const seen = new Set<string>();
-  const tokens: string[] = [];
-  for (const part of parts) {
-    const normalized = normalizeContextToken(part);
-    if (!normalized) continue;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    tokens.push(normalized);
-  }
-  return tokens;
-};
 
 const logCaptureWarn = (message: string, error?: unknown) => {
   void logWarn(message, { scope: 'capture', extra: buildCaptureExtra(undefined, error) });
