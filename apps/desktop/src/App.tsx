@@ -344,6 +344,21 @@ function App() {
     }, [showTray]);
 
     useEffect(() => {
+        if (!isTauriRuntime()) return;
+        const hideFromDock = closeBehavior === 'tray' && showTray !== false;
+        let cancelled = false;
+        import('@tauri-apps/api/core')
+            .then(async ({ invoke }) => {
+                if (cancelled) return;
+                await invoke('set_macos_activation_policy', { accessory: hideFromDock });
+            })
+            .catch((error) => void logError(error, { scope: 'window', step: 'setActivationPolicy' }));
+        return () => {
+            cancelled = true;
+        };
+    }, [closeBehavior, showTray]);
+
+    useEffect(() => {
         if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
         const idleCallback =
             (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
