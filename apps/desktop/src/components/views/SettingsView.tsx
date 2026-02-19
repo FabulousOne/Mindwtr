@@ -10,6 +10,8 @@ import {
     Sparkles,
 } from 'lucide-react';
 import {
+    normalizeDateFormatSetting,
+    resolveDateLocaleTag,
     DEFAULT_ANTHROPIC_THINKING_BUDGET,
     flushPendingSave,
     safeFormatDate,
@@ -118,6 +120,7 @@ export function SettingsView() {
     const closeBehavior = settings?.window?.closeBehavior ?? 'ask';
     const trayVisible = settings?.window?.showTray !== false;
     const densityMode = (settings?.appearance?.density === 'compact' ? 'compact' : 'comfortable') as DensityMode;
+    const dateFormat = normalizeDateFormatSetting(settings?.dateFormat);
     const [saved, setSaved] = useState(false);
     const [appVersion, setAppVersion] = useState('0.1.0');
     const [logPath, setLogPath] = useState('');
@@ -411,6 +414,12 @@ export function SettingsView() {
             .catch((error) => reportError('Failed to update week start', error));
     };
 
+    const saveDateFormatPreference = (value: 'system' | 'dmy' | 'mdy') => {
+        updateSettings({ dateFormat: value })
+            .then(showSaved)
+            .catch((error) => reportError('Failed to update date format', error));
+    };
+
     const handleWindowDecorationsChange = useCallback((enabled: boolean) => {
         updateSettings({
             window: {
@@ -617,7 +626,7 @@ export function SettingsView() {
 
     const attachmentsLastCleanupDisplay = useMemo(() => {
         if (!attachmentsLastCleanupAt) return '';
-        return safeFormatDate(attachmentsLastCleanupAt, 'MMM d, HH:mm');
+        return safeFormatDate(attachmentsLastCleanupAt, 'Pp');
     }, [attachmentsLastCleanupAt]);
     const anthropicThinkingOptions = [
         { value: DEFAULT_ANTHROPIC_THINKING_BUDGET || 1024, label: t.aiThinkingLow },
@@ -736,22 +745,10 @@ export function SettingsView() {
     const weeklyReviewTime = settings?.weeklyReviewTime || '18:00';
     const weeklyReviewDay = Number.isFinite(settings?.weeklyReviewDay) ? settings?.weeklyReviewDay as number : 0;
     const weekStart = settings?.weekStart === 'monday' ? 'monday' : 'sunday';
-    const localeMap: Record<Language, string> = {
-        en: 'en-US',
-        zh: 'zh-CN',
-        es: 'es-ES',
-        hi: 'hi-IN',
-        ar: 'ar',
-        de: 'de-DE',
-        ru: 'ru-RU',
-        ja: 'ja-JP',
-        fr: 'fr-FR',
-        pt: 'pt-PT',
-        ko: 'ko-KR',
-        it: 'it-IT',
-        tr: 'tr-TR',
-    };
-    const locale = localeMap[language] ?? 'en-US';
+    const systemLocale = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function'
+        ? Intl.DateTimeFormat().resolvedOptions().locale
+        : '';
+    const locale = resolveDateLocaleTag({ language, dateFormat, systemLocale });
     const weekdayOptions = useMemo(() => (
         Array.from({ length: 7 }, (_, i) => {
             const base = new Date(2021, 7, 1 + i);
@@ -786,7 +783,7 @@ export function SettingsView() {
         badge?: boolean;
         badgeLabel?: string;
     }>>(() => [
-        { id: 'main', icon: Monitor, label: t.general, keywords: [t.appearance, t.density, t.language, t.weekStart, t.keybindings, t.windowDecorations, t.closeBehavior, t.showTray, 'theme', 'dark mode', 'light mode'] },
+        { id: 'main', icon: Monitor, label: t.general, keywords: [t.appearance, t.density, t.language, t.weekStart, t.dateFormat, t.keybindings, t.windowDecorations, t.closeBehavior, t.showTray, 'theme', 'dark mode', 'light mode'] },
         { id: 'gtd', icon: ListChecks, label: t.gtd, keywords: ['auto-archive', 'priorities', 'time estimates', 'pomodoro', 'capture', 'inbox processing', '2-minute rule', 'task editor'] },
         { id: 'notifications', icon: Bell, label: t.notifications, keywords: ['review reminders', 'weekly review', 'daily digest', 'morning', 'evening'] },
         { id: 'sync', icon: Database, label: t.sync, keywords: ['file sync', 'WebDAV', 'cloud', 'sync now', 'attachments', 'diagnostics', 'logging'] },
@@ -877,6 +874,8 @@ export function SettingsView() {
                     onLanguageChange={saveLanguagePreference}
                     weekStart={weekStart}
                     onWeekStartChange={saveWeekStartPreference}
+                    dateFormat={dateFormat}
+                    onDateFormatChange={saveDateFormatPreference}
                     keybindingStyle={keybindingStyle}
                     onKeybindingStyleChange={handleKeybindingStyleChange}
                     onOpenHelp={openHelp}

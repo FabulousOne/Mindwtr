@@ -37,9 +37,11 @@ import {
     DEFAULT_GEMINI_THINKING_BUDGET,
     generateUUID,
     getDefaultAIConfig,
+    normalizeDateFormatSetting,
     getDefaultCopilotModel,
     getCopilotModelOptions,
     getModelOptions,
+    resolveDateLocaleTag,
     translateText,
     type AIProviderId,
     type AIReasoningEffort,
@@ -240,6 +242,7 @@ export default function SettingsPage() {
     const [modelPicker, setModelPicker] = useState<null | 'model' | 'copilot' | 'speech'>(null);
     const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
     const [weekStartPickerOpen, setWeekStartPickerOpen] = useState(false);
+    const [dateFormatPickerOpen, setDateFormatPickerOpen] = useState(false);
     const [syncOptionsOpen, setSyncOptionsOpen] = useState(false);
     const [syncHistoryExpanded, setSyncHistoryExpanded] = useState(false);
     const [externalCalendars, setExternalCalendars] = useState<ExternalCalendarSubscription[]>([]);
@@ -268,6 +271,7 @@ export default function SettingsPage() {
     const weeklyReviewTime = settings.weeklyReviewTime || '18:00';
     const weeklyReviewDay = Number.isFinite(settings.weeklyReviewDay) ? settings.weeklyReviewDay as number : 0;
     const weekStart = settings.weekStart === 'monday' ? 'monday' : 'sunday';
+    const dateFormat = normalizeDateFormatSetting(settings.dateFormat);
     const loggingEnabled = settings.diagnostics?.loggingEnabled === true;
     const lastSyncStats = settings.lastSyncStats ?? null;
     const syncConflictCount = (lastSyncStats?.tasks.conflicts || 0) + (lastSyncStats?.projects.conflicts || 0);
@@ -372,22 +376,10 @@ export default function SettingsPage() {
             },
         }).catch(logSettingsError);
     };
-    const localeMap: Record<Language, string> = {
-        en: 'en-US',
-        zh: 'zh-CN',
-        es: 'es-ES',
-        hi: 'hi-IN',
-        ar: 'ar',
-        de: 'de-DE',
-        ru: 'ru-RU',
-        ja: 'ja-JP',
-        fr: 'fr-FR',
-        pt: 'pt-PT',
-        ko: 'ko-KR',
-        it: 'it-IT',
-        tr: 'tr-TR',
-    };
-    const locale = localeMap[language] ?? 'en-US';
+    const systemLocale = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function'
+        ? Intl.DateTimeFormat().resolvedOptions().locale
+        : '';
+    const locale = resolveDateLocaleTag({ language, dateFormat, systemLocale });
     const toTimePickerDate = (time: string) => {
         const [hours, minutes] = time.split(':').map((v) => parseInt(v, 10));
         const date = new Date();
@@ -558,6 +550,12 @@ export default function SettingsPage() {
         { value: 'monday', label: t('settings.weekStartMonday') },
     ];
     const currentWeekStartLabel = weekStartOptions.find((opt) => opt.value === weekStart)?.label ?? t('settings.weekStartSunday');
+    const dateFormatOptions: { value: 'system' | 'dmy' | 'mdy'; label: string }[] = [
+        { value: 'system', label: t('settings.dateFormatSystem') },
+        { value: 'dmy', label: t('settings.dateFormatDmy') },
+        { value: 'mdy', label: t('settings.dateFormatMdy') },
+    ];
+    const currentDateFormatLabel = dateFormatOptions.find((opt) => opt.value === dateFormat)?.label ?? t('settings.dateFormatSystem');
     const openLink = (url: string) => Linking.openURL(url);
     const updateAISettings = useCallback((next: Partial<NonNullable<typeof settings.ai>>) => {
         updateSettings({ ai: { ...(settings.ai ?? {}), ...next } }).catch(logSettingsError);
@@ -2127,6 +2125,56 @@ export default function SettingsPage() {
                                                 onPress={() => {
                                                     updateSettings({ weekStart: option.value }).catch(logSettingsError);
                                                     setWeekStartPickerOpen(false);
+                                                }}
+                                            >
+                                                <Text style={[styles.pickerOptionText, { color: selected ? tc.tint : tc.text }]}>
+                                                    {option.label}
+                                                </Text>
+                                                {selected && <Text style={{ color: tc.tint, fontSize: 18 }}>✓</Text>}
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </View>
+                        </Pressable>
+                    </Modal>
+
+                    <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginTop: 12 }]}>
+                        <TouchableOpacity style={styles.settingRow} onPress={() => setDateFormatPickerOpen(true)}>
+                            <View style={styles.settingInfo}>
+                                <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.dateFormat')}</Text>
+                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                    {currentDateFormatLabel}
+                                </Text>
+                            </View>
+                            <Text style={{ color: tc.secondaryText, fontSize: 18 }}>▾</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <Modal
+                        transparent
+                        visible={dateFormatPickerOpen}
+                        animationType="fade"
+                        onRequestClose={() => setDateFormatPickerOpen(false)}
+                    >
+                        <Pressable style={styles.pickerOverlay} onPress={() => setDateFormatPickerOpen(false)}>
+                            <View
+                                style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
+                                onStartShouldSetResponder={() => true}
+                            >
+                                <Text style={[styles.pickerTitle, { color: tc.text }]}>{t('settings.dateFormat')}</Text>
+                                <ScrollView style={styles.pickerList} contentContainerStyle={styles.pickerListContent}>
+                                    {dateFormatOptions.map((option) => {
+                                        const selected = dateFormat === option.value;
+                                        return (
+                                            <TouchableOpacity
+                                                key={option.value}
+                                                style={[
+                                                    styles.pickerOption,
+                                                    { borderColor: tc.border, backgroundColor: selected ? tc.filterBg : 'transparent' },
+                                                ]}
+                                                onPress={() => {
+                                                    updateSettings({ dateFormat: option.value }).catch(logSettingsError);
+                                                    setDateFormatPickerOpen(false);
                                                 }}
                                             >
                                                 <Text style={[styles.pickerOptionText, { color: selected ? tc.tint : tc.text }]}>

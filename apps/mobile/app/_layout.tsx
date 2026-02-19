@@ -14,7 +14,7 @@ import { QuickCaptureProvider, type QuickCaptureOptions } from '../contexts/quic
 
 import { ThemeProvider, useTheme } from '../contexts/theme-context';
 import { LanguageProvider, useLanguage } from '../contexts/language-context';
-import { setStorageAdapter, useTaskStore, flushPendingSave, isSupportedLanguage, generateUUID, sendDailyHeartbeat } from '@mindwtr/core';
+import { configureDateFormatting, setStorageAdapter, useTaskStore, flushPendingSave, isSupportedLanguage, generateUUID, sendDailyHeartbeat } from '@mindwtr/core';
 import { mobileStorage } from '../lib/storage-adapter';
 import { setNotificationOpenHandler, startMobileNotifications, stopMobileNotifications } from '../lib/notification-service';
 import { performMobileSync } from '../lib/sync-service';
@@ -155,6 +155,7 @@ function RootLayoutContent() {
   const [storageWarningShown, setStorageWarningShown] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const settingsLanguage = useTaskStore((state) => state.settings?.language);
+  const settingsDateFormat = useTaskStore((state) => state.settings?.dateFormat);
   const appState = useRef(AppState.currentState);
   const lastAutoSyncAt = useRef(0);
   const syncDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -311,6 +312,14 @@ function RootLayoutContent() {
     if (settingsLanguage === language) return;
     void setLanguage(settingsLanguage);
   }, [language, settingsLanguage, setLanguage]);
+
+  useEffect(() => {
+    configureDateFormatting({
+      language: settingsLanguage || language,
+      dateFormat: settingsDateFormat,
+      systemLocale: getDeviceLocale(),
+    });
+  }, [language, settingsDateFormat, settingsLanguage]);
 
   useEffect(() => {
     if (!hasShareIntent) return;

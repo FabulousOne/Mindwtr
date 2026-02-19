@@ -12,7 +12,7 @@ import { ArchiveView } from './components/views/ArchiveView';
 import { TrashView } from './components/views/TrashView';
 import { AgendaView } from './components/views/AgendaView';
 import { SearchView } from './components/views/SearchView';
-import { useTaskStore, flushPendingSave, isSupportedLanguage } from '@mindwtr/core';
+import { useTaskStore, configureDateFormatting, flushPendingSave, isSupportedLanguage } from '@mindwtr/core';
 import { GlobalSearch } from './components/GlobalSearch';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useLanguage } from './contexts/language-context';
@@ -38,6 +38,7 @@ function App() {
     const showTray = useTaskStore((state) => state.settings?.window?.showTray);
     const settingsTheme = useTaskStore((state) => state.settings?.theme);
     const settingsLanguage = useTaskStore((state) => state.settings?.language);
+    const settingsDateFormat = useTaskStore((state) => state.settings?.dateFormat);
     const updateSettings = useTaskStore((state) => state.updateSettings);
     const showToast = useUiStore((state) => state.showToast);
     const isFlatpak = isFlatpakRuntime();
@@ -87,6 +88,18 @@ function App() {
         if (settingsLanguage === language) return;
         setLanguage(settingsLanguage);
     }, [settingsLanguage, language, setLanguage]);
+
+    useEffect(() => {
+        const systemLocale = (() => {
+            const candidates = navigator.languages?.length ? navigator.languages : [navigator.language];
+            return String(candidates?.[0] || '').trim();
+        })();
+        configureDateFormatting({
+            language: settingsLanguage || language,
+            dateFormat: settingsDateFormat,
+            systemLocale,
+        });
+    }, [language, settingsDateFormat, settingsLanguage]);
 
     const translateOrFallback = useCallback((key: string, fallback: string) => {
         const value = t(key);

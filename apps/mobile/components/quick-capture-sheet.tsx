@@ -700,7 +700,7 @@ export function QuickCaptureSheet({
         }
         const now = new Date();
         const nowIso = now.toISOString();
-        const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'MMM d, HH:mm')}`;
+        const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'Pp')}`;
         const speech = settings.ai?.speechToText;
         const provider = speech?.provider ?? 'gemini';
         const model = speech?.model ?? (provider === 'openai' ? 'gpt-4o-transcribe' : provider === 'gemini' ? 'gemini-2.5-flash' : 'whisper-tiny');
@@ -885,7 +885,7 @@ export function QuickCaptureSheet({
         logCaptureWarn('Audio info lookup failed', error);
       }
       const nowIso = now.toISOString();
-      const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'MMM d, HH:mm')}`;
+      const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'Pp')}`;
       const speech = settings.ai?.speechToText;
       const provider = speech?.provider ?? 'gemini';
       const model = speech?.model ?? (provider === 'openai' ? 'gpt-4o-transcribe' : provider === 'gemini' ? 'gemini-2.5-flash' : 'whisper-tiny');
@@ -1051,7 +1051,7 @@ export function QuickCaptureSheet({
   }, [autoRecord, recording, recordingBusy, startRecording, visible]);
 
   const selectedProject = projectId ? projects.find((project) => project.id === projectId) : null;
-  const dueLabel = dueDate ? safeFormatDate(dueDate, 'MMM d') : t('taskEdit.dueDateLabel');
+  const dueLabel = dueDate ? safeFormatDate(dueDate, 'P') : t('taskEdit.dueDateLabel');
   const contextLabel = contextTags.length === 0
     ? t('taskEdit.contextsLabel')
     : `${contextTags[0].replace(/^@+/, '')}${contextTags.length > 1 ? ` +${contextTags.length - 1}` : ''}`;
