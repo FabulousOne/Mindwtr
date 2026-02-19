@@ -128,6 +128,7 @@ jobs:
           ls -la ./build
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          ANALYTICS_HEARTBEAT_URL: ${{ secrets.ANALYTICS_HEARTBEAT_URL }}
 
       - name: Prepare Google Play release notes
         run: |
