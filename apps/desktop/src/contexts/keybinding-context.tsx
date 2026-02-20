@@ -406,12 +406,14 @@ export function KeybindingProvider({
                     }
                 }
             }
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && !isEditableTarget(e.target)) {
-                if (e.code === 'KeyA') {
+            if (e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey && !isEditableTarget(e.target)) {
+                if (e.code === 'KeyM') {
                     e.preventDefault();
                     triggerQuickAdd();
                     return;
                 }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && !isEditableTarget(e.target)) {
                 if (e.code === 'Backslash') {
                     e.preventDefault();
                     toggleFocusMode();

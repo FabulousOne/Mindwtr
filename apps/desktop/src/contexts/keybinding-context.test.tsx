@@ -77,4 +77,22 @@ describe('KeybindingProvider (vim)', () => {
             expect(document.querySelector('[data-task-id="2"]')?.className).toMatch(/ring-2/);
         });
     });
+
+    it('triggers quick add with Ctrl+Alt+M', () => {
+        const quickAddListener = vi.fn();
+        window.addEventListener('mindwtr:quick-add', quickAddListener);
+
+        render(
+            <LanguageProvider>
+                <KeybindingProvider currentView="inbox" onNavigate={vi.fn()}>
+                    <DummyList />
+                </KeybindingProvider>
+            </LanguageProvider>
+        );
+
+        fireEvent.keyDown(window, { key: 'm', code: 'KeyM', ctrlKey: true, altKey: true });
+
+        expect(quickAddListener).toHaveBeenCalledTimes(1);
+        window.removeEventListener('mindwtr:quick-add', quickAddListener);
+    });
 });

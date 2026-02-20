@@ -2831,9 +2831,10 @@ pub fn run() {
             }
 
             // Global hotkey for Quick Add.
+            let quick_add_shortcut = "Control+Alt+M";
             handle
                 .global_shortcut()
-                .on_shortcut("CommandOrControl+Shift+A", move |app, _shortcut, _event| {
+                .on_shortcut(quick_add_shortcut, move |app, _shortcut, _event| {
                     show_main_and_emit(app);
                 })?;
             

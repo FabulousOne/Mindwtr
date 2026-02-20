@@ -204,7 +204,7 @@ Save frequently used searches for quick access:
 
 Capture tasks from anywhere on your desktop without switching windows:
 
-1. Press the global hotkey (Ctrl+Shift+A on Windows/Linux, Cmd+Shift+A on macOS)
+1. Press the global hotkey (`Ctrl+Alt+M`)
 2. Type your task with quick-add syntax
 3. Press Enter to add to Inbox
 4. Continue what you were doing

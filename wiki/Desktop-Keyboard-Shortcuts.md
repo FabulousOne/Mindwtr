@@ -16,7 +16,7 @@ Change presets in **Settings → Keyboard Shortcuts**.
 | `?` | Show keyboard shortcuts help |
 | `Ctrl+\\` / `Cmd+\\` | Toggle Focus Mode |
 | `Ctrl+B` / `Cmd+B` | Toggle Sidebar |
-| `Ctrl+Shift+A / Cmd+Shift+A` | Open Quick Add |
+| `Ctrl+Alt+M` | Open Quick Add |
 | `Ctrl+Shift+D / Cmd+Shift+D` | Toggle list details |
 | `Ctrl+Shift+C / Cmd+Shift+C` | Toggle list density |
 
@@ -66,7 +66,7 @@ When a task list is visible:
 | `Ctrl-h` | Show keyboard shortcuts help |
 | `Ctrl+\\` / `Cmd+\\` | Toggle Focus Mode |
 | `Ctrl+B` / `Cmd+B` | Toggle Sidebar |
-| `Ctrl+Shift+A / Cmd+Shift+A` | Open Quick Add |
+| `Ctrl+Alt+M` | Open Quick Add |
 | `Ctrl+Shift+D / Cmd+Shift+D` | Toggle list details |
 | `Ctrl+Shift+C / Cmd+Shift+C` | Toggle list density |
 
