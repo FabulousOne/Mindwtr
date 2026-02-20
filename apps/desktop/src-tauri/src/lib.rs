@@ -382,12 +382,34 @@ fn current_exe_path_lowercase() -> Option<String> {
         .and_then(|path| path.to_str().map(|value| value.to_lowercase()))
 }
 
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn current_exe_canonical_path_lowercase() -> Option<String> {
+    env::current_exe()
+        .ok()
+        .and_then(|path| fs::canonicalize(path).ok())
+        .and_then(|path| path.to_str().map(|value| value.to_lowercase()))
+}
+
 fn command_succeeds(cmd: &str, args: &[&str]) -> bool {
     Command::new(cmd)
         .args(args)
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false)
+}
+
+#[cfg(target_os = "windows")]
+fn command_output_lowercase(cmd: &str, args: &[&str]) -> Option<String> {
+    let output = Command::new(cmd).args(args).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let mut combined = String::from_utf8_lossy(&output.stdout).to_lowercase();
+    if !output.stderr.is_empty() {
+        combined.push('\n');
+        combined.push_str(&String::from_utf8_lossy(&output.stderr).to_lowercase());
+    }
+    Some(combined)
 }
 
 #[cfg(target_os = "macos")]
@@ -410,6 +432,20 @@ fn get_install_source() -> String {
         if is_windows_store_install() {
             return "microsoft-store".to_string();
         }
+        let is_windows_store_path = |path: &str| {
+            (path.contains("\\windowsapps\\") || path.contains("/windowsapps/"))
+                && path.contains("tech.dongdongbh.mindwtr")
+        };
+        if let Some(path) = current_exe_path_lowercase() {
+            if is_windows_store_path(&path) {
+                return "microsoft-store".to_string();
+            }
+        }
+        if let Some(path) = current_exe_canonical_path_lowercase() {
+            if is_windows_store_path(&path) {
+                return "microsoft-store".to_string();
+            }
+        }
         if env::var_os("WINGET_PACKAGE_IDENTIFIER").is_some() {
             return "winget".to_string();
         }
@@ -417,6 +453,21 @@ fn get_install_source() -> String {
             if path.contains("\\microsoft\\winget\\packages\\")
                 || path.contains("/microsoft/winget/packages/")
             {
+                return "winget".to_string();
+            }
+        }
+        if let Some(path) = current_exe_canonical_path_lowercase() {
+            if path.contains("\\microsoft\\winget\\packages\\")
+                || path.contains("/microsoft/winget/packages/")
+            {
+                return "winget".to_string();
+            }
+        }
+        if let Some(list_output) = command_output_lowercase(
+            "winget",
+            &["list", "--id", "dongdongbh.Mindwtr", "--exact", "--disable-interactivity"],
+        ) {
+            if list_output.contains("dongdongbh.mindwtr") && list_output.contains("winget") {
                 return "winget".to_string();
             }
         }
@@ -437,10 +488,19 @@ fn get_install_source() -> String {
                 }
             }
         }
+        let is_homebrew_path = |path: &str| path.contains("/caskroom/") || path.contains("/homebrew/");
         if let Some(path) = current_exe_path_lowercase() {
-            if path.contains("/caskroom/") || path.contains("/homebrew/") {
+            if is_homebrew_path(&path) {
                 return "homebrew".to_string();
             }
+        }
+        if let Some(path) = current_exe_canonical_path_lowercase() {
+            if is_homebrew_path(&path) {
+                return "homebrew".to_string();
+            }
+        }
+        if command_succeeds("brew", &["list", "--cask", "mindwtr"]) {
+            return "homebrew".to_string();
         }
         return "direct".to_string();
     }
