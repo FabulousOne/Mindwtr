@@ -24,7 +24,7 @@ import { useLanguage } from '../../../contexts/language-context';
 import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../../../lib/ai-config';
 import { fetchExternalCalendarEvents } from '../../../lib/external-calendar-events';
 
-type ReviewStep = 'intro' | 'inbox' | 'ai' | 'calendar' | 'waiting' | 'projects' | 'someday' | 'completed';
+type ReviewStep = 'inbox' | 'ai' | 'calendar' | 'waiting' | 'projects' | 'someday' | 'completed';
 type CalendarReviewEntry = {
     task: Task;
     date: Date;
@@ -41,7 +41,7 @@ type WeeklyReviewGuideModalProps = {
 };
 
 export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps) {
-    const [currentStep, setCurrentStep] = useState<ReviewStep>('intro');
+    const [currentStep, setCurrentStep] = useState<ReviewStep>('inbox');
     const [expandedExternalDays, setExpandedExternalDays] = useState<Set<string>>(new Set());
     const [projectTaskPrompt, setProjectTaskPrompt] = useState<{ projectId: string; projectTitle: string } | null>(null);
     const { tasks, projects, areas, settings, batchUpdateTasks } = useTaskStore(
@@ -131,7 +131,6 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
 
     const steps = useMemo<{ id: ReviewStep; title: string; description: string; icon: LucideIcon }[]>(() => {
         const list: { id: ReviewStep; title: string; description: string; icon: LucideIcon }[] = [
-            { id: 'intro', title: t('review.title'), description: t('review.intro'), icon: RefreshCw },
             { id: 'inbox', title: t('review.inboxStep'), description: t('review.inboxStepDesc'), icon: CheckSquare },
         ];
         if (aiEnabled) {
@@ -384,25 +383,6 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
 
     const renderStepContent = () => {
         switch (currentStep) {
-            case 'intro':
-                return (
-                    <div className="text-center space-y-6 py-12">
-                        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <RefreshCw className="w-10 h-10 text-primary" />
-                        </div>
-                        <h2 className="text-3xl font-bold">{t('review.timeFor')}</h2>
-                        <p className="text-muted-foreground text-lg max-w-md mx-auto">
-                            {t('review.timeForDesc')}
-                        </p>
-                        <button
-                            onClick={nextStep}
-                            className="bg-primary text-primary-foreground px-8 py-3 rounded-lg text-lg font-medium hover:bg-primary/90 transition-colors"
-                        >
-                            {t('review.startReview')}
-                        </button>
-                    </div>
-                );
-
             case 'inbox': {
                 const inboxTasks = tasks.filter((task) => task.status === 'inbox');
                 return (
@@ -743,7 +723,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                         {renderStepContent()}
                     </div>
 
-                    {currentStep !== 'intro' && currentStep !== 'completed' && (
+                    {currentStep !== 'completed' && (
                         <div className="flex justify-between items-center pt-3.5 border-t border-border mt-5">
                             <button
                                 onClick={prevStep}

@@ -33,10 +33,6 @@ describe('ReviewView', () => {
 
         // Open guide
         fireEvent.click(getByText('review.openGuide'));
-        expect(getByText('review.timeFor')).toBeInTheDocument();
-
-        // Intro -> Inbox
-        fireEvent.click(getByText('review.startReview'));
         expect(getByText('review.inboxStep')).toBeInTheDocument();
         expect(getByText('review.inboxZero')).toBeInTheDocument();
 
@@ -72,18 +68,16 @@ describe('ReviewView', () => {
     });
 
     it('can navigate back', () => {
-        const { getByText } = renderWithProviders(<ReviewView />);
+        const { getByText, queryByText } = renderWithProviders(<ReviewView />);
 
         // Open guide
         fireEvent.click(getByText('review.openGuide'));
-        expect(getByText('review.timeFor')).toBeInTheDocument();
-
-        // Go to Inbox
-        fireEvent.click(getByText('review.startReview'));
         expect(getByText('review.inboxStep')).toBeInTheDocument();
 
-        // Go back to Intro
+        // Go forward then back to Inbox
+        fireEvent.click(getByText('review.nextStepBtn'));
+        expect(queryByText('review.inboxStep')).not.toBeInTheDocument();
         fireEvent.click(getByText('review.back'));
-        expect(getByText('review.timeFor')).toBeInTheDocument();
+        expect(getByText('review.inboxStep')).toBeInTheDocument();
     });
 });

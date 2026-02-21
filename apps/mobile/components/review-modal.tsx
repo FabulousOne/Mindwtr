@@ -27,7 +27,7 @@ import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../lib/ai-config';
 import { logError } from '../lib/app-log';
 import { fetchExternalCalendarEvents } from '../lib/external-calendar';
 
-type ReviewStep = 'intro' | 'inbox' | 'ai' | 'calendar' | 'waiting' | 'projects' | 'someday' | 'completed';
+type ReviewStep = 'inbox' | 'ai' | 'calendar' | 'waiting' | 'projects' | 'someday' | 'completed';
 type ExternalCalendarDaySummary = {
     dayStart: Date;
     events: ExternalCalendarEvent[];
@@ -179,7 +179,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
     const { isDark } = useTheme();
     const { language } = useLanguage();
     const { openQuickCapture } = useQuickCapture();
-    const [currentStep, setCurrentStep] = useState<ReviewStep>('intro');
+    const [currentStep, setCurrentStep] = useState<ReviewStep>('inbox');
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [expandedProject, setExpandedProject] = useState<string | null>(null);
@@ -202,7 +202,6 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
 
     const steps = useMemo<{ id: ReviewStep; title: string; icon: string }[]>(() => {
         const list: { id: ReviewStep; title: string; icon: string }[] = [
-            { id: 'intro', title: labels.weeklyReview, icon: '🔄' },
             { id: 'inbox', title: labels.inbox, icon: '📥' },
         ];
         if (aiEnabled) {
@@ -243,7 +242,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
     };
 
     const handleClose = () => {
-        setCurrentStep('intro');
+        setCurrentStep('inbox');
         setExpandedExternalDays(new Set());
         onClose();
     };
@@ -584,24 +583,6 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
 
     const renderStepContent = () => {
         switch (currentStep) {
-            case 'intro':
-                return (
-                    <View style={styles.centerContent}>
-                        <Text style={styles.bigIcon}>🔄</Text>
-                        <Text style={[styles.heading, { color: tc.text }]}>
-                            {labels.timeFor}
-                        </Text>
-                        <Text style={[styles.description, { color: tc.secondaryText }]}>
-                            {labels.timeForDesc}
-                        </Text>
-                        <TouchableOpacity style={styles.primaryButton} onPress={nextStep}>
-                            <Text style={styles.primaryButtonText}>
-                                {labels.startReview} →
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                );
-
             case 'inbox':
                 return (
                     <View style={styles.stepContent}>
@@ -915,7 +896,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                     </View>
 
                     {/* Navigation */}
-                    {currentStep !== 'intro' && currentStep !== 'completed' && (
+                    {currentStep !== 'completed' && (
                         <View style={[styles.footer, { borderTopColor: tc.border }]}>
                             <TouchableOpacity style={styles.backButton} onPress={prevStep}>
                                 <Text style={[styles.backButtonText, { color: tc.secondaryText }]}>← {labels.back}</Text>

@@ -26,7 +26,7 @@ import { InboxProcessingModal } from './inbox-processing-modal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { fetchExternalCalendarEvents } from '../lib/external-calendar';
 
-type DailyReviewStep = 'intro' | 'today' | 'focus' | 'inbox' | 'waiting' | 'complete';
+type DailyReviewStep = 'today' | 'focus' | 'inbox' | 'waiting' | 'complete';
 
 interface DailyReviewModalProps {
     visible: boolean;
@@ -44,7 +44,7 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
     const tc = useThemeColors();
     const insets = useSafeAreaInsets();
 
-    const [currentStep, setCurrentStep] = useState<DailyReviewStep>('intro');
+    const [currentStep, setCurrentStep] = useState<DailyReviewStep>('today');
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
     const [showInboxProcessing, setShowInboxProcessing] = useState(false);
@@ -181,7 +181,6 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
     }, [activeTasks, sortBy]);
 
     const steps: { id: DailyReviewStep; title: string; description: string }[] = [
-        { id: 'intro', title: t('dailyReview.introTitle'), description: t('dailyReview.introDesc') },
         { id: 'today', title: t('dailyReview.todayStep'), description: t('dailyReview.todayDesc') },
         { id: 'focus', title: t('dailyReview.focusStep'), description: t('dailyReview.focusDesc') },
         { id: 'inbox', title: t('dailyReview.inboxStep'), description: t('dailyReview.inboxDesc') },
@@ -263,19 +262,6 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
 
     const renderStep = () => {
         switch (currentStep) {
-            case 'intro':
-                return (
-                    <View style={styles.centerContent}>
-                        <Text style={styles.bigIcon}>🧭</Text>
-                        <Text style={[styles.heading, { color: tc.text }]}>{t('dailyReview.title')}</Text>
-                        <Text style={[styles.description, { color: tc.secondaryText }]}>{t('dailyReview.introDesc')}</Text>
-                        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: tc.tint }]} onPress={next}>
-                            <Text style={styles.primaryButtonText}>
-                                {t('dailyReview.start')} →
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                );
             case 'today': {
                 const topTasks = [...overdueTasks, ...dueTodayTasks].slice(0, 8);
                 const totalToday = overdueTasks.length + dueTodayTasks.length;
@@ -423,7 +409,7 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
 
                 <View style={styles.content}>{renderStep()}</View>
 
-                {currentStep !== 'intro' && currentStep !== 'complete' && (
+                {currentStep !== 'complete' && (
                     <View
                         style={[
                             styles.footer,
