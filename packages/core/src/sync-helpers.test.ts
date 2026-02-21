@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertNoPendingAttachmentUploads, findPendingAttachmentUploads } from './sync-helpers';
+import { assertNoPendingAttachmentUploads, findPendingAttachmentUploads, sanitizeAppDataForRemote } from './sync-helpers';
 import type { AppData, Attachment } from './types';
 
 const now = '2026-02-19T00:00:00.000Z';
@@ -75,5 +75,146 @@ describe('sync-helpers pending attachment uploads', () => {
         expect(() => assertNoPendingAttachmentUploads(data)).toThrow(
             'Attachment upload incomplete: 2 file attachment(s) are still pending upload'
         );
+    });
+});
+
+describe('sync-helpers sanitizeAppDataForRemote', () => {
+    it('keeps only sync-eligible settings groups for remote payloads', () => {
+        const data: AppData = {
+            tasks: [],
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {
+                gtd: { autoArchiveDays: 7 },
+                features: { priorities: true },
+                notificationsEnabled: false,
+                weeklyReviewEnabled: true,
+                window: { decorations: false, closeBehavior: 'tray' },
+                diagnostics: { loggingEnabled: true },
+                taskSortBy: 'updatedAt',
+                sidebarCollapsed: true,
+                deviceId: 'local-device-id',
+                lastSyncAt: now,
+                lastSyncStatus: 'success',
+                lastSyncError: 'x',
+                lastSyncHistory: [
+                    {
+                        at: now,
+                        status: 'success',
+                        conflicts: 0,
+                        conflictIds: [],
+                        maxClockSkewMs: 0,
+                        timestampAdjustments: 0,
+                    },
+                ],
+                syncPreferences: {
+                    appearance: true,
+                    language: false,
+                    externalCalendars: true,
+                    ai: true,
+                },
+                syncPreferencesUpdatedAt: {
+                    appearance: now,
+                    language: now,
+                    externalCalendars: now,
+                    ai: now,
+                    preferences: now,
+                },
+                theme: 'dark',
+                appearance: { density: 'compact' },
+                keybindingStyle: 'emacs',
+                globalQuickAddShortcut: 'ctrl+alt+m',
+                language: 'zh',
+                weekStart: 'monday',
+                dateFormat: 'yyyy-MM-dd',
+                externalCalendars: [{ id: 'cal-1', name: 'Work', url: 'https://example.com/work.ics', enabled: true }],
+                ai: {
+                    enabled: true,
+                    provider: 'openai',
+                    apiKey: 'secret',
+                    speechToText: {
+                        enabled: true,
+                        provider: 'whisper',
+                        offlineModelPath: '/tmp/model.bin',
+                    },
+                },
+            },
+        };
+
+        const sanitized = sanitizeAppDataForRemote(data);
+
+        expect(sanitized.settings.syncPreferences).toEqual(data.settings.syncPreferences);
+        expect(sanitized.settings.syncPreferencesUpdatedAt).toEqual(data.settings.syncPreferencesUpdatedAt);
+        expect(sanitized.settings.theme).toBe('dark');
+        expect(sanitized.settings.appearance).toEqual({ density: 'compact' });
+        expect(sanitized.settings.keybindingStyle).toBe('emacs');
+        expect(sanitized.settings.externalCalendars).toEqual(data.settings.externalCalendars);
+
+        expect(sanitized.settings.language).toBeUndefined();
+        expect(sanitized.settings.weekStart).toBeUndefined();
+        expect(sanitized.settings.dateFormat).toBeUndefined();
+
+        expect(sanitized.settings.ai?.apiKey).toBeUndefined();
+        expect(sanitized.settings.ai?.speechToText?.offlineModelPath).toBeUndefined();
+
+        expect(sanitized.settings.globalQuickAddShortcut).toBeUndefined();
+        expect(sanitized.settings.deviceId).toBeUndefined();
+        expect(sanitized.settings.lastSyncAt).toBeUndefined();
+        expect(sanitized.settings.lastSyncStatus).toBeUndefined();
+        expect(sanitized.settings.lastSyncError).toBeUndefined();
+        expect(sanitized.settings.lastSyncHistory).toBeUndefined();
+        expect(sanitized.settings.window).toBeUndefined();
+        expect(sanitized.settings.notificationsEnabled).toBeUndefined();
+        expect(sanitized.settings.diagnostics).toBeUndefined();
+        expect(sanitized.settings.gtd).toBeUndefined();
+        expect(sanitized.settings.features).toBeUndefined();
+        expect(sanitized.settings.taskSortBy).toBeUndefined();
+        expect(sanitized.settings.sidebarCollapsed).toBeUndefined();
+    });
+
+    it('sanitizes file attachment URIs while preserving cloud metadata', () => {
+        const data: AppData = {
+            tasks: [
+                {
+                    id: 'task-1',
+                    title: 'Task',
+                    status: 'inbox',
+                    tags: [],
+                    contexts: [],
+                    createdAt: now,
+                    updatedAt: now,
+                    attachments: [
+                        {
+                            id: 'att-1',
+                            kind: 'file',
+                            title: 'a.pdf',
+                            uri: '/storage/a.pdf',
+                            cloudKey: 'attachments/a.pdf',
+                            fileHash: 'hash-a',
+                            localStatus: 'available',
+                            createdAt: now,
+                            updatedAt: now,
+                        },
+                    ],
+                },
+            ],
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {},
+        };
+
+        const sanitized = sanitizeAppDataForRemote(data);
+        const attachment = sanitized.tasks[0]?.attachments?.[0];
+
+        expect(attachment).toMatchObject({
+            id: 'att-1',
+            kind: 'file',
+            uri: '',
+            cloudKey: 'attachments/a.pdf',
+            fileHash: 'hash-a',
+        });
+        expect(attachment?.localStatus).toBeUndefined();
     });
 });

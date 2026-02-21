@@ -94,37 +94,43 @@ export const sanitizeAppDataForRemote = (data: AppData): AppData => {
 
     const sanitizeSettingsForRemote = (settings: AppData['settings']): AppData['settings'] => {
         const prefs = settings.syncPreferences ?? {};
-        const next: AppData['settings'] = { ...settings };
-        next.globalQuickAddShortcut = undefined;
+        const next: AppData['settings'] = {
+            syncPreferences: { ...prefs },
+            syncPreferencesUpdatedAt: settings.syncPreferencesUpdatedAt
+                ? { ...settings.syncPreferencesUpdatedAt }
+                : undefined,
+        };
 
-        if (prefs.appearance !== true) {
-            next.theme = undefined;
-            next.appearance = undefined;
-            next.keybindingStyle = undefined;
+        if (prefs.appearance === true) {
+            next.theme = settings.theme;
+            next.appearance = settings.appearance ? { ...settings.appearance } : settings.appearance;
+            next.keybindingStyle = settings.keybindingStyle;
+            // Desktop global shortcut registration is local runtime behavior and should never sync.
+            next.globalQuickAddShortcut = undefined;
         }
 
-        if (prefs.language !== true) {
-            next.language = undefined;
-            next.weekStart = undefined;
-            next.dateFormat = undefined;
+        if (prefs.language === true) {
+            next.language = settings.language;
+            next.weekStart = settings.weekStart;
+            next.dateFormat = settings.dateFormat;
         }
 
-        if (prefs.externalCalendars !== true) {
-            next.externalCalendars = undefined;
+        if (prefs.externalCalendars === true) {
+            next.externalCalendars = settings.externalCalendars
+                ? settings.externalCalendars.map((item) => ({ ...item }))
+                : settings.externalCalendars;
         }
 
-        if (prefs.ai !== true) {
-            next.ai = undefined;
-        } else if (next.ai) {
+        if (prefs.ai === true && settings.ai) {
             next.ai = {
-                ...next.ai,
+                ...settings.ai,
                 apiKey: undefined,
-                speechToText: next.ai.speechToText
+                speechToText: settings.ai.speechToText
                     ? {
-                        ...next.ai.speechToText,
+                        ...settings.ai.speechToText,
                         offlineModelPath: undefined,
                     }
-                    : next.ai.speechToText,
+                    : settings.ai.speechToText,
             };
         }
 
