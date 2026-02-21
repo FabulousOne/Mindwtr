@@ -19,7 +19,7 @@ Mindwtr is a Bun monorepo with:
 
 ### 1) Follow our community standards
 
-- Read and follow the [Code of Conduct](../CODE_OF_CONDUCT.md).
+- Read and follow the [Code of Conduct](./CODE_OF_CONDUCT.md).
 - Be respectful in issues, discussions, reviews, and commits.
 
 ### 2) Report security issues privately
