@@ -139,4 +139,5 @@ In **Settings → Sync**:
 ## See Also
 
 - [[Data and Sync]]
+- iCloud Drive users: use **File Sync** with both `data.json` and `attachments/` (not the Cloud endpoint)
 - [[Developer Guide]]

@@ -303,6 +303,7 @@ You can help in several ways:
 ## Roadmap
 
 - 📦 Add to Flathub
+- ☁️ Native iCloud/CloudKit sync (Apple ecosystem)
 - 🗣️ iOS Reminders Inbox import (Siri capture -> Mindwtr Inbox)
 - ⚡ iOS Shortcuts + URL scheme quick capture
 - 🧩 iOS Home Screen widget

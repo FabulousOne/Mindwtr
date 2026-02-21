@@ -73,6 +73,22 @@ Sync via a shared JSON file with any folder-based sync service:
 - iCloud Drive
 - Any network folder
 
+#### iCloud Drive as File Sync (macOS + iOS)
+
+iCloud Drive works with Mindwtr through **File Sync** (not a native iCloud backend yet).
+
+Recommended setup:
+1. On macOS, create a folder like `iCloud Drive/Mindwtr`.
+2. In Mindwtr desktop, set **Sync Backend = File** and pick that folder.
+3. Export once to create `data.json` and `attachments/`.
+4. Wait for iCloud Drive to finish uploading.
+5. On iOS, in Mindwtr mobile **Settings → Data & Sync → Select Folder**, choose the same iCloud Drive folder in Files.
+
+Important:
+- Sync both `data.json` **and** `attachments/`. Attachments are part of sync data.
+- Do not move only `data.json` without `attachments/`, or attachment metadata/files can drift.
+- If iCloud Optimize Storage offloads files, let Files re-download before running a manual sync.
+
 #### Syncthing Notes (Recommended Setup)
 
 Syncthing works well with Mindwtr, but the initial setup order matters.
