@@ -392,6 +392,7 @@ export function AgendaView() {
                             focusToggle={buildFocusToggle(task)}
                             showProjectBadgeInActions={false}
                             compactMetaEnabled={showListDetails}
+                            enableDoubleClickEdit
                         />
                     ))}
                 </div>
@@ -622,6 +623,7 @@ export function AgendaView() {
                                         project={task.projectId ? projectMap.get(task.projectId) : undefined}
                                         showProjectBadgeInActions={false}
                                         compactMetaEnabled={showListDetails}
+                                        enableDoubleClickEdit
                                     />
                                 ))}
                             </div>
@@ -660,6 +662,7 @@ export function AgendaView() {
                                         focusToggle={buildFocusToggle(task)}
                                         showProjectBadgeInActions={false}
                                         compactMetaEnabled={showListDetails}
+                                        enableDoubleClickEdit
                                     />
                                 ))}
                             </div>

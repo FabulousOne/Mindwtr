@@ -114,4 +114,34 @@ describe('AgendaView', () => {
         expect(getByText('Start today next task')).toBeInTheDocument();
         expect(queryByRole('heading', { name: /next actions/i })).not.toBeInTheDocument();
     });
+
+    it('opens editor when double-clicking a non-focused task row in Focus', () => {
+        const nextTask: Task = {
+            id: 'next-action-task',
+            title: 'Next action task',
+            status: 'next',
+            tags: [],
+            contexts: [],
+            createdAt: nowIso,
+            updatedAt: nowIso,
+        };
+
+        useTaskStore.setState({
+            tasks: [nextTask],
+            _allTasks: [nextTask],
+            projects: [],
+            _allProjects: [],
+            areas: [],
+            _allAreas: [],
+            settings: {},
+            highlightTaskId: null,
+        });
+
+        const { container, getByDisplayValue } = renderAgenda();
+        const row = container.querySelector('[data-task-id="next-action-task"]');
+        expect(row).toBeTruthy();
+
+        fireEvent.doubleClick(row!);
+        expect(getByDisplayValue('Next action task')).toBeInTheDocument();
+    });
 });
