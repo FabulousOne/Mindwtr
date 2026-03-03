@@ -77,7 +77,11 @@ export function SwipeableTaskItem({
             Alert.alert(t('digest.focus') || 'Focus', t('agenda.maxFocusItems') || 'Max 3 focus items.');
             return;
         }
-        updateTask(task.id, { isFocusedToday: true });
+        const updates: Partial<Task> = {
+            isFocusedToday: true,
+            ...(task.status !== 'next' ? { status: 'next' } : {}),
+        };
+        updateTask(task.id, updates);
     };
 
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);

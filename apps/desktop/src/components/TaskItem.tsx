@@ -224,7 +224,11 @@ export const TaskItem = memo(function TaskItem({
                 if (isFocused) {
                     updateTask(task.id, { isFocusedToday: false });
                 } else if (focusedCount < 3) {
-                    updateTask(task.id, { isFocusedToday: true });
+                    const updates: Partial<Task> = {
+                        isFocusedToday: true,
+                        ...(task.status !== 'next' ? { status: 'next' } : {}),
+                    };
+                    updateTask(task.id, updates);
                 }
             },
             title: isFocused ? removeLabel : (canToggle ? addLabel : maxLabel),

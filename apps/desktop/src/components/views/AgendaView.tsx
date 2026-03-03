@@ -347,7 +347,10 @@ export function AgendaView() {
         if (task.isFocusedToday) {
             updateTask(taskId, { isFocusedToday: false });
         } else if (focusedCount < 3) {
-            updateTask(taskId, { isFocusedToday: true });
+            updateTask(taskId, {
+                isFocusedToday: true,
+                ...(task.status !== 'next' ? { status: 'next' as const } : {}),
+            });
         }
     };
 

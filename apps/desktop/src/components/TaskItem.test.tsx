@@ -165,6 +165,22 @@ describe('TaskItem', () => {
         expect(button.className).not.toContain('opacity-0');
     });
 
+    it('does not navigate away when adding today focus', () => {
+        const onNavigate = vi.fn();
+        window.addEventListener('mindwtr:navigate', onNavigate as EventListener);
+        try {
+            const { getByRole } = render(
+                <LanguageProvider>
+                    <TaskItem task={mockTask} />
+                </LanguageProvider>
+            );
+            fireEvent.click(getByRole('button', { name: /add.*focus/i }));
+            expect(onNavigate).not.toHaveBeenCalled();
+        } finally {
+            window.removeEventListener('mindwtr:navigate', onNavigate as EventListener);
+        }
+    });
+
     it('does not show today focus toggle for done tasks', () => {
         const doneTask: Task = {
             ...mockTask,
