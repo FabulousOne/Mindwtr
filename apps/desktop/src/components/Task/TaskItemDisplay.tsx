@@ -1,7 +1,7 @@
 import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Clock, Timer, Paperclip, RotateCcw, Copy, MapPin, Hourglass, BookOpen, PauseCircle, Star } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Area, Attachment, Project, Task, TaskStatus, RecurrenceRule, RecurrenceStrategy } from '@mindwtr/core';
+import type { Area, Attachment, Project, Task, TaskStatus, RecurrenceRule, RecurrenceStrategy, Language } from '@mindwtr/core';
 import { DEFAULT_AREA_COLOR, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, hasTimeComponent, safeFormatDate, resolveTaskTextDirection } from '@mindwtr/core';
 import { cn } from '../../lib/utils';
 import { getAttachmentDisplayTitle } from '../../lib/attachment-utils';
@@ -33,6 +33,7 @@ interface TaskItemDisplayActions {
 
 interface TaskItemDisplayProps {
     task: Task;
+    language: Language;
     project?: Project;
     area?: Area;
     projectColor?: string;
@@ -77,6 +78,7 @@ const formatTimeEstimate = (estimate: string) => {
 
 export function TaskItemDisplay({
     task,
+    language,
     project,
     area,
     projectColor,
@@ -114,7 +116,7 @@ export function TaskItemDisplay({
         focusToggle,
     } = actions;
     const checklistProgress = getChecklistProgress(task);
-    const ageLabel = getTaskAgeLabel(task.createdAt);
+    const ageLabel = getTaskAgeLabel(task.createdAt, language);
     const showCompactMeta = compactMetaEnabled && !isViewOpen;
     const showAgeBadge = task.status !== 'done' && Boolean(ageLabel);
     const hasMetadata = Boolean(

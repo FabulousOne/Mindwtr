@@ -927,6 +927,7 @@ export const TaskItem = memo(function TaskItem({
                     ) : (
                         <TaskItemDisplay
                             task={task}
+                            language={language}
                             project={project}
                             area={taskArea}
                             projectColor={projectColor}
