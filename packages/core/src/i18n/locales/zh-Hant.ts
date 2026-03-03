@@ -1049,5 +1049,5 @@ export const zhHant: Record<string, string> = {
         'settings.saved': '設定已儲存',
         'settings.selectSyncFolderTitle': '選擇同步資料夾',
         'settings.undoNotifications': '撤銷通知',
-        'settings.undoNotificationsDesc': '在將任務標記為已完成或删除後顯示可撤銷提示。'
+        'settings.undoNotificationsDesc': '在將任務標記為已完成或刪除後顯示可撤銷提示。'
 };
