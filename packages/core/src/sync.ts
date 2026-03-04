@@ -747,19 +747,30 @@ function createEmptyEntityStats(localTotal: number, incomingTotal: number): Enti
     };
 }
 
-const CONTENT_DIFF_IGNORED_KEYS = new Set(['rev', 'revBy', 'updatedAt', 'createdAt', 'localStatus', 'purgedAt']);
+const CONTENT_DIFF_IGNORED_KEYS = new Set([
+    'rev',
+    'revBy',
+    'updatedAt',
+    'createdAt',
+    'localStatus',
+    'purgedAt',
+    // Order fields can differ due local adapter fallbacks (for legacy rows) without user edits.
+    'order',
+    'orderNum',
+]);
 
-const toComparableValue = (value: unknown): unknown => {
+const toComparableValue = (value: unknown, options?: { includeIgnoredKeys?: boolean }): unknown => {
+    const includeIgnoredKeys = options?.includeIgnoredKeys === true;
     if (Array.isArray(value)) {
-        return value.map((item) => toComparableValue(item));
+        return value.map((item) => toComparableValue(item, options));
     }
     if (value && typeof value === 'object') {
         const record = value as Record<string, unknown>;
         const comparable: Record<string, unknown> = {};
         for (const key of Object.keys(record).sort()) {
-            if (CONTENT_DIFF_IGNORED_KEYS.has(key)) continue;
-            if (key === 'uri' && record.kind === 'file') continue;
-            comparable[key] = toComparableValue(record[key]);
+            if (!includeIgnoredKeys && CONTENT_DIFF_IGNORED_KEYS.has(key)) continue;
+            if (!includeIgnoredKeys && key === 'uri' && record.kind === 'file') continue;
+            comparable[key] = toComparableValue(record[key], options);
         }
         return comparable;
     }
@@ -770,6 +781,7 @@ const hasContentDifference = (localItem: unknown, incomingItem: unknown): boolea
     JSON.stringify(toComparableValue(localItem)) !== JSON.stringify(toComparableValue(incomingItem));
 
 const comparableSignatureCache = new WeakMap<object, string>();
+const deterministicSignatureCache = new WeakMap<object, string>();
 
 const toComparableSignature = (value: unknown): string => {
     if (value && typeof value === 'object') {
@@ -782,10 +794,26 @@ const toComparableSignature = (value: unknown): string => {
     return JSON.stringify(toComparableValue(value));
 };
 
+const toDeterministicSignature = (value: unknown): string => {
+    if (value && typeof value === 'object') {
+        const cached = deterministicSignatureCache.get(value);
+        if (cached) return cached;
+        const signature = JSON.stringify(toComparableValue(value, { includeIgnoredKeys: true }));
+        deterministicSignatureCache.set(value, signature);
+        return signature;
+    }
+    return JSON.stringify(toComparableValue(value, { includeIgnoredKeys: true }));
+};
+
 const chooseDeterministicWinner = <T>(localItem: T, incomingItem: T): T => {
     const localSignature = toComparableSignature(localItem);
     const incomingSignature = toComparableSignature(incomingItem);
-    if (localSignature === incomingSignature) return incomingItem;
+    if (localSignature === incomingSignature) {
+        const localFullSignature = toDeterministicSignature(localItem);
+        const incomingFullSignature = toDeterministicSignature(incomingItem);
+        if (localFullSignature === incomingFullSignature) return incomingItem;
+        return incomingFullSignature > localFullSignature ? incomingItem : localItem;
+    }
     return incomingSignature > localSignature ? incomingItem : localItem;
 };
 

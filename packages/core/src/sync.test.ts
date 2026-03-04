@@ -691,6 +691,22 @@ describe('Sync Logic', () => {
             expect(reverse.tasks[0].title).toBe('omega');
         });
 
+        it('resolves order-only legacy drift consistently across sync direction', () => {
+            const localTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+                order: 42,
+                orderNum: 42,
+            } satisfies Task;
+            const incomingTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+            } satisfies Task;
+
+            const forward = mergeAppData(mockAppData([localTask]), mockAppData([incomingTask]));
+            const reverse = mergeAppData(mockAppData([incomingTask]), mockAppData([localTask]));
+
+            expect(forward.tasks[0]).toEqual(reverse.tasks[0]);
+        });
+
         it('prefers tombstone when delete-vs-live operation times are equal', () => {
             const local = mockAppData([
                 createMockTask('1', '2023-01-02T00:00:00.000Z', '2023-01-02T00:05:00.000Z'),
@@ -1060,6 +1076,43 @@ describe('Sync Logic', () => {
             expect(result.stats.tasks.maxClockSkewMs).toBe(29000);
             expect(result.data.tasks[0].updatedAt).toBe('2026-02-22T22:30:40.000Z');
         });
+
+        it('does not count conflicts for legacy order-field shape differences', () => {
+            const now = '2026-02-22T22:30:40.000Z';
+            const localTask = {
+                ...createMockTask('task-1', now),
+                order: 7,
+                orderNum: 7,
+            } satisfies Task;
+            const incomingTask = {
+                ...createMockTask('task-1', now),
+            } satisfies Task;
+            const localProject = {
+                ...createMockProject('project-1', now),
+                order: 0,
+            } satisfies Project;
+            const incomingProject = {
+                ...createMockProject('project-1', now),
+            } as unknown as Project;
+            const localSection = {
+                ...createMockSection('section-1', 'project-1', now),
+                order: 0,
+            } satisfies Section;
+            const incomingSection = {
+                ...createMockSection('section-1', 'project-1', now),
+            } as unknown as Section;
+            delete (incomingProject as Record<string, unknown>).order;
+            delete (incomingSection as Record<string, unknown>).order;
+
+            const result = mergeAppDataWithStats(
+                mockAppData([localTask], [localProject], [localSection]),
+                mockAppData([incomingTask], [incomingProject], [incomingSection])
+            );
+
+            expect(result.stats.tasks.conflicts).toBe(0);
+            expect(result.stats.projects.conflicts).toBe(0);
+            expect(result.stats.sections.conflicts).toBe(0);
+        });
     });
 
     describe('performSyncCycle', () => {
@@ -1082,6 +1135,48 @@ describe('Sync Logic', () => {
 
             expect(result.status).toBe('conflict');
             expect(result.stats.tasks.conflicts).toBe(1);
+        });
+
+        it('returns success when only order-field shape differs', async () => {
+            const now = '2026-03-01T00:00:00.000Z';
+            const localTask = {
+                ...createMockTask('task-1', now),
+                order: 13,
+                orderNum: 13,
+            } satisfies Task;
+            const incomingTask = {
+                ...createMockTask('task-1', now),
+            } satisfies Task;
+
+            const localProject = {
+                ...createMockProject('project-1', now),
+                order: 0,
+            } satisfies Project;
+            const incomingProject = {
+                ...createMockProject('project-1', now),
+            } as unknown as Project;
+            delete (incomingProject as Record<string, unknown>).order;
+
+            const localSection = {
+                ...createMockSection('section-1', 'project-1', now),
+                order: 0,
+            } satisfies Section;
+            const incomingSection = {
+                ...createMockSection('section-1', 'project-1', now),
+            } as unknown as Section;
+            delete (incomingSection as Record<string, unknown>).order;
+
+            const result = await performSyncCycle({
+                readLocal: async () => mockAppData([localTask], [localProject], [localSection]),
+                readRemote: async () => mockAppData([incomingTask], [incomingProject], [incomingSection]),
+                writeLocal: async () => undefined,
+                writeRemote: async () => undefined,
+            });
+
+            expect(result.status).toBe('success');
+            expect(result.stats.tasks.conflicts).toBe(0);
+            expect(result.stats.projects.conflicts).toBe(0);
+            expect(result.stats.sections.conflicts).toBe(0);
         });
 
         it('fails before writes when merged data is invalid', async () => {
