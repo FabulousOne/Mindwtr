@@ -36,6 +36,7 @@ export function AgendaView() {
     const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
     const [selectedPriorities, setSelectedPriorities] = useState<TaskPriority[]>([]);
     const [selectedTimeEstimates, setSelectedTimeEstimates] = useState<TimeEstimate[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [top3Only, setTop3Only] = useState(false);
     const prioritiesEnabled = settings?.features?.priorities === true;
@@ -92,10 +93,18 @@ export function AgendaView() {
         if (activeTimeEstimates.length > 0 && (!task.timeEstimate || !activeTimeEstimates.includes(task.timeEstimate))) return false;
         return true;
     }, [selectedTokens, activePriorities, activeTimeEstimates]);
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+    const matchesSearchQuery = useCallback((title: string) => {
+        if (!normalizedSearchQuery) return true;
+        return title.toLowerCase().includes(normalizedSearchQuery);
+    }, [normalizedSearchQuery]);
 
     const { filteredActiveTasks, reviewDueCandidates } = useMemo(() => {
         const now = new Date();
-        const filtered = activeTasks.filter(matchesFilters);
+        const filtered = activeTasks.filter((task) =>
+            matchesFilters(task)
+            && matchesSearchQuery(task.title)
+        );
         const reviewDue = tasks
             .filter((task) => {
                 if (task.deletedAt) return false;
@@ -107,11 +116,12 @@ export function AgendaView() {
                     if (project?.status === 'archived') return false;
                 }
                 if (!taskMatchesAreaFilter(task, resolvedAreaFilter, projectMap, areaById)) return false;
+                if (!matchesSearchQuery(task.title)) return false;
                 return true;
             })
             .filter(matchesFilters);
         return { filteredActiveTasks: filtered, reviewDueCandidates: reviewDue };
-    }, [activeTasks, tasks, projectMap, matchesFilters, resolvedAreaFilter, areaById]);
+    }, [activeTasks, tasks, projectMap, matchesFilters, matchesSearchQuery, resolvedAreaFilter, areaById]);
 
     const reviewDueProjects = useMemo(() => {
         const now = new Date();
@@ -120,6 +130,7 @@ export function AgendaView() {
                 if (project.deletedAt) return false;
                 if (project.status === 'archived') return false;
                 if (!projectMatchesAreaFilter(project, resolvedAreaFilter, areaById)) return false;
+                if (!matchesSearchQuery(project.title)) return false;
                 return isDueForReview(project.reviewAt, now);
             })
             .sort((a, b) => {
@@ -128,8 +139,9 @@ export function AgendaView() {
                 if (aReview !== bReview) return aReview - bReview;
                 return a.title.localeCompare(b.title);
             });
-    }, [projects, resolvedAreaFilter, areaById]);
+    }, [projects, matchesSearchQuery, resolvedAreaFilter, areaById]);
     const hasFilters = selectedTokens.length > 0 || activePriorities.length > 0 || activeTimeEstimates.length > 0;
+    const hasTaskFilters = hasFilters || Boolean(normalizedSearchQuery);
     const showFiltersPanel = filtersOpen || hasFilters;
     const toggleTokenFilter = (token: string) => {
         setSelectedTokens((prev) =>
@@ -532,6 +544,14 @@ export function AgendaView() {
                         </button>
                     </div>
                 </div>
+                <input
+                    type="text"
+                    data-view-filter-input
+                    placeholder={t('common.search')}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className="w-full text-sm px-3 py-2 rounded border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
                 {showFiltersPanel && (
                     <div className="space-y-4">
                         <div className="space-y-2">
@@ -710,7 +730,7 @@ export function AgendaView() {
                 <div className="text-center py-12 text-muted-foreground">
                     <p className="text-4xl mb-4">✨</p>
                     <p className="text-lg font-medium">{t('agenda.allClear')}</p>
-                    <p>{hasFilters ? t('filters.noMatch') : t('agenda.noTasks')}</p>
+                    <p>{hasTaskFilters ? t('filters.noMatch') : t('agenda.noTasks')}</p>
                 </div>
             )}
             </div>

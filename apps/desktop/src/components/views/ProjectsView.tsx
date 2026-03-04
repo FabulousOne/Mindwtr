@@ -92,6 +92,7 @@ export function ProjectsView() {
     const [sectionTaskDraft, setSectionTaskDraft] = useState('');
     const [sectionTaskTargetId, setSectionTaskTargetId] = useState<string | null>(null);
     const [tagDraft, setTagDraft] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [editProjectTitle, setEditProjectTitle] = useState('');
     const [projectTaskTitle, setProjectTaskTitle] = useState('');
     const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -253,6 +254,7 @@ export function ProjectsView() {
     };
 
     const selectedProject = projects.find(p => p.id === selectedProjectId);
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
     const {
         handleAddSection,
@@ -287,8 +289,12 @@ export function ProjectsView() {
     }, [selectedProject?.id, selectedProject?.title]);
     const projectAllTasks = useMemo(() => {
         if (!selectedProjectId) return [];
-        return allTasks.filter((task) => !task.deletedAt && task.projectId === selectedProjectId);
-    }, [allTasks, selectedProjectId]);
+        return allTasks.filter((task) => {
+            if (task.deletedAt || task.projectId !== selectedProjectId) return false;
+            if (normalizedSearchQuery && !task.title.toLowerCase().includes(normalizedSearchQuery)) return false;
+            return true;
+        });
+    }, [allTasks, normalizedSearchQuery, selectedProjectId]);
     const projectTasks = useMemo(() => (
         projectAllTasks.filter((task) => task.status !== 'done' && task.status !== 'reference' && task.status !== 'archived')
     ), [projectAllTasks]);
@@ -381,12 +387,13 @@ export function ProjectsView() {
         const references = allTasks.filter((task) => {
             if (task.deletedAt) return false;
             if (task.status !== 'reference') return false;
+            if (normalizedSearchQuery && !task.title.toLowerCase().includes(normalizedSearchQuery)) return false;
             if (task.projectId === selectedProject.id) return true;
             return isProjectTagMatch(task);
         });
 
         return sortProjectTasks(references);
-    }, [allTasks, selectedProject, sortProjectTasks]);
+    }, [allTasks, normalizedSearchQuery, selectedProject, sortProjectTasks]);
 
     useEffect(() => {
         if (!highlightTaskId) return;
@@ -802,6 +809,16 @@ export function ProjectsView() {
                     {/* Project Details & Tasks */}
                     <div className="flex-1 min-w-0 h-full flex">
                         <div className="flex flex-col h-full min-h-0 w-full max-w-[1100px] rounded-2xl border border-border/70 bg-card/40">
+                            <div className="px-4 py-3 sm:px-5 border-b border-border/60">
+                                <input
+                                    type="text"
+                                    data-view-filter-input
+                                    placeholder={t('common.search')}
+                                    value={searchQuery}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                    className="w-full text-sm px-3 py-2 rounded border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                />
+                            </div>
                             {selectedProject ? (
                                 <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-5 space-y-4">
                                     {(isCreatingProject || isProjectDeleting || isAreaCreating) && (

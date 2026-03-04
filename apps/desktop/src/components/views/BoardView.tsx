@@ -175,6 +175,7 @@ export function BoardView() {
 
     const [activeTask, setActiveTask] = React.useState<Task | null>(null);
     const [computeSequential, setComputeSequential] = React.useState(false);
+    const [searchQuery, setSearchQuery] = React.useState('');
     const boardFilters = useUiStore((state) => state.boardFilters);
     const setBoardFilters = useUiStore((state) => state.setBoardFilters);
     const selectedProjectIds = boardFilters.selectedProjectIds;
@@ -272,15 +273,19 @@ export function BoardView() {
         [tasks, sortBy],
     );
     const filteredTasks = React.useMemo(() => {
+        const normalizedQuery = searchQuery.trim().toLowerCase();
         const areaFiltered = sortedTasks.filter((task) =>
             taskMatchesAreaFilter(task, resolvedAreaFilter, projectMap, areaById)
         );
-        if (!hasProjectFilters) return areaFiltered;
-        return areaFiltered.filter((task) => {
+        const searchFiltered = normalizedQuery
+            ? areaFiltered.filter((task) => task.title.toLowerCase().includes(normalizedQuery))
+            : areaFiltered;
+        if (!hasProjectFilters) return searchFiltered;
+        return searchFiltered.filter((task) => {
             const projectKey = task.projectId ?? NO_PROJECT_FILTER;
             return boardFilters.selectedProjectIds.includes(projectKey);
         });
-    }, [hasProjectFilters, sortedTasks, boardFilters.selectedProjectIds, resolvedAreaFilter, projectMap, areaById]);
+    }, [hasProjectFilters, sortedTasks, boardFilters.selectedProjectIds, searchQuery, resolvedAreaFilter, projectMap, areaById]);
 
     const sequentialProjectIds = React.useMemo(() => {
         return new Set(projects.filter((p) => p.isSequential && !p.deletedAt).map((p) => p.id));
@@ -446,6 +451,16 @@ export function BoardView() {
                                 {showFiltersPanel ? t('filters.hide') : t('filters.show')}
                             </button>
                         </div>
+                    </div>
+                    <div className="mt-3">
+                        <input
+                            type="text"
+                            data-view-filter-input
+                            placeholder={t('common.search')}
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            className="w-full text-sm px-3 py-2 rounded border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
                     </div>
 
                     {showFiltersPanel && (

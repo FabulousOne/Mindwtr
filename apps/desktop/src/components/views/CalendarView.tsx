@@ -45,6 +45,7 @@ export function CalendarView() {
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [viewFilterQuery, setViewFilterQuery] = useState('');
     const [scheduleQuery, setScheduleQuery] = useState('');
     const [scheduleError, setScheduleError] = useState<string | null>(null);
     const [externalCalendars, setExternalCalendars] = useState<ExternalCalendarSubscription[]>([]);
@@ -54,6 +55,7 @@ export function CalendarView() {
     const [editingTimeTaskId, setEditingTimeTaskId] = useState<string | null>(null);
     const [editingTimeValue, setEditingTimeValue] = useState<string>('');
     const calendarBodyRef = useRef<HTMLDivElement | null>(null);
+    const normalizedViewFilterQuery = viewFilterQuery.trim().toLowerCase();
 
     useEffect(() => {
         if (!perf.enabled) return;
@@ -75,6 +77,7 @@ export function CalendarView() {
         if (task.status === 'done' || task.status === 'archived' || task.status === 'reference') return false;
         if (!isTaskInActiveProject(task, projectMap)) return false;
         if (!taskMatchesAreaFilter(task, resolvedAreaFilter, projectMap, areaById)) return false;
+        if (normalizedViewFilterQuery && !task.title.toLowerCase().includes(normalizedViewFilterQuery)) return false;
         return true;
     };
 
@@ -91,7 +94,7 @@ export function CalendarView() {
             else map.set(key, [task]);
         }
         return map;
-    }, [tasks, projectMap, resolvedAreaFilter, areaById]);
+    }, [tasks, projectMap, resolvedAreaFilter, areaById, normalizedViewFilterQuery]);
 
     const scheduledByDay = useMemo(() => {
         const map = new Map<string, Task[]>();
@@ -106,7 +109,7 @@ export function CalendarView() {
             else map.set(key, [task]);
         }
         return map;
-    }, [tasks, projectMap, resolvedAreaFilter, areaById]);
+    }, [tasks, projectMap, resolvedAreaFilter, areaById, normalizedViewFilterQuery]);
 
     const getDeadlinesForDay = (date: Date) => deadlinesByDay.get(dayKey(date)) ?? [];
     const getScheduledForDay = (date: Date) => scheduledByDay.get(dayKey(date)) ?? [];
@@ -294,7 +297,7 @@ export function CalendarView() {
                 return task.title.toLowerCase().includes(query);
             })
             .slice(0, 12);
-    }, [tasks, scheduleQuery, selectedDate, projectMap]);
+    }, [tasks, scheduleQuery, selectedDate, projectMap, normalizedViewFilterQuery]);
 
     useEffect(() => {
         if (!selectedDate) return;
@@ -459,6 +462,16 @@ export function CalendarView() {
                     </button>
                 </div>
             </header>
+            <div className="mb-4">
+                <input
+                    type="text"
+                    data-view-filter-input
+                    placeholder={t('common.search')}
+                    value={viewFilterQuery}
+                    onChange={(event) => setViewFilterQuery(event.target.value)}
+                    className="w-full text-sm px-3 py-2 rounded border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+            </div>
 
             <div ref={calendarBodyRef} className="space-y-6">
                 <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden shadow-sm">

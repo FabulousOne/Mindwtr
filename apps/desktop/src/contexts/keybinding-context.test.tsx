@@ -71,7 +71,14 @@ const FallbackTaskList = ({
     onEditTask2: () => void;
 }) => {
     return (
-        <div data-main-content>
+        <div data-main-content tabIndex={-1}>
+            <input
+                type="text"
+                data-view-filter-input
+                ref={setVisibleRect}
+                placeholder="Search..."
+                defaultValue=""
+            />
             <div data-task-id="1" ref={setVisibleRect}>
                 <button type="button" aria-expanded={false}>
                     Task 1
@@ -188,6 +195,11 @@ describe('KeybindingProvider (vim)', () => {
                 </KeybindingProvider>
             </LanguageProvider>
         );
+
+        fireEvent.keyDown(window, { key: 'o' });
+        expect(document.activeElement?.getAttribute('data-view-filter-input')).not.toBeNull();
+        fireEvent.keyDown(window, { key: 'Escape' });
+        expect(document.activeElement?.getAttribute('data-view-filter-input')).toBeNull();
 
         fireEvent.keyDown(window, { key: 'j' });
         fireEvent.keyDown(window, { key: 'e' });

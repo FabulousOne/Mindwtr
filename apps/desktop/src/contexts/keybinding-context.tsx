@@ -182,6 +182,20 @@ export function KeybindingProvider({
         scopeRef.current = scope;
     }, []);
 
+    const focusFallbackFilterInput = useCallback(() => {
+        const root = document.querySelector<HTMLElement>('[data-main-content]') ?? document.body;
+        const input = Array.from(root.querySelectorAll<HTMLElement>('[data-view-filter-input]'))
+            .find((element) => {
+                if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) return false;
+                if (element.disabled) return false;
+                const rect = element.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) return false;
+                const style = window.getComputedStyle(element);
+                return style.display !== 'none' && style.visibility !== 'hidden';
+            });
+        input?.focus();
+    }, []);
+
     const getFallbackTaskElements = useCallback((): HTMLElement[] => {
         const root = document.querySelector<HTMLElement>('[data-main-content]') ?? document.body;
         const items = Array.from(root.querySelectorAll<HTMLElement>('[data-task-id]'));
@@ -311,6 +325,7 @@ export function KeybindingProvider({
         editSelected: fallbackEditSelected,
         toggleDoneSelected: fallbackToggleDoneSelected,
         deleteSelected: fallbackDeleteSelected,
+        focusAddInput: focusFallbackFilterInput,
     }), [
         fallbackDeleteSelected,
         fallbackEditSelected,
@@ -319,6 +334,7 @@ export function KeybindingProvider({
         fallbackSelectNext,
         fallbackSelectPrev,
         fallbackToggleDoneSelected,
+        focusFallbackFilterInput,
     ]);
 
     const getActiveScope = useCallback((): TaskListScope => {
@@ -542,6 +558,18 @@ export function KeybindingProvider({
                 e.preventDefault();
                 setIsHelpOpen(false);
                 return;
+            }
+            if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'Escape') {
+                const active = document.activeElement;
+                if (
+                    active instanceof HTMLElement
+                    && active.matches('[data-view-filter-input]')
+                ) {
+                    e.preventDefault();
+                    active.blur();
+                    focusMainContent();
+                    return;
+                }
             }
             if (editingTaskIdRef.current) {
                 if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'Escape') {

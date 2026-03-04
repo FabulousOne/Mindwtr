@@ -34,6 +34,7 @@ export function ReviewView() {
     );
     const { t } = useLanguage();
     const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all');
+    const [searchQuery, setSearchQuery] = useState('');
     const [selectionMode, setSelectionMode] = useState(false);
     const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
     const [tagPromptOpen, setTagPromptOpen] = useState(false);
@@ -43,6 +44,7 @@ export function ReviewView() {
     const [moveToStatus, setMoveToStatus] = useState<TaskStatus | ''>('');
 
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
     const statusOptions = STATUS_OPTIONS;
     const projectMapById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
@@ -94,15 +96,19 @@ export function ReviewView() {
             const list = filterStatus === 'all'
                 ? nextOpenTasks
                 : nextVisibleTasks.filter((task) => task.status === filterStatus);
+            const sortedTasks = sortTasksBy(list, sortBy);
+            const searchFilteredTasks = normalizedSearchQuery
+                ? sortedTasks.filter((task) => task.title.toLowerCase().includes(normalizedSearchQuery))
+                : sortedTasks;
 
             return {
                 projectMap: nextProjectMap,
                 tasksById: nextTasksById,
                 statusCounts: nextStatusCounts,
-                filteredTasks: sortTasksBy(list, sortBy),
+                filteredTasks: searchFilteredTasks,
             };
         });
-    }, [filterStatus, projects, sortBy, tasks, resolvedAreaFilter, projectMapById, areaById]);
+    }, [filterStatus, normalizedSearchQuery, projects, sortBy, tasks, resolvedAreaFilter, projectMapById, areaById]);
 
     const selectedIdsArray = useMemo(() => Array.from(multiSelectedIds), [multiSelectedIds]);
 
@@ -174,6 +180,14 @@ export function ReviewView() {
                     onSelect={setFilterStatus}
                     t={t}
                 />
+                <input
+                    type="text"
+                    data-view-filter-input
+                    placeholder={t('common.search')}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className="w-full text-sm px-3 py-2 rounded border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
 
                 {selectionMode && (
                     <ReviewBulkActions
@@ -195,6 +209,7 @@ export function ReviewView() {
                     multiSelectedIds={multiSelectedIds}
                     highlightTaskId={highlightTaskId}
                     onToggleSelect={toggleMultiSelect}
+                    emptyMessage={normalizedSearchQuery ? t('filters.noMatch') : t('review.noTasks')}
                     t={t}
                 />
 

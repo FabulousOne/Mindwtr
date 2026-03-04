@@ -24,6 +24,7 @@ export function ContextsView() {
     const [selectedContext, setSelectedContext] = useState<string | null>(null);
     const NO_CONTEXT_TOKEN = '__no_context__';
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
+    const [searchQuery, setSearchQuery] = useState('');
     const [selectionMode, setSelectionMode] = useState(false);
     const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
     const [tagPromptOpen, setTagPromptOpen] = useState(false);
@@ -71,11 +72,15 @@ export function ContextsView() {
     const hasContext = (task: typeof activeTasks[number]) =>
         (task.contexts?.length || 0) > 0 || (task.tags?.length || 0) > 0;
 
-    const filteredTasks = selectedContext === NO_CONTEXT_TOKEN
+    const contextFilteredTasks = selectedContext === NO_CONTEXT_TOKEN
         ? scopedTasks.filter((t) => !hasContext(t))
         : selectedContext
             ? scopedTasks.filter(t => matchesSelected(t, selectedContext))
             : scopedTasks.filter((t) => hasContext(t));
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+    const filteredTasks = normalizedSearchQuery
+        ? contextFilteredTasks.filter((task) => task.title.toLowerCase().includes(normalizedSearchQuery))
+        : contextFilteredTasks;
     const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
 
     const exitSelectionMode = () => {
@@ -263,6 +268,16 @@ export function ContextsView() {
                         </div>
                     </div>
                 </header>
+                <div className="mb-4">
+                    <input
+                        type="text"
+                        data-view-filter-input
+                        placeholder={t('common.search')}
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        className="w-full text-sm px-3 py-2 rounded border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                </div>
 
                 {selectionMode && selectedIdsArray.length > 0 && (
                     <div className="mb-4">
@@ -293,7 +308,7 @@ export function ContextsView() {
                         ))
                     ) : (
                         <div className="text-center text-muted-foreground py-12">
-                            {t('contexts.noTasks')}
+                            {normalizedSearchQuery ? t('filters.noMatch') : t('contexts.noTasks')}
                         </div>
                     )}
                 </div>

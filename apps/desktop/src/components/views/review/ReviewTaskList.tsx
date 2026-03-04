@@ -10,6 +10,7 @@ type ReviewTaskListProps = {
     multiSelectedIds: Set<string>;
     highlightTaskId?: string | null;
     onToggleSelect: (taskId: string) => void;
+    emptyMessage?: string;
     t: (key: string) => string;
 };
 
@@ -20,6 +21,7 @@ export function ReviewTaskList({
     multiSelectedIds,
     highlightTaskId,
     onToggleSelect,
+    emptyMessage,
     t,
 }: ReviewTaskListProps) {
     const shouldVirtualize = tasks.length > 100;
@@ -60,7 +62,7 @@ export function ReviewTaskList({
     if (tasks.length === 0) {
         return (
             <div className="text-center py-12 text-muted-foreground">
-                <p>{t('review.noTasks')}</p>
+                <p>{emptyMessage ?? t('review.noTasks')}</p>
             </div>
         );
     }
