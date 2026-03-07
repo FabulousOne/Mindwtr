@@ -1,4 +1,4 @@
-- Reduced false sync conflict prompts and improved overall sync reliability.
-- Improved iOS file-sync fallback behavior for providers without folder picking.
-- Added recurrence UI translation coverage for repeat-on labels in non-English locales.
-- Hardened cloud and sync error handling for more stable daily use.
+- Scoped task project pickers by area so editing shows more relevant projects.
+- Improved picker accessibility across task, project, section, and area selectors.
+- Added confirmation before swipe-to-trash deletes a task.
+- Clarified iOS file-sync guidance when a provider does not support folder selection.

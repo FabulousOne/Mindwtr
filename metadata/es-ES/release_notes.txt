@@ -1,4 +1,4 @@
-- Reducimos avisos falsos de conflictos y mejoramos la fiabilidad general del sync.
-- Mejoramos el fallback de sync en iOS cuando el proveedor no permite elegir carpetas.
-- Anadimos cobertura de traduccion para etiquetas de repeticion "repetir en".
-- Reforzamos el manejo de errores de cloud/sync para un uso diario mas estable.
+- Limitamos los selectores de proyectos por area para mostrar opciones mas relevantes al editar tareas.
+- Mejoramos la accesibilidad en selectores de tareas, proyectos, secciones y areas.
+- Anadimos confirmacion antes de enviar una tarea a la papelera al deslizar para borrar.
+- Aclaramos la guia de sync en iOS cuando el proveedor no permite elegir carpetas.
