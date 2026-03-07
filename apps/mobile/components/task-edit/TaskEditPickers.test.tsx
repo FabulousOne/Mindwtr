@@ -5,7 +5,7 @@ import renderer, { act } from 'react-test-renderer';
 import { TaskEditAreaPicker } from './TaskEditAreaPicker';
 import { TaskEditSectionPicker } from './TaskEditSectionPicker';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const tc = {
     cardBg: '#111',
