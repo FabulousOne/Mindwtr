@@ -263,6 +263,19 @@ deleteArea(id: string): Promise<void>;
 reorderAreas(orderedIds: string[]): Promise<void>;
 ```
 
+#### Section Operations
+
+```typescript
+// Create
+addSection(projectId: string, title: string, initialProps?: Partial<Section>): Promise<Section | null>;
+
+// Update
+updateSection(id: string, updates: Partial<Section>): Promise<void>;
+
+// Delete
+deleteSection(id: string): Promise<void>;
+```
+
 #### Tag Operations
 
 ```typescript

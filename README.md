@@ -86,7 +86,7 @@ Mindwtr is built for people who want a complete GTD system without lock-in. Here
 
 Legend: `✅` = yes, `❌` = no, `⚠️` = partial/limited support.
 
-*Checked against official product docs/pages on February 25, 2026. If any entry is outdated, feel free to open an issue/PR with sources.*
+*This comparison is based on the current public capabilities of each product. If any entry is outdated, feel free to open an issue or PR with sources.*
 
 ## Philosophy
 

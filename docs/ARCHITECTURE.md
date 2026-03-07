@@ -2,6 +2,13 @@
 
 Mindwtr is a local-first GTD app with a shared core package and platform-specific shells.
 
+This file is a short orientation note. The full architecture reference lives in the wiki:
+
+- [Wiki: Architecture](../wiki/Architecture.md)
+- [Wiki: Sync Algorithm](../wiki/Sync-Algorithm.md)
+- [Wiki: Data and Sync](../wiki/Data-and-Sync.md)
+- [Wiki: Performance Guide](../wiki/Performance-Guide.md)
+
 ## Monorepo layout
 
 - `packages/core`  
@@ -34,3 +41,4 @@ Mindwtr is a local-first GTD app with a shared core package and platform-specifi
 - Recurrence: new task instances on completion.
 - Task editor layout: configurable field visibility and ordering.
 
+For the current source of truth on data flow, sync semantics, and storage tradeoffs, prefer the wiki pages above.
