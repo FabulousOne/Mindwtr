@@ -849,6 +849,25 @@ jobs:
             echo "pkgver unchanged (${VERSION}); keep current pkgrel for now"
           fi
 
+      - name: Sync Tauri compatibility patch
+        shell: bash
+        working-directory: aur-mindwtr
+        run: |
+          set -euo pipefail
+          SOURCE_TAURI_CONF="../source/apps/desktop/src-tauri/tauri.conf.json"
+          if jq -e '.bundle.macOS.infoPlist? // empty' "$SOURCE_TAURI_CONF" >/dev/null; then
+            echo "Upstream tauri.conf.json still uses infoPlist; keeping tauri-v2-schema.patch in the AUR package."
+            exit 0
+          fi
+
+          echo "Upstream tauri.conf.json already uses AUR-compatible macOS files config; removing stale tauri-v2-schema.patch."
+          rm -f tauri-v2-schema.patch
+          sed -i \
+            -e "s/[[:space:]]*'tauri-v2-schema\\.patch'//" \
+            -e "/tauri_conf_v2_compat:/d" \
+            -e "/patch -Np1 -i \\.\\.\\/tauri-v2-schema\\.patch/d" \
+            PKGBUILD
+
       - name: Update checksums
         shell: bash
         working-directory: aur-mindwtr
@@ -957,12 +976,18 @@ jobs:
           AUR_USERNAME: ${{ secrets.AUR_USERNAME }}
           AUR_EMAIL: ${{ secrets.AUR_EMAIL }}
         run: |
-          if git diff --quiet -- PKGBUILD .SRCINFO; then
+          if [ -z "$(git status --porcelain -- PKGBUILD .SRCINFO tauri-v2-schema.patch)" ]; then
             echo "No AUR source-package changes to publish."
             exit 0
           fi
           git config --local user.name "${AUR_USERNAME:-mindwtr-bot}"
           git config --local user.email "${AUR_EMAIL:-actions@github.com}"
           git add PKGBUILD .SRCINFO
+          if git ls-files --error-unmatch tauri-v2-schema.patch >/dev/null 2>&1; then
+            git add -u -- tauri-v2-schema.patch
+          fi
+          if [ -e tauri-v2-schema.patch ]; then
+            git add -- tauri-v2-schema.patch
+          fi
           git commit -m "Update to ${{ steps.version.outputs.tag }}"
           git push origin HEAD
