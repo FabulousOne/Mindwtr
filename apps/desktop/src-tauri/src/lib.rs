@@ -603,6 +603,12 @@ fn is_homebrew_install_linux() -> bool {
 }
 
 #[cfg(target_os = "windows")]
+fn is_winget_install_path(path: &str) -> bool {
+    path.contains("\\microsoft\\winget\\packages\\")
+        || path.contains("/microsoft/winget/packages/")
+}
+
+#[cfg(target_os = "windows")]
 fn command_output_lowercase(cmd: &str, args: &[&str]) -> Option<String> {
     let output = Command::new(cmd)
         .args(args)
@@ -633,8 +639,7 @@ fn find_macos_bundle_root(path: &Path) -> Option<PathBuf> {
         .map(|ancestor| ancestor.to_path_buf())
 }
 
-#[tauri::command]
-fn get_install_source() -> String {
+fn detect_install_source() -> String {
     #[cfg(target_os = "windows")]
     {
         if is_windows_store_install() {
@@ -644,16 +649,12 @@ fn get_install_source() -> String {
             return "winget".to_string();
         }
         if let Some(path) = current_exe_path_lowercase() {
-            if path.contains("\\microsoft\\winget\\packages\\")
-                || path.contains("/microsoft/winget/packages/")
-            {
+            if is_winget_install_path(&path) {
                 return "winget".to_string();
             }
         }
         if let Some(path) = current_exe_canonical_path_lowercase() {
-            if path.contains("\\microsoft\\winget\\packages\\")
-                || path.contains("/microsoft/winget/packages/")
-            {
+            if is_winget_install_path(&path) {
                 return "winget".to_string();
             }
         }
@@ -740,6 +741,13 @@ fn get_install_source() -> String {
     {
         "direct".to_string()
     }
+}
+
+#[tauri::command]
+async fn get_install_source() -> String {
+    tauri::async_runtime::spawn_blocking(detect_install_source)
+        .await
+        .unwrap_or_else(|_| "unknown".to_string())
 }
 
 #[tauri::command]

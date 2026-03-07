@@ -5,7 +5,7 @@ import './index.css';
 
 import { generateUUID, sendDailyHeartbeat, setStorageAdapter } from '@mindwtr/core';
 import { LanguageProvider } from './contexts/language-context';
-import { isTauriRuntime } from './lib/runtime';
+import { getInstallSourceOrFallback, isTauriRuntime } from './lib/runtime';
 import { reportError } from './lib/report-error';
 import { webStorage } from './lib/storage-adapter-web';
 import { logWarn, setupGlobalErrorLogging } from './lib/app-log';
@@ -98,8 +98,7 @@ const getOrCreateAnalyticsDistinctId = (): string => {
 const getDesktopChannel = async (): Promise<string> => {
     if (!isTauriRuntime()) return 'web';
     try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        const source = await invoke<string>('get_install_source');
+        const source = await getInstallSourceOrFallback('unknown');
         return normalizeDesktopChannel(source);
     } catch {
         return 'unknown';

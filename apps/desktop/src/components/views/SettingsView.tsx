@@ -22,7 +22,7 @@ import {
 
 import { useKeybindings } from '../../contexts/keybinding-context';
 import { useLanguage, type Language } from '../../contexts/language-context';
-import { isFlatpakRuntime, isTauriRuntime } from '../../lib/runtime';
+import { getInstallSourceOrFallback, isFlatpakRuntime, isTauriRuntime } from '../../lib/runtime';
 import { reportError } from '../../lib/report-error';
 import { SyncService } from '../../lib/sync-service';
 import { clearLog, getLogPath } from '../../lib/app-log';
@@ -196,8 +196,7 @@ export function SettingsView() {
         let cancelled = false;
         (async () => {
             try {
-                const { invoke } = await import('@tauri-apps/api/core');
-                const rawSource = await invoke<string>('get_install_source');
+                const rawSource = await getInstallSourceOrFallback('unknown');
                 const source = normalizeInstallSource(rawSource);
                 if (!cancelled) {
                     setInstallSource(source);
