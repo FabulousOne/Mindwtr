@@ -3203,7 +3203,15 @@ fn resolve_sync_dir(app: &tauri::AppHandle, path: Option<String>) -> Result<Path
 #[tauri::command]
 fn get_sync_path(app: tauri::AppHandle) -> Result<String, String> {
     let config = read_config(&app);
-    let path = resolve_sync_dir(&app, config.sync_path).or_else(|_| resolve_sync_dir(&app, None))?;
+    let Some(sync_path) = config
+        .sync_path
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(String::new());
+    };
+    let path = resolve_sync_dir(&app, Some(sync_path.to_string()))?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -3651,6 +3659,9 @@ fn open_path(path: String) -> Result<bool, String> {
 #[tauri::command]
 fn read_sync_file(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
     let sync_path_str = get_sync_path(app)?;
+    if sync_path_str.trim().is_empty() {
+        return Err("Sync path is not configured".to_string());
+    }
     let sync_dir = PathBuf::from(&sync_path_str);
     let sync_file = sync_dir.join(DATA_FILE_NAME);
     let backup_file = sync_dir.join(format!("{}.bak", DATA_FILE_NAME));
@@ -3725,6 +3736,9 @@ fn read_sync_file(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
 #[tauri::command]
 fn write_sync_file(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
     let sync_path_str = get_sync_path(app)?;
+    if sync_path_str.trim().is_empty() {
+        return Err("Sync path is not configured".to_string());
+    }
     let sync_file = PathBuf::from(&sync_path_str).join(DATA_FILE_NAME);
     let backup_file = PathBuf::from(&sync_path_str).join(format!("{}.bak", DATA_FILE_NAME));
     let tmp_file = PathBuf::from(&sync_path_str).join(format!("{}.tmp", DATA_FILE_NAME));
