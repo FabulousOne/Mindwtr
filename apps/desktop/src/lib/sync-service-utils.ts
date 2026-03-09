@@ -62,6 +62,23 @@ export const hashString = async (value: string): Promise<string> => {
 
 export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+export const yieldToRenderer = async (): Promise<void> => {
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+        return;
+    }
+    await sleep(0);
+};
+
+export const createCooperativeYield = (every = 8) => {
+    let counter = 0;
+    return async (): Promise<void> => {
+        counter += 1;
+        if (counter % every !== 0) return;
+        await yieldToRenderer();
+    };
+};
+
 export {
     getFileSyncDir,
     isSyncFilePath,

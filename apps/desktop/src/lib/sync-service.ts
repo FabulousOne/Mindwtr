@@ -74,6 +74,8 @@ import {
     sleep,
     stripFileScheme,
     toStableJson,
+    createCooperativeYield,
+    yieldToRenderer,
     writeAttachmentFileSafely,
     writeFileSafelyAbsolute,
 } from './sync-service-utils';
@@ -288,10 +290,12 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
     const previousPendingRemoteDeletes = normalizePendingRemoteDeletes(appData.settings.attachments?.pendingRemoteDeletes);
     const previousPendingByCloudKey = new Map(previousPendingRemoteDeletes.map((item) => [item.cloudKey, item]));
     const cleanupTargets = new Map<string, Attachment>();
+    const maybeYield = createCooperativeYield(4);
     for (const attachment of orphaned) cleanupTargets.set(attachment.id, attachment);
     for (const attachment of deletedAttachments) cleanupTargets.set(attachment.id, attachment);
     const remoteCleanupTargets = new Map<string, { cloudKey: string; title: string }>();
     for (const attachment of cleanupTargets.values()) {
+        await maybeYield();
         if (!attachment.cloudKey) continue;
         remoteCleanupTargets.set(attachment.cloudKey, {
             cloudKey: attachment.cloudKey,
@@ -299,6 +303,7 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
         });
     }
     for (const pending of previousPendingRemoteDeletes) {
+        await maybeYield();
         remoteCleanupTargets.set(pending.cloudKey, {
             cloudKey: pending.cloudKey,
             title: pending.title || pending.cloudKey,
@@ -373,6 +378,7 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
     };
 
     for (const attachment of cleanupTargets.values()) {
+        await maybeYield();
         await deleteAttachmentFile(attachment);
     }
 
@@ -383,6 +389,7 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
         || (backend === 'file' && !!fileBaseDir)
     );
     for (const target of remoteCleanupTargets.values()) {
+        await maybeYield();
         const existing = previousPendingByCloudKey.get(target.cloudKey);
         if (!canAttemptRemoteDelete) {
             nextPendingRemoteDeletes.set(target.cloudKey, {
@@ -572,8 +579,10 @@ async function syncAttachments(
     let abortedByRateLimit = false;
     let uploadCount = 0;
     let uploadLimitLogged = false;
+    const maybeYieldAttachmentLoop = createCooperativeYield(4);
 
     for (const attachment of attachmentsById.values()) {
+        await maybeYieldAttachmentLoop();
         if (attachment.kind !== 'file') continue;
         if (attachment.deletedAt) continue;
         if (abortedByRateLimit) break;
@@ -732,6 +741,7 @@ async function syncAttachments(
 
     let downloadCount = 0;
     for (const attachment of downloadQueue) {
+        await maybeYieldAttachmentLoop();
         if (attachment.kind !== 'file') continue;
         if (attachment.deletedAt) continue;
         if (abortedByRateLimit) break;
@@ -1931,6 +1941,7 @@ export class SyncService {
             lastResult: SyncService.syncStatus.lastResult,
             lastResultAt: SyncService.syncStatus.lastResultAt,
         });
+        await yieldToRenderer();
 
         const setStep = (next: string) => {
             step = next;
@@ -1952,6 +1963,7 @@ export class SyncService {
             };
             // 1. Flush pending writes so disk reflects the latest state
             setStep('flush');
+            await yieldToRenderer();
             await flushPendingSave();
             localSnapshotChangeAt = useTaskStore.getState().lastDataChangeAt;
 
@@ -1973,6 +1985,7 @@ export class SyncService {
             }
             if (isTauriRuntimeEnv()) {
                 setStep('snapshot');
+                await yieldToRenderer();
                 try {
                     await tauriInvoke<string>('create_data_snapshot');
                 } catch (error) {
@@ -2032,6 +2045,7 @@ export class SyncService {
             // Pre-sync local attachments so cloudKeys exist before writing remote data.
             if (isTauriRuntimeEnv() && (backend === 'webdav' || backend === 'file' || backend === 'cloud')) {
                 setStep('attachments_prepare');
+                await yieldToRenderer();
                 try {
                     const localData = await readLocalDataForSync();
                     let preMutated = false;
@@ -2230,6 +2244,7 @@ export class SyncService {
                 onStep: (next) => {
                     setStep(next);
                 },
+                yieldToUi: yieldToRenderer,
                 historyContext: {
                     backend,
                     type: 'merge',
@@ -2276,6 +2291,7 @@ export class SyncService {
 
             if ((backend === 'webdav' || backend === 'file' || backend === 'cloud') && isTauriRuntimeEnv()) {
                 setStep('attachments');
+                await yieldToRenderer();
                 try {
                     const applyAttachmentSyncMutation = async (
                         syncAttachmentsOp: (candidateData: AppData) => Promise<AppData | boolean | null>
@@ -2291,6 +2307,7 @@ export class SyncService {
                         ensureLocalSnapshotFresh();
                         mergedData = nextData;
                         await tauriInvoke('save_data', { data: mergedData });
+                        await yieldToRenderer();
                     };
 
                     ensureLocalSnapshotFresh();
@@ -2337,6 +2354,7 @@ export class SyncService {
 
             if (isTauriRuntimeEnv() && shouldRunAttachmentCleanup(mergedData.settings.attachments?.lastCleanupAt, CLEANUP_INTERVAL_MS)) {
                 setStep('attachments_cleanup');
+                await yieldToRenderer();
                 ensureLocalSnapshotFresh();
                 ensureNetworkStillAvailable();
                 mergedData = await cleanupOrphanedAttachments(mergedData, backend);
@@ -2345,6 +2363,7 @@ export class SyncService {
 
             // 7. Refresh UI Store
             setStep('refresh');
+            await yieldToRenderer();
             ensureLocalSnapshotFresh();
             await useTaskStore.getState().fetchData({ silent: true });
 

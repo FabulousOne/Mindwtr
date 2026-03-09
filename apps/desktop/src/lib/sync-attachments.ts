@@ -4,7 +4,7 @@ import {
     computeSha256Hex,
     globalProgressTracker,
 } from '@mindwtr/core';
-import { stripFileScheme } from './sync-service-utils';
+import { createCooperativeYield, stripFileScheme } from './sync-service-utils';
 
 type PendingRemoteAttachmentDeleteEntry = NonNullable<
     NonNullable<AppData['settings']['attachments']>['pendingRemoteDeletes']
@@ -90,8 +90,10 @@ type BasicRemoteAttachmentSyncOptions = {
 
 export async function syncBasicRemoteAttachments(options: BasicRemoteAttachmentSyncOptions): Promise<boolean> {
     let didMutate = false;
+    const maybeYield = createCooperativeYield(4);
 
     for (const attachment of options.attachmentsById.values()) {
+        await maybeYield();
         if (attachment.kind !== 'file') continue;
         if (attachment.deletedAt) continue;
 

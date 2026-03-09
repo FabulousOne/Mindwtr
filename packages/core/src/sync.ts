@@ -81,6 +81,7 @@ export type SyncCycleIO = {
     tombstoneRetentionDays?: number;
     now?: () => string;
     onStep?: (step: SyncStep) => void;
+    yieldToUi?: () => Promise<void>;
 };
 
 export type SyncCycleResult = {
@@ -1184,8 +1185,14 @@ const hasPendingRemoteWriteFlag = (data: AppData): boolean => isValidTimestamp(d
 
 export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult> {
     const nowIso = io.now ? io.now() : new Date().toISOString();
+    const yieldToUi = async () => {
+        if (typeof io.yieldToUi === 'function') {
+            await io.yieldToUi();
+        }
+    };
 
     io.onStep?.('read-local');
+    await yieldToUi();
     const localDataRaw = await io.readLocal();
     const localShapeErrors = validateSyncPayloadShape(localDataRaw, 'local');
     if (localShapeErrors.length > 0) {
@@ -1197,16 +1204,19 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
 
     if (hasPendingRemoteWriteFlag(localData)) {
         io.onStep?.('write-remote');
+        await yieldToUi();
         await io.writeRemote(localData);
         const recoveredLocalData = clearPendingRemoteWriteFlag(localData);
         if (recoveredLocalData !== localData) {
             io.onStep?.('write-local');
+            await yieldToUi();
             await io.writeLocal(recoveredLocalData);
         }
         localData = recoveredLocalData;
     }
 
     io.onStep?.('read-remote');
+    await yieldToUi();
     const remoteDataRaw = await io.readRemote();
     if (remoteDataRaw) {
         const remoteShapeErrors = validateSyncPayloadShape(remoteDataRaw, 'remote');
@@ -1226,6 +1236,7 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
     const remoteData = purgeExpiredTombstones(remoteNormalized, nowIso, io.tombstoneRetentionDays).data;
 
     io.onStep?.('merge');
+    await yieldToUi();
     const mergeResult = mergeAppDataWithStats(localData, remoteData);
     const conflictCount = (mergeResult.stats.tasks.conflicts || 0)
         + (mergeResult.stats.projects.conflicts || 0)
@@ -1307,14 +1318,17 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
 
     const finalDataWithPendingRemoteWrite = withPendingRemoteWriteFlag(finalData, nowIso);
     io.onStep?.('write-local');
+    await yieldToUi();
     await io.writeLocal(finalDataWithPendingRemoteWrite);
 
     // Write local first so a local persistence failure cannot leave remote ahead.
     io.onStep?.('write-remote');
+    await yieldToUi();
     await io.writeRemote(finalDataWithPendingRemoteWrite);
 
     const persistedFinalData = clearPendingRemoteWriteFlag(finalDataWithPendingRemoteWrite);
     if (persistedFinalData !== finalDataWithPendingRemoteWrite) {
+        await yieldToUi();
         await io.writeLocal(persistedFinalData);
     }
 
