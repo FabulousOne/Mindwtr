@@ -1,20 +1,31 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import renderer from 'react-test-renderer';
+import { Alert } from 'react-native';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import renderer, { act } from 'react-test-renderer';
 
 import { TaskEditModal } from './task-edit-modal';
 
 vi.mock('@mindwtr/core', async () => {
   const actual = await vi.importActual<typeof import('@mindwtr/core')>('@mindwtr/core');
+  const storeState = {
+    tasks: [],
+    projects: [],
+    sections: [],
+    areas: [],
+    settings: { features: {}, ai: {}, gtd: { taskEditor: { order: [], hidden: [] } } },
+    duplicateTask: vi.fn(),
+    resetTaskChecklist: vi.fn(),
+    addProject: vi.fn(),
+    addSection: vi.fn(),
+    addArea: vi.fn(),
+    deleteTask: vi.fn(),
+  };
+  const useTaskStore = Object.assign(() => storeState, {
+    getState: () => storeState,
+  });
   return {
     ...actual,
-    useTaskStore: () => ({
-      tasks: [],
-      projects: [],
-      settings: { features: {}, ai: {}, gtd: { taskEditor: { order: [], hidden: [] } } },
-      duplicateTask: vi.fn(),
-      resetTaskChecklist: vi.fn(),
-    }),
+    useTaskStore,
   };
 });
 
@@ -55,7 +66,7 @@ vi.mock('./task-edit/TaskEditViewTab', () => ({
 }));
 
 vi.mock('./task-edit/TaskEditFormTab', () => ({
-  TaskEditFormTab: () => React.createElement('TaskEditFormTab'),
+  TaskEditFormTab: (props: any) => React.createElement('TaskEditFormTab', props),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -81,9 +92,14 @@ vi.mock('expo-linking', () => ({
 }));
 
 describe('TaskEditModal', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('renders without crashing', () => {
-    expect(() =>
-      renderer.create(
+    expect(() => {
+      act(() => {
+        renderer.create(
         <TaskEditModal
           visible
           task={{
@@ -98,7 +114,142 @@ describe('TaskEditModal', () => {
           onClose={vi.fn()}
           onSave={vi.fn()}
         />
-      )
-    ).not.toThrow();
+        );
+      });
+    }).not.toThrow();
+  });
+
+  it('closes immediately when there are no pending changes', () => {
+    const onClose = vi.fn();
+    let tree: renderer.ReactTestRenderer;
+
+    act(() => {
+      tree = renderer.create(
+        <TaskEditModal
+          visible
+          task={{
+            id: 't1',
+            title: 'Test task',
+            status: 'inbox',
+            tags: [],
+            contexts: [],
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          }}
+          onClose={onClose}
+          onSave={vi.fn()}
+        />
+      );
+    });
+
+    const modal = tree!.root.findAll((node) => node.props.visible === true && typeof node.props.onRequestClose === 'function')[0];
+    expect(modal).toBeTruthy();
+
+    const alertSpy = vi.spyOn(Alert, 'alert');
+    act(() => {
+      modal!.props.onRequestClose();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('prompts before closing when there are unsaved changes and can discard them', () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    let tree: renderer.ReactTestRenderer;
+
+    act(() => {
+      tree = renderer.create(
+        <TaskEditModal
+          visible
+          task={{
+            id: 't1',
+            title: 'Test task',
+            status: 'inbox',
+            tags: [],
+            contexts: [],
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          }}
+          onClose={onClose}
+          onSave={onSave}
+        />
+      );
+    });
+
+    const formTab = tree!.root.findAll((node) => typeof node.props.onTitleDraftChange === 'function')[0];
+    act(() => {
+      formTab.props.onTitleDraftChange('Changed task');
+    });
+
+    const modal = tree!.root.findAll((node) => node.props.visible === true && typeof node.props.onRequestClose === 'function')[0];
+    const alertSpy = vi.spyOn(Alert, 'alert');
+
+    act(() => {
+      modal!.props.onRequestClose();
+    });
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const buttons = (alertSpy.mock.calls[0]?.[2] ?? []) as Array<{ text?: string; onPress?: () => void }>;
+    expect(Array.isArray(buttons)).toBe(true);
+    expect(buttons.map((button) => button.text)).toEqual([
+      'common.cancel',
+      'common.discard',
+      'common.save',
+    ]);
+
+    act(() => {
+      buttons[1]?.onPress?.();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('can save from the discard confirmation', () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    let tree: renderer.ReactTestRenderer;
+
+    act(() => {
+      tree = renderer.create(
+        <TaskEditModal
+          visible
+          task={{
+            id: 't1',
+            title: 'Test task',
+            status: 'inbox',
+            tags: [],
+            contexts: [],
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          }}
+          onClose={onClose}
+          onSave={onSave}
+        />
+      );
+    });
+
+    const formTab = tree!.root.findAll((node) => typeof node.props.onTitleDraftChange === 'function')[0];
+    act(() => {
+      formTab.props.onTitleDraftChange('Changed task');
+    });
+
+    const modal = tree!.root.findAll((node) => node.props.visible === true && typeof node.props.onRequestClose === 'function')[0];
+    const alertSpy = vi.spyOn(Alert, 'alert');
+
+    act(() => {
+      modal!.props.onRequestClose();
+    });
+
+    const buttons = (alertSpy.mock.calls[0]?.[2] ?? []) as Array<{ text?: string; onPress?: () => void }>;
+
+    act(() => {
+      buttons[2]?.onPress?.();
+    });
+
+    expect(onSave).toHaveBeenCalledWith('t1', expect.objectContaining({ title: 'Changed task' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

@@ -102,6 +102,16 @@ interface TaskEditModalProps {
 
 type TaskEditTab = 'task' | 'view';
 
+function areTaskFieldValuesEqual(left: unknown, right: unknown): boolean {
+    if ((left === '' && right == null) || (right === '' && left == null)) {
+        return true;
+    }
+    if (Array.isArray(left) || Array.isArray(right) || (typeof left === 'object' && left !== null) || (typeof right === 'object' && right !== null)) {
+        return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+    }
+    return (left ?? null) === (right ?? null);
+}
+
 const getOrdinalTranslationKey = (value: '1' | '2' | '3' | '4' | '-1'): 'first' | 'second' | 'third' | 'fourth' | 'last' => {
     if (value === '-1') return 'last';
     if (value === '1') return 'first';
@@ -1424,6 +1434,81 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
         updateTagInput(parseTokenList(tagInputDraft, '#').join(', '));
     }, [tagInputDraft, updateTagInput]);
 
+    const discardAndClose = useCallback(() => {
+        if (titleDebounceRef.current) {
+            clearTimeout(titleDebounceRef.current);
+            titleDebounceRef.current = null;
+        }
+        if (descriptionDebounceRef.current) {
+            clearTimeout(descriptionDebounceRef.current);
+            descriptionDebounceRef.current = null;
+        }
+        isDirtyRef.current = false;
+        onClose();
+    }, [onClose]);
+
+    const hasPendingChanges = useCallback((): boolean => {
+        if (!task) return false;
+
+        const baseTask = baseTaskRef.current ?? task;
+        const pendingContexts = isContextInputFocused
+            ? parseTokenList(contextInputDraft, '@')
+            : (editedTask.contexts ?? baseTask.contexts ?? []);
+        const pendingTags = isTagInputFocused
+            ? parseTokenList(tagInputDraft, '#')
+            : (editedTask.tags ?? baseTask.tags ?? []);
+        const currentSnapshot: Task = {
+            ...baseTask,
+            ...editedTask,
+            title: String(titleDraftRef.current ?? editedTask.title ?? baseTask.title ?? ''),
+            description: String(descriptionDraftRef.current ?? editedTask.description ?? baseTask.description ?? ''),
+            contexts: pendingContexts,
+            tags: pendingTags,
+        };
+        const keys = new Set<keyof Task>([
+            ...(Object.keys(baseTask) as (keyof Task)[]),
+            ...(Object.keys(currentSnapshot) as (keyof Task)[]),
+        ]);
+
+        for (const key of keys) {
+            if (!areTaskFieldValuesEqual(currentSnapshot[key], baseTask[key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }, [contextInputDraft, editedTask, isContextInputFocused, isTagInputFocused, tagInputDraft, task]);
+
+    const handleAttemptClose = useCallback(() => {
+        if (!hasPendingChanges()) {
+            discardAndClose();
+            return;
+        }
+
+        Alert.alert(
+            t('taskEdit.discardChanges'),
+            t('taskEdit.discardChangesDesc'),
+            [
+                {
+                    text: t('common.cancel'),
+                    style: 'cancel',
+                },
+                {
+                    text: t('common.discard'),
+                    style: 'destructive',
+                    onPress: discardAndClose,
+                },
+                {
+                    text: t('common.save'),
+                    onPress: () => {
+                        void handleSave();
+                    },
+                },
+            ],
+            { cancelable: true }
+        );
+    }, [discardAndClose, handleSave, hasPendingChanges, t]);
+
     const handleDone = () => {
         void handleSave();
     };
@@ -2517,7 +2602,7 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
             animationType="slide"
             presentationStyle="pageSheet"
             allowSwipeDismissal
-            onRequestClose={handleDone}
+            onRequestClose={handleAttemptClose}
         >
             <SafeAreaView
                 style={[styles.container, { backgroundColor: tc.bg }]}
