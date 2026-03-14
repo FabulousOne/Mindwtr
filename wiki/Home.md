@@ -34,7 +34,7 @@ Mindwtr is **simple by default and powerful when needed**. We focus on reducing 
 ### User Guides
 - [[User Guide Desktop]] — Complete desktop app documentation
   - [[Desktop Installation]] — Install on Linux, Windows, macOS
-  - [[Desktop Keyboard Shortcuts]] — Vim and Emacs keybindings
+  - Keyboard shortcuts now live in [[User Guide Desktop]]
 - [[User Guide Mobile]] — Complete mobile app documentation
   - [[Mobile Installation]] — Install on Android and iOS (App Store/TestFlight)
 - [[Pomodoro Focus]] — Optional deep-work timer in Focus view
@@ -50,7 +50,7 @@ Mindwtr is **simple by default and powerful when needed**. We focus on reducing 
 ### Data & Sync
 - [[Data and Sync]] — Storage locations and sync setup
 - [[Sync Algorithm]] — Conflict rules, tombstones, and merge behavior
-- [[Cloud Sync]] — Self-hosted cloud sync backend overview
+- Self-hosted cloud setup is split between [[Data and Sync]] (client setup) and [[Cloud Deployment]] (server operations)
 - [[Dropbox Sync]] — Native Dropbox OAuth sync setup
 - [[Cloud Deployment]] — Cloud deployment and operations runbook
 - [[Calendar Integration]] — External calendars (ICS)

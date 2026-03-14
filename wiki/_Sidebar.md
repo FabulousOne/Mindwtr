@@ -11,7 +11,6 @@
 **User Guides**
 * [[User Guide Desktop]]
   * [[Desktop Installation]]
-  * [[Desktop Keyboard Shortcuts]]
 * [[User Guide Mobile]]
   * [[Mobile Installation]]
 * [[Pomodoro Focus]]
@@ -31,7 +30,6 @@
 **Data & Sync**
 * [[Data and Sync]]
 * [[Sync Algorithm]]
-* [[Cloud Sync]]
 * [[Dropbox Sync]]
 * [[Cloud Deployment]]
 * [[Local API]]
