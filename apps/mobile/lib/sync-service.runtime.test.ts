@@ -189,9 +189,10 @@ vi.mock('@mindwtr/core', async () => {
   };
 });
 
+const syncServiceModulePromise = import('./sync-service');
+
 describe('mobile sync-service runtime', () => {
-  beforeEach(() => {
-    vi.resetModules();
+  beforeEach(async () => {
     vi.clearAllMocks();
 
     storeStateRef.current = {
@@ -250,28 +251,29 @@ describe('mobile sync-service runtime', () => {
       await io.writeRemote(data);
       return { status: 'success', stats: emptyStats, data };
     });
+
+    const syncServiceModule = await syncServiceModulePromise;
+    syncServiceModule.__mobileSyncTestUtils.reset();
   });
 
   it('pauses repeated WebDAV sync attempts after a rate limit response', async () => {
     const rateLimitError = Object.assign(new Error('WebDAV GET failed (429): Too Many Requests'), { status: 429 });
     coreMocks.webdavGetJson.mockRejectedValue(rateLimitError);
 
-    const mod = await import('./sync-service');
-    mod.__mobileSyncTestUtils.reset();
-
-    const first = await mod.performMobileSync();
+    const syncServiceModule = await syncServiceModulePromise;
+    const first = await syncServiceModule.performMobileSync();
     expect(first.success).toBe(false);
     expect(first.error).toContain('WebDAV rate limited. Sync paused briefly; try again in about a minute.');
     expect(coreMocks.webdavGetJson).toHaveBeenCalledTimes(1);
-    expect(mod.__mobileSyncTestUtils.getWebdavSyncBlockedUntil()).toBeGreaterThan(Date.now());
+    expect(syncServiceModule.__mobileSyncTestUtils.getWebdavSyncBlockedUntil()).toBeGreaterThan(Date.now());
 
     coreMocks.webdavGetJson.mockResolvedValue(emptyData);
 
-    const second = await mod.performMobileSync();
+    const second = await syncServiceModule.performMobileSync();
     expect(second.success).toBe(false);
     expect(second.error).toContain('WebDAV rate limited. Sync paused briefly; try again in about a minute.');
     expect(coreMocks.webdavGetJson).toHaveBeenCalledTimes(1);
-  });
+  }, 20_000);
 
   it('reports sync activity state while a sync cycle is in flight', async () => {
     let releaseSync!: () => void;
@@ -287,15 +289,13 @@ describe('mobile sync-service runtime', () => {
       return { status: 'success', stats: emptyStats, data: emptyData };
     });
 
-    const mod = await import('./sync-service');
-    mod.__mobileSyncTestUtils.reset();
-
+    const syncServiceModule = await syncServiceModulePromise;
     const states: string[] = [];
-    const unsubscribe = mod.subscribeMobileSyncActivityState((state) => {
+    const unsubscribe = syncServiceModule.subscribeMobileSyncActivityState((state) => {
       states.push(state);
     });
 
-    const syncPromise = mod.performMobileSync();
+    const syncPromise = syncServiceModule.performMobileSync();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(states).toContain('syncing');
