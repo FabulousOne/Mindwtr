@@ -1508,15 +1508,21 @@ export class SyncService {
         }
     }
 
-    static async testWebDavConnection(config: { url: string; username?: string; password?: string }): Promise<void> {
+    static async testWebDavConnection(config: { url: string; username?: string; password?: string; hasPassword?: boolean }): Promise<void> {
         const normalizedUrl = normalizeWebdavUrl(config.url.trim());
         if (!normalizedUrl) {
             throw new Error('WebDAV URL not configured');
         }
         const fetcher = await getTauriFetch();
+        const password = await resolveWebdavPassword({
+            url: config.url,
+            username: config.username || '',
+            password: config.password,
+            hasPassword: config.hasPassword,
+        });
         await webdavGetJson<unknown>(normalizedUrl, {
             username: config.username?.trim(),
-            password: config.password ?? '',
+            password,
             timeoutMs: 10_000,
             fetcher: fetcher ?? fetch,
         });

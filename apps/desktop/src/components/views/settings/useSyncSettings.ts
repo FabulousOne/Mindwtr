@@ -252,6 +252,7 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
                 url: trimmedUrl,
                 username: webdavUsername.trim(),
                 password: webdavPassword,
+                hasPassword: webdavHasPassword,
             });
             setWebdavTestState('success');
             setSyncError(null);

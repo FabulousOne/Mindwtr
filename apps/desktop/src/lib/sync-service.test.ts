@@ -145,6 +145,39 @@ describe('SyncService testability hooks', () => {
         expect(firstCall[0]).toBe('https://example.com/remote.php/dav/files/user/mindwtr/data.json');
         expect(firstCall[1]).toMatchObject({ method: 'GET' });
     });
+
+    it('reuses the stored WebDAV password when settings only expose hasPassword', async () => {
+        const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}', {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        }));
+        const invoke = vi.fn(async (command: string) => {
+            if (command === 'get_webdav_password') return 'stored-secret';
+            throw new Error(`unexpected command: ${command}`);
+        });
+        __syncServiceTestUtils.setDependenciesForTests({
+            getTauriFetch: async () => fetchSpy as unknown as typeof fetch,
+            invoke: invoke as unknown as <T>(command: string, args?: Record<string, unknown>) => Promise<T>,
+            isTauriRuntime: () => true,
+        });
+
+        await SyncService.testWebDavConnection({
+            url: 'https://example.com/remote.php/dav/files/user/mindwtr',
+            username: 'alice',
+            hasPassword: true,
+        });
+
+        expect(invoke).toHaveBeenCalledWith('get_webdav_password', undefined);
+        const firstCall = fetchSpy.mock.calls[0];
+        expect(firstCall).toBeDefined();
+        if (!firstCall) {
+            throw new Error('Expected WebDAV fetch call');
+        }
+        const init = firstCall[1] as RequestInit | undefined;
+        expect(init?.headers).toMatchObject({
+            Authorization: 'Basic YWxpY2U6c3RvcmVkLXNlY3JldA==',
+        });
+    });
 });
 
 describe('SyncService orchestration', () => {
