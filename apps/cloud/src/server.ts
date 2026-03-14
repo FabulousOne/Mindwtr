@@ -93,8 +93,39 @@ const AUTH_FAILURE_RATE_MAX = Number.isFinite(authFailureRateMaxValue) && authFa
     ? Math.floor(authFailureRateMaxValue)
     : 30;
 const ATTACHMENT_PATH_ALLOWLIST = /^[a-zA-Z0-9._/-]+$/;
+const CLOUD_DATA_LOCK_TTL_MS = 30_000;
+const CLOUD_DATA_LOCK_REFRESH_MS = 2_000;
+const CLOUD_DATA_LOCK_WAIT_TIMEOUT_MS = 60_000;
+const CLOUD_TASK_CREATION_ALLOWED_PROP_KEYS = new Set<keyof Task>([
+    'status',
+    'priority',
+    'taskMode',
+    'startTime',
+    'dueDate',
+    'recurrence',
+    'pushCount',
+    'tags',
+    'contexts',
+    'checklist',
+    'description',
+    'textDirection',
+    'attachments',
+    'location',
+    'projectId',
+    'sectionId',
+    'areaId',
+    'isFocusedToday',
+    'timeEstimate',
+    'reviewAt',
+]);
 // Accept URL-safe and common base64 token alphabets to avoid breaking existing deployments.
 const BEARER_TOKEN_PATTERN = /^[A-Za-z0-9._~+/=-]{20,512}$/;
+
+type CloudFileLock = {
+    owner: string;
+    acquiredAt: number;
+    heartbeatAt: number;
+};
 
 function decodeAttachmentPath(rawPath: string): string | null {
     try {
@@ -276,7 +307,8 @@ function tokenToKey(token: string): string {
     return createHash('sha256').update(token).digest('hex');
 }
 
-function getClientIp(req: Request): string {
+function getClientIp(req: Request, trustProxyHeaders = false): string {
+    if (!trustProxyHeaders) return 'unknown';
     const forwarded = req.headers.get('x-forwarded-for');
     if (forwarded) {
         const first = forwarded.split(',')[0]?.trim();
@@ -518,6 +550,18 @@ function asStatus(value: unknown): TaskStatus | null {
     return allowed.includes(value as TaskStatus) ? (value as TaskStatus) : null;
 }
 
+function validateTaskCreationProps(value: unknown): { ok: true; props: Partial<Task> } | { ok: false; error: string } {
+    if (!isRecord(value)) return { ok: false, error: 'Invalid task props' };
+    const invalidKeys = Object.keys(value).filter((key) => !CLOUD_TASK_CREATION_ALLOWED_PROP_KEYS.has(key as keyof Task));
+    if (invalidKeys.length > 0) {
+        return {
+            ok: false,
+            error: `Unsupported task props: ${invalidKeys.slice(0, 10).join(', ')}`,
+        };
+    }
+    return { ok: true, props: value as Partial<Task> };
+}
+
 function pickTaskList(
     data: AppData,
     opts: { includeDeleted: boolean; includeCompleted: boolean; status?: TaskStatus | null; query?: string }
@@ -565,6 +609,99 @@ function writeData(filePath: string, data: unknown) {
     }
 }
 
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function getCloudLockPath(dataDir: string, key: string): string {
+    return join(dataDir, '.locks', `${key}.lock`);
+}
+
+function readCloudLock(lockPath: string): CloudFileLock | null {
+    try {
+        const raw = readFileSync(lockPath, 'utf8');
+        const parsed = JSON.parse(raw) as Partial<CloudFileLock>;
+        if (!parsed || typeof parsed.owner !== 'string') return null;
+        const acquiredAt = Number(parsed.acquiredAt);
+        const heartbeatAt = Number(parsed.heartbeatAt);
+        if (!Number.isFinite(acquiredAt) || !Number.isFinite(heartbeatAt)) return null;
+        return {
+            owner: parsed.owner,
+            acquiredAt,
+            heartbeatAt,
+        };
+    } catch {
+        return null;
+    }
+}
+
+function writeCloudLock(lockPath: string, lock: CloudFileLock, flag: 'wx' | 'w'): void {
+    mkdirSync(dirname(lockPath), { recursive: true });
+    writeFileSync(lockPath, JSON.stringify(lock), { flag, mode: 0o600 });
+}
+
+async function withCloudFileLock<T>(dataDir: string, key: string, fn: () => Promise<T>): Promise<T> {
+    const owner = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const lockPath = getCloudLockPath(dataDir, key);
+    const startedAt = Date.now();
+    let attempt = 0;
+    while (true) {
+        const now = Date.now();
+        try {
+            writeCloudLock(lockPath, { owner, acquiredAt: now, heartbeatAt: now }, 'wx');
+            break;
+        } catch (error) {
+            const isExistingLock = typeof error === 'object'
+                && error !== null
+                && 'code' in error
+                && (error as { code?: string }).code === 'EEXIST';
+            if (!isExistingLock) {
+                throw error;
+            }
+            const currentLock = readCloudLock(lockPath);
+            const lastHeartbeatAt = currentLock?.heartbeatAt ?? currentLock?.acquiredAt ?? 0;
+            if (Number.isFinite(lastHeartbeatAt) && now - lastHeartbeatAt > CLOUD_DATA_LOCK_TTL_MS) {
+                try {
+                    unlinkSync(lockPath);
+                    continue;
+                } catch {
+                    // Another process may have refreshed or released the lock.
+                }
+            }
+            if (now - startedAt > CLOUD_DATA_LOCK_WAIT_TIMEOUT_MS) {
+                throw new Error('Timed out waiting for cloud data lock');
+            }
+            attempt += 1;
+            await sleep(Math.min(1000, 25 * attempt));
+        }
+    }
+
+    const refreshTimer = setInterval(() => {
+        try {
+            const currentLock = readCloudLock(lockPath);
+            if (!currentLock || currentLock.owner !== owner) return;
+            writeCloudLock(lockPath, { ...currentLock, heartbeatAt: Date.now() }, 'w');
+        } catch {
+            // Best effort only; stale-lock cleanup covers crashes.
+        }
+    }, CLOUD_DATA_LOCK_REFRESH_MS);
+    if (typeof refreshTimer.unref === 'function') {
+        refreshTimer.unref();
+    }
+
+    try {
+        return await fn();
+    } finally {
+        clearInterval(refreshTimer);
+        try {
+            const currentLock = readCloudLock(lockPath);
+            if (currentLock?.owner === owner && existsSync(lockPath)) {
+                unlinkSync(lockPath);
+            }
+        } catch {
+            // Best-effort cleanup if another process already reclaimed the stale lock.
+        }
+    }
+}
+
 function ensureWritableDir(dirPath: string): boolean {
     try {
         mkdirSync(dirPath, { recursive: true });
@@ -604,15 +741,18 @@ export const __cloudTestUtils = {
     parseBoolEnv,
     resolveAllowedAuthTokensFromEnv,
     isAuthorizedToken,
+    getClientIp,
     toRateLimitRoute,
     validateAppData,
     asStatus,
+    validateTaskCreationProps,
     pickTaskList,
     readJsonBody,
     writeData,
     normalizeAttachmentRelativePath,
     isPathWithinRoot,
     pathContainsSymlink,
+    validateTaskCreationProps,
     createWriteLockRunner,
 };
 
@@ -626,6 +766,7 @@ type CloudServerOptions = {
     maxBodyBytes?: number;
     maxAttachmentBytes?: number;
     allowedAuthTokens?: Set<string> | null;
+    trustProxyHeaders?: boolean;
 };
 
 type CloudServerHandle = {
@@ -633,11 +774,13 @@ type CloudServerHandle = {
     port: number;
 };
 
-function createWriteLockRunner() {
+function createWriteLockRunner(dataDir?: string) {
     const writeLocks = new Map<string, Promise<void>>();
     return async <T>(key: string, fn: () => Promise<T>) => {
         const current = writeLocks.get(key) ?? Promise.resolve();
-        const run = current.catch(() => undefined).then(() => fn());
+        const run = current.catch(() => undefined).then(() => (
+            dataDir ? withCloudFileLock(dataDir, key, fn) : fn()
+        ));
         writeLocks.set(key, run.then(() => undefined, () => undefined));
         return run;
     };
@@ -660,8 +803,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         options.maxAttachmentBytes ?? process.env.MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES ?? 50_000_000
     );
     const allowedAuthTokens = options.allowedAuthTokens ?? resolveAllowedAuthTokensFromEnv(process.env);
+    const trustProxyHeaders = options.trustProxyHeaders ?? parseBoolEnv(process.env.MINDWTR_CLOUD_TRUST_PROXY_HEADERS);
     const encoder = new TextEncoder();
-    const withWriteLock = createWriteLockRunner();
+    const withWriteLock = createWriteLockRunner(dataDir);
     const rateLimitCleanupMs = Number(process.env.MINDWTR_CLOUD_RATE_CLEANUP_MS || 60_000);
     const pruneExpiredRateLimits = (now: number) => {
         for (const [key, state] of rateLimits.entries()) {
@@ -699,7 +843,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         return null;
     };
     const unauthorizedResponse = (req: Request): Response => {
-        const authRateKey = `auth-failure:${getClientIp(req)}`;
+        const authRateKey = `auth-failure:${getClientIp(req, trustProxyHeaders)}`;
         const authRateLimitResponse = checkRateLimit(authRateKey, AUTH_FAILURE_RATE_MAX);
         if (authRateLimitResponse) {
             return authRateLimitResponse;
@@ -725,6 +869,11 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     } else {
         logInfo('token namespace mode enabled by explicit opt-in', {
             hint: 'set MINDWTR_CLOUD_AUTH_TOKENS to enforce a strict token allowlist',
+        });
+    }
+    if (trustProxyHeaders) {
+        logWarn('trusting proxy IP headers for auth failure rate limiting', {
+            hint: 'enable this only behind a trusted reverse proxy that overwrites forwarded IP headers',
         });
     }
     if (!ensureWritableDir(dataDir)) {
@@ -799,7 +948,12 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                         const input = typeof (body as any).input === 'string' ? String((body as any).input) : '';
                         const rawTitle = typeof (body as any).title === 'string' ? String((body as any).title) : '';
-                        const initialProps = typeof (body as any).props === 'object' && (body as any).props ? (body as any).props : {};
+                        const rawInitialProps = typeof (body as any).props === 'object' && (body as any).props ? (body as any).props : {};
+                        const validatedInitialProps = validateTaskCreationProps(rawInitialProps);
+                        if (!validatedInitialProps.ok) {
+                            return errorResponse(validatedInitialProps.error, 400);
+                        }
+                        const initialProps = validatedInitialProps.props;
                         if (input.trim().length > MAX_TASK_TITLE_LENGTH) {
                             return errorResponse(`Quick-add input too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
                         }
@@ -844,6 +998,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                             createdAt: nowIso,
                             updatedAt: nowIso,
                         } as Task;
+                        if ((status === 'done' || status === 'archived') && !task.completedAt) {
+                            task.completedAt = nowIso;
+                        }
 
                         data.tasks.push(task);
                         writeData(filePath, data);
@@ -966,18 +1123,18 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 const filePath = join(dataDir, `${key}.json`);
 
                 if (req.method === 'GET') {
-                    if (!existsSync(filePath)) {
-                        const emptyData: AppData = { tasks: [], projects: [], sections: [], areas: [], settings: {} };
-                        await withWriteLock(key, async () => {
+                    return await withWriteLock(key, async () => {
+                        if (!existsSync(filePath)) {
+                            const emptyData: AppData = { tasks: [], projects: [], sections: [], areas: [], settings: {} };
                             if (!existsSync(filePath)) writeData(filePath, emptyData);
-                        });
-                        return jsonResponse(emptyData);
-                    }
-                    const data = readData(filePath);
-                    if (!data) return errorResponse('Failed to read data', 500);
-                    const validated = validateAppData(data);
-                    if (!validated.ok) return errorResponse(validated.error, 500);
-                    return jsonResponse(validated.data);
+                            return jsonResponse(emptyData);
+                        }
+                        const data = readData(filePath);
+                        if (!data) return errorResponse('Failed to read data', 500);
+                        const validated = validateAppData(data);
+                        if (!validated.ok) return errorResponse(validated.error, 500);
+                        return jsonResponse(validated.data);
+                    });
                 }
 
                 if (req.method === 'PUT') {

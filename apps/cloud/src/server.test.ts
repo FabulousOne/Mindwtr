@@ -69,6 +69,19 @@ describe('cloud server utils', () => {
         );
     });
 
+    test('ignores proxy IP headers unless explicitly trusted', () => {
+        const req = new Request('http://localhost/v1/data', {
+            headers: {
+                'x-forwarded-for': '203.0.113.10, 10.0.0.1',
+                'cf-connecting-ip': '203.0.113.11',
+                'x-real-ip': '203.0.113.12',
+            },
+        });
+
+        expect(__cloudTestUtils.getClientIp(req)).toBe('unknown');
+        expect(__cloudTestUtils.getClientIp(req, true)).toBe('203.0.113.10');
+    });
+
     test('rejects invalid app data payload', () => {
         const result = __cloudTestUtils.validateAppData({ tasks: 'invalid', projects: [] });
         expect(result.ok).toBe(false);
@@ -142,6 +155,23 @@ describe('cloud server utils', () => {
         expect(__cloudTestUtils.asStatus('reference')).toBe('reference');
         expect(__cloudTestUtils.asStatus('todo')).toBeNull();
         expect(__cloudTestUtils.asStatus('in-progress')).toBeNull();
+    });
+
+    test('rejects reserved task creation props', () => {
+        expect(__cloudTestUtils.validateTaskCreationProps({
+            status: 'next',
+            projectId: 'p1',
+        }).ok).toBe(true);
+
+        const invalid = __cloudTestUtils.validateTaskCreationProps({
+            status: 'next',
+            rev: 99,
+            deletedAt: '2026-01-01T00:00:00.000Z',
+        });
+        expect(invalid.ok).toBe(false);
+        if (invalid.ok) throw new Error('Expected invalid task props');
+        expect(invalid.error).toContain('rev');
+        expect(invalid.error).toContain('deletedAt');
     });
 
     test('validates settings.attachments.pendingRemoteDeletes structure', () => {
@@ -382,6 +412,39 @@ describe('cloud server api', () => {
             headers: authHeaders,
         });
         expect(archiveDeleted.status).toBe(404);
+    });
+
+    test('rejects reserved fields on task creation', async () => {
+        const createResponse = await fetch(`${baseUrl}/v1/tasks`, {
+            method: 'POST',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                title: 'Cloud Task',
+                props: {
+                    rev: 99,
+                    deletedAt: '2026-01-01T00:00:00.000Z',
+                },
+            }),
+        });
+        expect(createResponse.status).toBe(400);
+        const payload = await createResponse.json();
+        expect(payload.error).toContain('Unsupported task props');
+    });
+
+    test('auth failure rate limiting does not trust spoofed forwarded IP headers by default', async () => {
+        let lastStatus = 0;
+        for (let attempt = 0; attempt < 31; attempt += 1) {
+            const response = await fetch(`${baseUrl}/v1/tasks`, {
+                headers: {
+                    'x-forwarded-for': `203.0.113.${attempt}`,
+                },
+            });
+            lastStatus = response.status;
+        }
+        expect(lastStatus).toBe(429);
     });
 
     test('supports attachment upload/download/delete endpoints', async () => {
@@ -726,7 +789,7 @@ describe('cloud server api', () => {
         expect(mergedTask?.updatedAt).toBe('2026-01-01T00:00:00.100Z');
     });
 
-    test('keeps newer delete over older live update during /v1/data merge', async () => {
+    test('keeps the live record when delete is only slightly newer during /v1/data merge', async () => {
         const base = { projects: [], sections: [], areas: [], settings: {} };
         const taskId = 'merge-race-delete-wins';
 
@@ -776,7 +839,7 @@ describe('cloud server api', () => {
         const body = await getResponse.json();
         const mergedTask = (body.tasks as Array<{ id: string; updatedAt: string; deletedAt?: string }>).find((task) => task.id === taskId);
         expect(mergedTask).toBeTruthy();
-        expect(mergedTask?.deletedAt).toBe('2026-01-01T00:00:00.100Z');
-        expect(mergedTask?.updatedAt).toBe('2026-01-01T00:00:00.100Z');
+        expect(mergedTask?.deletedAt).toBeUndefined();
+        expect(mergedTask?.updatedAt).toBe('2026-01-01T00:00:00.000Z');
     });
 });
