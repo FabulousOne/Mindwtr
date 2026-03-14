@@ -34,7 +34,17 @@ export const clearDerivedCache = () => {
 
 function shouldPromoteScheduledTask(task: AppData['tasks'][number], nowMs: number): boolean {
     if (task.deletedAt || task.purgedAt) return false;
-    if (task.status === 'next' || task.status === 'done' || task.status === 'archived' || task.status === 'reference') return false;
+    // Explicit Waiting should remain stable even when dated items become due.
+    // Waiting represents a handoff/follow-up decision, not a transient scheduling bucket.
+    if (
+        task.status === 'next'
+        || task.status === 'waiting'
+        || task.status === 'done'
+        || task.status === 'archived'
+        || task.status === 'reference'
+    ) {
+        return false;
+    }
     const startMs = safeParseDate(task.startTime)?.getTime() ?? NaN;
     if (Number.isFinite(startMs) && startMs <= nowMs) return true;
     const dueMs = safeParseDate(task.dueDate)?.getTime() ?? NaN;

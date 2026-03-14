@@ -382,6 +382,39 @@ describe('TaskStore', () => {
         expect(archived?.title).toBe('Lifecycle Task Updated');
     });
 
+    it('keeps explicit waiting status after a refresh even when dated tasks are due', async () => {
+        let persistedData = {
+            tasks: [],
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {},
+        };
+        mockStorage.getData = vi.fn().mockImplementation(async () => persistedData);
+        mockStorage.saveData = vi.fn().mockImplementation(async (data) => {
+            persistedData = JSON.parse(JSON.stringify(data));
+        });
+
+        const { addTask, moveTask } = useTaskStore.getState();
+        await addTask('Waiting handoff', {
+            status: 'next',
+            dueDate: '2026-02-14T08:00:00.000Z',
+            startTime: '2026-02-14T07:30:00.000Z',
+        });
+
+        const taskId = useTaskStore.getState()._allTasks[0]?.id;
+        if (!taskId) throw new Error('Failed to seed waiting task');
+
+        await moveTask(taskId, 'waiting');
+        await flushPendingSave();
+        await useTaskStore.getState().fetchData({ silent: true });
+
+        const refreshed = useTaskStore.getState()._allTasks.find((task) => task.id === taskId);
+        expect(refreshed?.status).toBe('waiting');
+        expect(refreshed?.dueDate).toBe('2026-02-14T08:00:00.000Z');
+        expect(refreshed?.startTime).toBe('2026-02-14T07:30:00.000Z');
+    });
+
     it('queryTasks defaults to visible tasks and can include archived/deleted when requested', async () => {
         const { addTask, moveTask, deleteTask, queryTasks } = useTaskStore.getState();
         addTask('Visible task');
