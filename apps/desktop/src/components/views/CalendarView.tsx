@@ -10,6 +10,7 @@ import { checkBudget } from '../../config/performanceBudgets';
 import { TaskItem } from '../TaskItem';
 import { resolveAreaFilter, taskMatchesAreaFilter } from '../../lib/area-filter';
 import { fetchExternalCalendarEvents } from '../../lib/external-calendar-events';
+import { getCalendarMonthNames, getCalendarWeekdayHeaders, resolveCalendarLocale } from './calendar-locale';
 
 const dayKey = (date: Date) => format(date, 'yyyy-MM-dd');
 
@@ -27,7 +28,7 @@ export function CalendarView() {
         shallow
     );
     const { projectMap } = getDerivedState();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const resolveText = useCallback(
         (key: string, fallback: string) => {
             const value = t(key);
@@ -42,6 +43,14 @@ export function CalendarView() {
         [settings?.filters?.areaId, areas],
     );
     const weekStartsOn = settings?.weekStart === 'monday' ? 1 : 0;
+    const calendarLocale = useMemo(
+        () => resolveCalendarLocale({
+            language,
+            dateFormat: settings?.dateFormat,
+            systemLocale: typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().locale : undefined,
+        }),
+        [language, settings?.dateFormat]
+    );
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -382,9 +391,10 @@ export function CalendarView() {
         setEditingTimeTaskId(null);
         setEditingTimeValue('');
     };
-    const monthNames = useMemo(
-        () => Array.from({ length: 12 }, (_, index) => format(new Date(2000, index, 1), 'MMMM')),
-        []
+    const monthNames = useMemo(() => getCalendarMonthNames(calendarLocale), [calendarLocale]);
+    const weekdayHeaders = useMemo(
+        () => getCalendarWeekdayHeaders(calendarLocale, weekStartsOn as 0 | 1),
+        [calendarLocale, weekStartsOn]
     );
     const currentYear = getYear(currentMonth);
     const yearOptions = useMemo(
@@ -475,10 +485,7 @@ export function CalendarView() {
 
             <div ref={calendarBodyRef} className="space-y-6">
                 <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden shadow-sm">
-                    {(weekStartsOn === 1
-                        ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                        : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                    ).map((day) => (
+                    {weekdayHeaders.map((day) => (
                         <div key={day} className="bg-card p-2 text-center text-sm font-medium text-muted-foreground">
                             {day}
                         </div>
