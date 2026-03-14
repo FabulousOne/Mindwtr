@@ -41,7 +41,40 @@ jobs:
         run: cd packages/core && bun run tsc --noEmit
 
       - name: Run unit tests
-        run: cd packages/core && bun test
+        run: bun run --filter @mindwtr/core test -- --coverage
+
+      - name: Core coverage summary
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'packages/core/coverage/coverage-summary.json';
+          if (!fs.existsSync(path)) {
+            console.log(`No coverage summary found at ${path}`);
+            process.exit(0);
+          }
+          const total = JSON.parse(fs.readFileSync(path, 'utf8')).total;
+          const lines = [
+            '### Core Coverage',
+            '',
+            '| Metric | Percent | Covered / Total |',
+            '| --- | ---: | ---: |',
+            `| Lines | ${total.lines.pct}% | ${total.lines.covered} / ${total.lines.total} |`,
+            `| Statements | ${total.statements.pct}% | ${total.statements.covered} / ${total.statements.total} |`,
+            `| Functions | ${total.functions.pct}% | ${total.functions.covered} / ${total.functions.total} |`,
+            `| Branches | ${total.branches.pct}% | ${total.branches.covered} / ${total.branches.total} |`,
+            '',
+          ];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          NODE
+
+      - name: Upload core coverage artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: core-coverage
+          path: packages/core/coverage
+          if-no-files-found: ignore
 
       - name: Cloud app tests
         run: bun run --filter mindwtr-cloud test
@@ -100,7 +133,40 @@ jobs:
         run: cd apps/desktop && bun run tsc --noEmit
 
       - name: Run tests
-        run: cd apps/desktop && bun test
+        run: bun run --filter mindwtr test -- --coverage
+
+      - name: Desktop coverage summary
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'apps/desktop/coverage/coverage-summary.json';
+          if (!fs.existsSync(path)) {
+            console.log(`No coverage summary found at ${path}`);
+            process.exit(0);
+          }
+          const total = JSON.parse(fs.readFileSync(path, 'utf8')).total;
+          const lines = [
+            '### Desktop Coverage',
+            '',
+            '| Metric | Percent | Covered / Total |',
+            '| --- | ---: | ---: |',
+            `| Lines | ${total.lines.pct}% | ${total.lines.covered} / ${total.lines.total} |`,
+            `| Statements | ${total.statements.pct}% | ${total.statements.covered} / ${total.statements.total} |`,
+            `| Functions | ${total.functions.pct}% | ${total.functions.covered} / ${total.functions.total} |`,
+            `| Branches | ${total.branches.pct}% | ${total.branches.covered} / ${total.branches.total} |`,
+            '',
+          ];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          NODE
+
+      - name: Upload desktop coverage artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: desktop-coverage
+          path: apps/desktop/coverage
+          if-no-files-found: ignore
 
       - name: Build Vite frontend
         run: cd apps/desktop && bun run build:vite
@@ -142,7 +208,86 @@ jobs:
         continue-on-error: true
 
       - name: Mobile tests
-        run: bun run --filter mobile test
+        run: bun run --filter mobile test -- --coverage
+
+      - name: Mobile coverage summary
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'apps/mobile/coverage/coverage-summary.json';
+          if (!fs.existsSync(path)) {
+            console.log(`No coverage summary found at ${path}`);
+            process.exit(0);
+          }
+          const total = JSON.parse(fs.readFileSync(path, 'utf8')).total;
+          const lines = [
+            '### Mobile Coverage',
+            '',
+            '| Metric | Percent | Covered / Total |',
+            '| --- | ---: | ---: |',
+            `| Lines | ${total.lines.pct}% | ${total.lines.covered} / ${total.lines.total} |`,
+            `| Statements | ${total.statements.pct}% | ${total.statements.covered} / ${total.statements.total} |`,
+            `| Functions | ${total.functions.pct}% | ${total.functions.covered} / ${total.functions.total} |`,
+            `| Branches | ${total.branches.pct}% | ${total.branches.covered} / ${total.branches.total} |`,
+            '',
+          ];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          NODE
+
+      - name: Upload mobile coverage artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mobile-coverage
+          path: apps/mobile/coverage
+          if-no-files-found: ignore
+
+  e2e:
+    runs-on: ubuntu-latest
+    name: E2E (Web)
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2
+        with:
+          bun-version-file: ".bun-version"
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: bun run test:e2e
+
+      - name: Upload Playwright HTML report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-test-results
+          path: test-results
+          if-no-files-found: ignore
 
   # Lint check
   lint:
