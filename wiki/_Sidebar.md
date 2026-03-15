@@ -36,6 +36,7 @@
 * [[MCP Server]]
 * [[Web App PWA]]
 * [[Calendar Integration]]
+* [[Obsidian Integration]]
 * [[AI Assistant]]
 * [[Reusable Lists]]
 * [[Attachments]]

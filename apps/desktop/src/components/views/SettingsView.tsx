@@ -2,9 +2,9 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { ErrorBoundary } from '../ErrorBoundary';
 import {
     Bell,
-    CalendarDays,
     Database,
     Info,
+    Link2,
     ListChecks,
     Monitor,
     Sparkles,
@@ -47,6 +47,7 @@ import { SettingsUpdateModal } from './settings/SettingsUpdateModal';
 import { SettingsSidebar } from './settings/SettingsSidebar';
 import { useAiSettings } from './settings/useAiSettings';
 import { useCalendarSettings } from './settings/useCalendarSettings';
+import { useObsidianSettings } from './settings/useObsidianSettings';
 import { useSyncSettings } from './settings/useSyncSettings';
 import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
@@ -55,7 +56,7 @@ import { type GlobalQuickAddShortcutSetting } from '../../lib/global-quick-add-s
 
 type ThemeMode = DesktopThemeMode;
 type DensityMode = 'comfortable' | 'compact';
-type SettingsPage = 'main' | 'gtd' | 'notifications' | 'sync' | 'calendar' | 'ai' | 'about';
+type SettingsPage = 'main' | 'gtd' | 'notifications' | 'sync' | 'integrations' | 'ai' | 'about';
 type LinuxDistroInfo = { id?: string; id_like?: string[] };
 type DateFormatUiSetting = DateFormatSetting;
 
@@ -75,9 +76,9 @@ const SettingsNotificationsPage = lazy(wrapSettingsOpenImport(
     'page-chunk:notifications',
     () => import('./settings/SettingsNotificationsPage').then((m) => ({ default: m.SettingsNotificationsPage }))
 ));
-const SettingsCalendarPage = lazy(wrapSettingsOpenImport(
-    'page-chunk:calendar',
-    () => import('./settings/SettingsCalendarPage').then((m) => ({ default: m.SettingsCalendarPage }))
+const SettingsIntegrationsPage = lazy(wrapSettingsOpenImport(
+    'page-chunk:integrations',
+    () => import('./settings/SettingsIntegrationsPage').then((m) => ({ default: m.SettingsIntegrationsPage }))
 ));
 const SettingsSyncPage = lazy(wrapSettingsOpenImport(
     'page-chunk:sync',
@@ -284,6 +285,11 @@ export function SettingsView() {
         const key = 'settings.selectSyncFolderTitle';
         const translated = translate(key);
         return translated === key ? 'Select sync folder' : translated;
+    }, [translate]);
+    const selectObsidianVaultTitle = useMemo(() => {
+        const key = 'settings.selectObsidianVaultTitle';
+        const translated = translate(key);
+        return translated === key ? 'Select Obsidian vault' : translated;
     }, [translate]);
 
     // Heavy settings hooks are only needed when their page is active.
@@ -848,8 +854,8 @@ export function SettingsView() {
                 return t.ai;
             case 'sync':
                 return t.sync;
-            case 'calendar':
-                return t.calendar;
+            case 'integrations':
+                return t.integrations;
             case 'about':
                 return t.about;
             default:
@@ -869,8 +875,8 @@ export function SettingsView() {
         { id: 'gtd', icon: ListChecks, label: t.gtd, keywords: ['auto-archive', 'priorities', 'time estimates', 'pomodoro', 'capture', 'inbox processing', '2-minute rule', 'task editor'] },
         { id: 'notifications', icon: Bell, label: t.notifications, keywords: ['review reminders', 'weekly review', 'daily digest', 'morning', 'evening'] },
         { id: 'sync', icon: Database, label: t.sync, keywords: ['file sync', 'WebDAV', 'cloud', 'sync now', 'attachments', 'diagnostics', 'logging'] },
+        { id: 'integrations', icon: Link2, label: t.integrations, keywords: ['obsidian', 'vault', 'calendar', 'ICS', 'apple calendar', 'integration'] },
         { id: 'ai', icon: Sparkles, label: t.ai, keywords: ['OpenAI', 'Gemini', 'Anthropic', 'API key', 'speech', 'whisper', 'copilot', 'model'] },
-        { id: 'calendar', icon: CalendarDays, label: t.calendar, keywords: ['external calendar', 'iCal', 'subscription', 'URL'] },
         { id: 'about', icon: Info, label: t.about, badge: hasUpdateBadge, badgeLabel: t.updateAvailable, keywords: ['version', 'update', 'license', 'sponsor'] },
     ], [hasUpdateBadge, t]);
 
@@ -924,6 +930,27 @@ export function SettingsView() {
         showSaved,
         selectSyncFolderTitle,
     });
+    const {
+        obsidianVaultPath,
+        setObsidianVaultPath,
+        obsidianEnabled,
+        setObsidianEnabled,
+        obsidianScanFoldersText,
+        setObsidianScanFoldersText,
+        obsidianLastScannedAt,
+        obsidianHasVaultMarker,
+        obsidianVaultWarning,
+        isSavingObsidian,
+        isScanningObsidian,
+        onBrowseObsidianVault,
+        onSaveObsidian,
+        onRemoveObsidian,
+        onRescanObsidian,
+    } = useObsidianSettings({
+        isTauri,
+        showSaved,
+        selectVaultFolderTitle: selectObsidianVaultTitle,
+    });
     const syncPreferences = settings?.syncPreferences ?? {};
     const handleUpdateSyncPreferences = useCallback((updates: Partial<NonNullable<AppData['settings']['syncPreferences']>>) => {
         updateSettings({ syncPreferences: { ...syncPreferences, ...updates } })
@@ -931,7 +958,7 @@ export function SettingsView() {
             .catch((error) => reportError('Failed to update sync preferences', error));
     }, [syncPreferences, showSaved, updateSettings]);
 
-    const CalendarPage = () => {
+    const IntegrationsPage = () => {
         const {
             externalCalendars,
             newCalendarName,
@@ -947,8 +974,9 @@ export function SettingsView() {
         } = useCalendarSettings({ showSaved, settings, updateSettings, isMac });
 
         return (
-            <SettingsCalendarPage
+            <SettingsIntegrationsPage
                 t={t}
+                isTauri={isTauri}
                 newCalendarName={newCalendarName}
                 newCalendarUrl={newCalendarUrl}
                 calendarError={calendarError}
@@ -962,6 +990,21 @@ export function SettingsView() {
                 onRemoveCalendar={handleRemoveCalendar}
                 onRequestSystemCalendarPermission={handleRequestSystemCalendarPermission}
                 maskCalendarUrl={maskCalendarUrl}
+                obsidianVaultPath={obsidianVaultPath}
+                obsidianEnabled={obsidianEnabled}
+                obsidianScanFoldersText={obsidianScanFoldersText}
+                obsidianLastScannedAt={obsidianLastScannedAt}
+                obsidianHasVaultMarker={obsidianHasVaultMarker}
+                obsidianVaultWarning={obsidianVaultWarning}
+                isSavingObsidian={isSavingObsidian}
+                isScanningObsidian={isScanningObsidian}
+                onObsidianVaultPathChange={setObsidianVaultPath}
+                onObsidianEnabledChange={setObsidianEnabled}
+                onObsidianScanFoldersTextChange={setObsidianScanFoldersText}
+                onBrowseObsidianVault={onBrowseObsidianVault}
+                onSaveObsidian={onSaveObsidian}
+                onRemoveObsidian={onRemoveObsidian}
+                onRescanObsidian={onRescanObsidian}
             />
         );
     };
@@ -1078,8 +1121,8 @@ export function SettingsView() {
             );
         }
 
-        if (page === 'calendar') {
-            return <CalendarPage />;
+        if (page === 'integrations') {
+            return <IntegrationsPage />;
         }
 
         if (page === 'sync') {

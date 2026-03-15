@@ -1,0 +1,167 @@
+import { safeFormatDate } from '@mindwtr/core';
+
+import { cn } from '../../../lib/utils';
+
+type Labels = {
+    obsidianVault: string;
+    obsidianVaultDesc: string;
+    obsidianEnable: string;
+    obsidianVaultPath: string;
+    obsidianVaultPathHint: string;
+    obsidianScanFolders: string;
+    obsidianScanFoldersHint: string;
+    obsidianSave: string;
+    obsidianRemove: string;
+    obsidianRescan: string;
+    obsidianRescanning: string;
+    obsidianLastScanned: string;
+    obsidianNeverScanned: string;
+    obsidianMissingMarker: string;
+    browse: string;
+};
+
+type SettingsObsidianSectionProps = {
+    t: Labels;
+    isTauri: boolean;
+    obsidianVaultPath: string;
+    obsidianEnabled: boolean;
+    obsidianScanFoldersText: string;
+    obsidianLastScannedAt: string | null;
+    obsidianHasVaultMarker: boolean | null;
+    obsidianVaultWarning: string | null;
+    isSavingObsidian: boolean;
+    isScanningObsidian: boolean;
+    onObsidianVaultPathChange: (value: string) => void;
+    onObsidianEnabledChange: (value: boolean) => void;
+    onObsidianScanFoldersTextChange: (value: string) => void;
+    onBrowseObsidianVault: () => Promise<void> | void;
+    onSaveObsidian: () => Promise<void> | void;
+    onRemoveObsidian: () => Promise<void> | void;
+    onRescanObsidian: () => Promise<void> | void;
+};
+
+export function SettingsObsidianSection({
+    t,
+    isTauri,
+    obsidianVaultPath,
+    obsidianEnabled,
+    obsidianScanFoldersText,
+    obsidianLastScannedAt,
+    obsidianHasVaultMarker,
+    obsidianVaultWarning,
+    isSavingObsidian,
+    isScanningObsidian,
+    onObsidianVaultPathChange,
+    onObsidianEnabledChange,
+    onObsidianScanFoldersTextChange,
+    onBrowseObsidianVault,
+    onSaveObsidian,
+    onRemoveObsidian,
+    onRescanObsidian,
+}: SettingsObsidianSectionProps) {
+    return (
+        <div className="bg-card border border-border rounded-lg p-6 space-y-4">
+            <div className="space-y-1">
+                <div className="text-sm font-medium">{t.obsidianVault}</div>
+                <p className="text-xs text-muted-foreground">{t.obsidianVaultDesc}</p>
+            </div>
+
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <p className="text-sm font-medium">{t.obsidianEnable}</p>
+                    <p className="text-xs text-muted-foreground">{t.obsidianVaultPathHint}</p>
+                </div>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={obsidianEnabled}
+                    onClick={() => onObsidianEnabledChange(!obsidianEnabled)}
+                    className={cn(
+                        "relative inline-flex h-5 w-9 items-center rounded-full border transition-colors",
+                        obsidianEnabled ? "bg-primary border-primary" : "bg-muted/50 border-border",
+                    )}
+                >
+                    <span
+                        className={cn(
+                            "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                            obsidianEnabled ? "translate-x-4" : "translate-x-1",
+                        )}
+                    />
+                </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">{t.obsidianVaultPath}</label>
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        value={obsidianVaultPath}
+                        onChange={(event) => onObsidianVaultPathChange(event.target.value)}
+                        placeholder="/path/to/your/Obsidian/vault"
+                        className="flex-1 bg-muted p-2 rounded text-sm font-mono border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    <button
+                        type="button"
+                        onClick={onBrowseObsidianVault}
+                        disabled={!isTauri}
+                        className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:bg-secondary/90 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {t.browse}
+                    </button>
+                </div>
+                {obsidianVaultWarning && (
+                    <p className="text-xs text-amber-600">
+                        {obsidianHasVaultMarker === false ? t.obsidianMissingMarker : obsidianVaultWarning}
+                    </p>
+                )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">{t.obsidianScanFolders}</label>
+                <textarea
+                    value={obsidianScanFoldersText}
+                    onChange={(event) => onObsidianScanFoldersTextChange(event.target.value)}
+                    rows={3}
+                    className="bg-muted p-2 rounded text-sm font-mono border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={'/\nProjects\nDaily'}
+                />
+                <p className="text-xs text-muted-foreground">{t.obsidianScanFoldersHint}</p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                    {t.obsidianLastScanned}:{' '}
+                    <span className="font-medium text-foreground">
+                        {obsidianLastScannedAt ? safeFormatDate(obsidianLastScannedAt, 'PPpp', obsidianLastScannedAt) : t.obsidianNeverScanned}
+                    </span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={onRemoveObsidian}
+                        disabled={isSavingObsidian || !obsidianVaultPath.trim()}
+                        className="px-4 py-2 bg-muted text-muted-foreground rounded-md text-sm font-medium hover:bg-muted/80 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {t.obsidianRemove}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onRescanObsidian}
+                        disabled={isScanningObsidian || !obsidianEnabled || !obsidianVaultPath.trim()}
+                        className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:bg-secondary/90 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isScanningObsidian ? t.obsidianRescanning : t.obsidianRescan}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onSaveObsidian}
+                        disabled={isSavingObsidian}
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 whitespace-nowrap disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+                    >
+                        {t.obsidianSave}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}

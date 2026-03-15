@@ -53,6 +53,7 @@ Mindwtr is **simple by default and powerful when needed**. We focus on reducing 
 - Self-hosted cloud setup is split between [[Data and Sync]] (client setup) and [[Cloud Deployment]] (server operations)
 - [[Dropbox Sync]] — Native Dropbox OAuth sync setup
 - [[Cloud Deployment]] — Cloud deployment and operations runbook
+- [[Obsidian Integration]] — Desktop vault import and deep links
 - [[Calendar Integration]] — External calendars (ICS)
 - [[AI Assistant]] — Optional BYOK assistant
 - [[Reusable Lists]] — Templates and checklist reset

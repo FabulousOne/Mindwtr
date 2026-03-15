@@ -4,6 +4,7 @@ import type { ExternalCalendarSubscription } from '@mindwtr/core';
 import { cn } from '../../../lib/utils';
 
 type Labels = {
+    calendar: string;
     calendarDesc: string;
     calendarName: string;
     calendarUrl: string;
@@ -91,7 +92,10 @@ export function SettingsCalendarPage({
             )}
 
             <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-                <p className="text-sm text-muted-foreground">{t.calendarDesc}</p>
+                <div className="space-y-1">
+                    <div className="text-sm font-medium">{t.calendar}</div>
+                    <p className="text-xs text-muted-foreground">{t.calendarDesc}</p>
+                </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-1">

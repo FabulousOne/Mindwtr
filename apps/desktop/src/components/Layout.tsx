@@ -1,5 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, Inbox, CheckSquare, Archive, Layers, Tag, CheckCircle2, HelpCircle, Folder, Settings, Target, Search, ChevronsLeft, ChevronsRight, Trash2, PauseCircle, Book, Clock3, RefreshCw } from 'lucide-react';
+import {
+    Calendar,
+    Inbox,
+    CheckSquare,
+    Archive,
+    Layers,
+    Tag,
+    CheckCircle2,
+    HelpCircle,
+    Folder,
+    Settings,
+    Target,
+    Search,
+    ChevronsLeft,
+    ChevronsRight,
+    Trash2,
+    PauseCircle,
+    Book,
+    Clock3,
+    RefreshCw,
+    BookOpen,
+    type LucideIcon,
+} from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTaskStore, safeParseDate, safeFormatDate } from '@mindwtr/core';
 import { useLanguage } from '../contexts/language-context';
@@ -14,6 +36,19 @@ interface LayoutProps {
     currentView: string;
     onViewChange: (view: string) => void;
 }
+
+type NavItem = {
+    id: string;
+    labelKey?: string;
+    fallbackLabel?: string;
+    icon: LucideIcon;
+    count?: number;
+};
+
+type NavSection = {
+    label: string;
+    items: NavItem[];
+};
 
 export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     const { tasks, projects, areas, settings, updateSettings, error, setError } = useTaskStore((state) => ({
@@ -107,16 +142,18 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
         'search',
         'agenda',
         'tutorial',
+        'obsidian',
     ]);
     const isWideView = wideViews.has(currentView);
     const fullWidthViews = new Set([
         'board',
         'projects',
+        'obsidian',
         'settings',
     ]);
     const isFullWidthView = fullWidthViews.has(currentView);
 
-    const navSections = useMemo(() => ([
+    const navSections = useMemo<NavSection[]>(() => ([
         {
             label: t('nav.sectionFocus') || 'Focus',
             items: [
@@ -139,6 +176,7 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                 { id: 'calendar', labelKey: 'nav.calendar', icon: Calendar },
                 { id: 'review', labelKey: 'nav.review', icon: CheckCircle2 },
                 { id: 'contexts', labelKey: 'nav.contexts', icon: Tag },
+                { id: 'obsidian', labelKey: 'nav.obsidian', fallbackLabel: 'Obsidian', icon: BookOpen },
                 { id: 'board', labelKey: 'nav.board', icon: Layers },
                 { id: 'tutorial', labelKey: 'nav.tutorial', icon: HelpCircle },
             ],
@@ -300,11 +338,11 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                                             isCollapsed ? "justify-center px-2 py-2.5" : "justify-between px-3 py-2.5"
                                         )}
                                         aria-current={currentView === item.id ? 'page' : undefined}
-                                        title={t(item.labelKey)}
+                                    title={item.labelKey ? tOrFallback(item.labelKey, item.fallbackLabel ?? item.id) : (item.fallbackLabel ?? item.id)}
                                     >
                                         <div className={cn("flex items-center gap-3", isCollapsed && "gap-0")}>
                                             <item.icon className={cn("w-4 h-4", currentView === item.id && "text-primary")} />
-                                            {!isCollapsed && t(item.labelKey)}
+                                            {!isCollapsed && (item.labelKey ? tOrFallback(item.labelKey, item.fallbackLabel ?? item.id) : (item.fallbackLabel ?? item.id))}
                                         </div>
                                         {!isCollapsed && item.count !== undefined && item.count > 0 && (
                                             <span className={cn(

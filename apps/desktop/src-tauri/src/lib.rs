@@ -267,10 +267,38 @@ struct AppConfigToml {
     webdav_password: Option<String>,
     cloud_url: Option<String>,
     cloud_token: Option<String>,
+    obsidian_config: Option<String>,
     external_calendars: Option<String>,
     ai_key_openai: Option<String>,
     ai_key_anthropic: Option<String>,
     ai_key_gemini: Option<String>,
+}
+
+fn default_obsidian_scan_folders() -> Vec<String> {
+    vec!["/".to_string()]
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ObsidianConfigPayload {
+    vault_path: Option<String>,
+    vault_name: String,
+    #[serde(default = "default_obsidian_scan_folders")]
+    scan_folders: Vec<String>,
+    last_scanned_at: Option<String>,
+    enabled: bool,
+}
+
+impl Default for ObsidianConfigPayload {
+    fn default() -> Self {
+        Self {
+            vault_path: None,
+            vault_name: String::new(),
+            scan_folders: default_obsidian_scan_folders(),
+            last_scanned_at: None,
+            enabled: false,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1960,6 +1988,8 @@ fn read_config_toml(path: &Path) -> AppConfigToml {
             config.cloud_url = parse_toml_string_value(value);
         } else if key == "cloud_token" {
             config.cloud_token = parse_toml_string_value(value);
+        } else if key == "obsidian_config" {
+            config.obsidian_config = parse_toml_string_value(value);
         } else if key == "external_calendars" {
             config.external_calendars = parse_toml_string_value(value);
         } else if key == "ai_key_openai" {
@@ -2044,6 +2074,9 @@ fn write_config_toml_with_header(path: &Path, config: &AppConfigToml, header: &s
     if let Some(cloud_token) = &config.cloud_token {
         lines.push(format!("cloud_token = {}", serialize_toml_string_value(cloud_token)));
     }
+    if let Some(obsidian_config) = &config.obsidian_config {
+        lines.push(format!("obsidian_config = {}", serialize_toml_string_value(obsidian_config)));
+    }
     if let Some(external_calendars) = &config.external_calendars {
         lines.push(format!("external_calendars = {}", serialize_toml_string_value(external_calendars)));
     }
@@ -2081,6 +2114,9 @@ fn merge_config(base: &mut AppConfigToml, overrides: AppConfigToml) {
     }
     if overrides.cloud_token.is_some() {
         base.cloud_token = overrides.cloud_token;
+    }
+    if overrides.obsidian_config.is_some() {
+        base.obsidian_config = overrides.obsidian_config;
     }
     if overrides.external_calendars.is_some() {
         base.external_calendars = overrides.external_calendars;
@@ -2147,6 +2183,7 @@ fn config_has_values(config: &AppConfigToml) -> bool {
         || config.webdav_password.is_some()
         || config.cloud_url.is_some()
         || config.cloud_token.is_some()
+        || config.obsidian_config.is_some()
         || config.external_calendars.is_some()
         || config.ai_key_openai.is_some()
         || config.ai_key_anthropic.is_some()
@@ -3237,6 +3274,71 @@ fn normalize_backend(value: &str) -> Option<&str> {
     }
 }
 
+fn normalize_obsidian_scan_folders(scan_folders: Vec<String>) -> Vec<String> {
+    let mut normalized: Vec<String> = Vec::new();
+    for raw in scan_folders {
+        let trimmed = raw.trim().replace('\\', "/");
+        let value = if trimmed.is_empty() || trimmed == "/" {
+            "/".to_string()
+        } else {
+            trimmed.trim_start_matches('/').trim_end_matches('/').to_string()
+        };
+        if value.is_empty() || normalized.iter().any(|existing| existing == &value) {
+            continue;
+        }
+        normalized.push(value);
+    }
+    if normalized.is_empty() {
+        default_obsidian_scan_folders()
+    } else {
+        normalized
+    }
+}
+
+fn normalize_obsidian_config_payload(payload: ObsidianConfigPayload) -> ObsidianConfigPayload {
+    let vault_path = payload
+        .vault_path
+        .and_then(|value| {
+            let trimmed = value.trim().to_string();
+            if trimmed.is_empty() { None } else { Some(trimmed) }
+        });
+    let vault_name = if !payload.vault_name.trim().is_empty() {
+        payload.vault_name.trim().to_string()
+    } else if let Some(path) = vault_path.as_ref() {
+        Path::new(path)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("")
+            .trim()
+            .to_string()
+    } else {
+        String::new()
+    };
+    let last_scanned_at = payload
+        .last_scanned_at
+        .and_then(|value| {
+            let trimmed = value.trim().to_string();
+            if trimmed.is_empty() { None } else { Some(trimmed) }
+        });
+
+    ObsidianConfigPayload {
+        enabled: payload.enabled && vault_path.is_some(),
+        vault_path,
+        vault_name,
+        scan_folders: normalize_obsidian_scan_folders(payload.scan_folders),
+        last_scanned_at,
+    }
+}
+
+fn read_obsidian_config_payload(config: &AppConfigToml) -> ObsidianConfigPayload {
+    let Some(raw) = config.obsidian_config.as_ref() else {
+        return ObsidianConfigPayload::default();
+    };
+    serde_json::from_str::<ObsidianConfigPayload>(raw)
+        .map(normalize_obsidian_config_payload)
+        .unwrap_or_default()
+}
+
 #[tauri::command]
 fn get_sync_backend(app: tauri::AppHandle) -> Result<String, String> {
     let config = read_config(&app);
@@ -3254,6 +3356,27 @@ fn set_sync_backend(app: tauri::AppHandle, backend: String) -> Result<bool, Stri
     config.sync_backend = Some(normalized.to_string());
     write_config_files(&config_path, &get_secrets_path(&app), &config)?;
     Ok(true)
+}
+
+#[tauri::command]
+fn get_obsidian_config(app: tauri::AppHandle) -> Result<Value, String> {
+    let config = read_config(&app);
+    serde_json::to_value(read_obsidian_config_payload(&config)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_obsidian_config(app: tauri::AppHandle, config: Value) -> Result<Value, String> {
+    let payload = serde_json::from_value::<ObsidianConfigPayload>(config)
+        .map(normalize_obsidian_config_payload)
+        .map_err(|e| format!("Invalid Obsidian config: {e}"))?;
+    let config_path = get_config_path(&app);
+    let mut current = read_config(&app);
+    current.obsidian_config = Some(
+        serde_json::to_string(&payload)
+            .map_err(|e| format!("Failed to encode Obsidian config: {e}"))?
+    );
+    write_config_files(&config_path, &get_secrets_path(&app), &current)?;
+    serde_json::to_value(payload).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -4057,6 +4180,8 @@ pub fn run() {
             set_sync_path,
             get_sync_backend,
             set_sync_backend,
+            get_obsidian_config,
+            set_obsidian_config,
             get_webdav_config,
             get_webdav_password,
             set_webdav_config,

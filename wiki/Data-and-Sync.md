@@ -4,6 +4,8 @@ Mindwtr stores data locally and supports multiple synchronization options betwee
 
 Mindwtr does **not** run a hosted cloud service. Sync is local‑first and user‑configured: you choose how the `data.json` file (and `attachments/`) moves between devices. It won’t happen automatically until you set up one of the options below—but once configured, it works smoothly.
 
+For desktop vault import and note deep links, see [[Obsidian Integration]].
+
 ---
 
 ## Data Storage

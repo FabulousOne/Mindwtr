@@ -3,6 +3,7 @@ import { Layout } from './components/Layout';
 import { ListView } from './components/views/ListView';
 import { CalendarView } from './components/views/CalendarView';
 const BoardView = lazy(() => import('./components/views/BoardView').then((m) => ({ default: m.BoardView })));
+const ObsidianView = lazy(() => import('./components/views/ObsidianView').then((m) => ({ default: m.ObsidianView })));
 const ProjectsView = lazy(() => import('./components/views/ProjectsView').then((m) => ({ default: m.ProjectsView })));
 import { ContextsView } from './components/views/ContextsView';
 const ReviewView = lazy(() => import('./components/views/ReviewView').then((m) => ({ default: m.ReviewView })));
@@ -28,6 +29,7 @@ import { createDesktopAutoSyncController } from './lib/auto-sync-controller';
 import { beginSettingsOpenTrace, markSettingsOpenTrace, wrapSettingsOpenImport } from './lib/settings-open-diagnostics';
 import { THEME_STORAGE_KEY, applyThemeMode, mapSyncedThemeToDesktop, resolveNativeTheme } from './lib/theme';
 import { useUiStore } from './store/ui-store';
+import { useObsidianStore } from './store/obsidian-store';
 
 const SettingsView = lazy(wrapSettingsOpenImport(
     'settings-view-chunk',
@@ -159,6 +161,7 @@ function App() {
     useEffect(() => {
         if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
         fetchData();
+        useObsidianStore.getState().loadConfig().catch((error) => reportError('Obsidian init failed', error));
         const unsubscribeExternalSync = SyncService.subscribeExternalSyncChange(setExternalSyncChange);
 
         const reportError = (label: string, error: unknown) => {
@@ -390,6 +393,7 @@ function App() {
             ?? ((id: number) => window.clearTimeout(id));
         const id = idleCallback(() => {
             void import('./components/views/BoardView');
+            void import('./components/views/ObsidianView');
             void import('./components/views/ProjectsView');
             void import('./components/views/ReviewView');
         });
@@ -420,6 +424,8 @@ function App() {
                 return <CalendarView />;
             case 'board':
                 return <BoardView />;
+            case 'obsidian':
+                return <ObsidianView />;
             case 'projects':
                 return <ProjectsView />;
             case 'contexts':
