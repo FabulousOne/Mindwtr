@@ -300,6 +300,43 @@ describe('Sync Logic', () => {
             expect(attachment?.cloudKey).toBe('attachments/att-missing.txt');
         });
 
+        it('marks merged file attachments as missing when no usable URI survives', () => {
+            const localAttachment: Attachment = {
+                id: 'att-orphaned',
+                kind: 'file',
+                title: 'doc.txt',
+                uri: '  ',
+                createdAt: '2023-01-01T00:00:00.000Z',
+                updatedAt: '2023-01-02T00:00:00.000Z',
+            };
+            const incomingAttachment: Attachment = {
+                id: 'att-orphaned',
+                kind: 'file',
+                title: 'doc.txt',
+                uri: '/incoming/../secret.txt',
+                cloudKey: 'attachments/att-orphaned.txt',
+                fileHash: 'hash-1',
+                createdAt: '2023-01-01T00:00:00.000Z',
+                updatedAt: '2023-01-03T00:00:00.000Z',
+            };
+            const localTask: Task = {
+                ...createMockTask('1', '2023-01-02'),
+                attachments: [localAttachment],
+            };
+            const incomingTask: Task = {
+                ...createMockTask('1', '2023-01-03'),
+                attachments: [incomingAttachment],
+            };
+
+            const merged = mergeAppData(mockAppData([localTask]), mockAppData([incomingTask]));
+            const attachment = merged.tasks[0].attachments?.find((item) => item.id === 'att-orphaned');
+
+            expect(attachment?.uri).toBe('');
+            expect(attachment?.localStatus).toBe('missing');
+            expect(attachment?.cloudKey).toBe('attachments/att-orphaned.txt');
+            expect(attachment?.fileHash).toBe('hash-1');
+        });
+
         it('enriches incoming-only attachments with localStatus when uri exists', () => {
             const incomingAttachment: Attachment = {
                 id: 'att-incoming-only',

@@ -946,7 +946,16 @@ const sanitizeMergedAttachmentUri = (value: unknown): string | undefined => {
     return trimmed;
 };
 
-function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; deletedAt?: string; rev?: number; revBy?: string }>(
+type MergeableEntity = {
+    id: string;
+    createdAt: string;
+    updatedAt: string;
+    deletedAt?: string;
+    rev?: number;
+    revBy?: string;
+};
+
+function mergeEntitiesWithStats<T extends MergeableEntity>(
     local: T[],
     incoming: T[],
     mergeConflict?: (localItem: T, incomingItem: T, winner: T) => T,
@@ -959,10 +968,8 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
     const stats = createEmptyEntityStats(local.length, incoming.length);
     const merged: T[] = [];
     let invalidDeletedAtWarnings = 0;
-    // Reject timestamps in the future so a clock-skewed device cannot permanently dominate merges.
-    const maxAllowedMergeTime = Date.now();
-    const normalizeTimestamps = <Item extends { id?: string; updatedAt: string; createdAt?: string }>(item: Item): Item => {
-        if (!('createdAt' in item) || !item.createdAt) return item;
+    const normalizeTimestamps = (item: T): T => {
+        if (!item.createdAt) return item;
         const createdTime = new Date(item.createdAt).getTime();
         const updatedTime = new Date(item.updatedAt).getTime();
         if (!Number.isFinite(createdTime) || !Number.isFinite(updatedTime)) return item;
@@ -978,7 +985,7 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
                 context: { id: item.id, createdAt: item.createdAt, updatedAt: item.updatedAt },
             });
         }
-        return { ...item, createdAt: item.updatedAt } as Item;
+        return { ...item, createdAt: item.updatedAt };
     };
 
     for (const id of allIds) {
@@ -992,19 +999,22 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
         if (!incomingItem) {
             stats.localOnly += 1;
             stats.resolvedUsingLocal += 1;
-            merged.push(normalizeTimestamps(localItem as unknown as { updatedAt: string; createdAt?: string }) as T);
+            merged.push(normalizeTimestamps(localItem));
             continue;
         }
 
         if (!localItem) {
             stats.incomingOnly += 1;
             stats.resolvedUsingIncoming += 1;
-            merged.push(normalizeTimestamps(incomingItem as unknown as { updatedAt: string; createdAt?: string }) as T);
+            merged.push(normalizeTimestamps(incomingItem));
             continue;
         }
 
-        const normalizedLocalItem = normalizeTimestamps(localItem as unknown as { updatedAt: string; createdAt?: string }) as T;
-        const normalizedIncomingItem = normalizeTimestamps(incomingItem as unknown as { updatedAt: string; createdAt?: string }) as T;
+        const normalizedLocalItem = normalizeTimestamps(localItem);
+        const normalizedIncomingItem = normalizeTimestamps(incomingItem);
+        // Reject timestamps in the future per merge decision so long-running
+        // syncs don't keep using a stale captured "now" value.
+        const maxAllowedMergeTime = Date.now();
 
         const safeLocalTime = parseMergeTimestamp(normalizedLocalItem.updatedAt, maxAllowedMergeTime);
         const safeIncomingTime = parseMergeTimestamp(normalizedIncomingItem.updatedAt, maxAllowedMergeTime);
@@ -1102,7 +1112,7 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
         }
 
         const mergedItem = mergeConflict ? mergeConflict(normalizedLocalItem, normalizedIncomingItem, winner) : winner;
-        merged.push(normalizeTimestamps(mergedItem as unknown as { updatedAt: string; createdAt?: string }) as T);
+        merged.push(normalizeTimestamps(mergedItem));
     }
 
     stats.mergedTotal = merged.length;
@@ -1176,6 +1186,14 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
         }
         const localById = new Map(localList.map((item) => [item.id, item]));
         const incomingById = new Map(incomingList.map((item) => [item.id, item]));
+        const normalizeMissingFileStatus = (
+            status: Attachment['localStatus'],
+            deletedAt?: string
+        ): Attachment['localStatus'] | undefined => {
+            if (deletedAt) return status;
+            if (status === 'uploading' || status === 'downloading') return status;
+            return 'missing';
+        };
         const hasAvailableUri = (attachment?: Attachment): boolean => {
             return attachment?.kind === 'file'
                 && attachment.localStatus !== 'missing'
@@ -1208,7 +1226,8 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
                 uri = incomingUri || incomingAttachment.uri;
                 localStatus = incomingAttachment.localStatus || 'available';
             } else {
-                uri = sanitizeMergedAttachmentUri(uri) ?? '';
+                uri = '';
+                localStatus = normalizeMissingFileStatus(localStatus, winner.deletedAt);
             }
             if ((localStatus === undefined || localStatus === null) && !!sanitizeMergedAttachmentUri(uri)) {
                 localStatus = 'available';
@@ -1244,7 +1263,11 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
                 fileHash: attachment.deletedAt
                     ? attachment.fileHash
                     : attachment.fileHash || localFile?.fileHash || incomingFile?.fileHash,
-                localStatus: attachment.localStatus ?? (uriAvailable ? 'available' : undefined),
+                localStatus: attachment.deletedAt
+                    ? attachment.localStatus
+                    : uriAvailable
+                        ? attachment.localStatus ?? 'available'
+                        : normalizeMissingFileStatus(attachment.localStatus, attachment.deletedAt),
             };
         });
 
