@@ -4071,15 +4071,8 @@ export default function SettingsPage() {
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
-                                <Text style={[styles.settingLabel, { color: tc.text }]}>
-                                    {localize('Device calendars', '设备日历')}
-                                </Text>
-                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                    {localize(
-                                        'Read events from calendars already synced on this device (DAVx5, iCloud, Outlook, etc.).',
-                                        '读取设备上已同步的日历事件（DAVx5、iCloud、Outlook 等）。'
-                                    )}
-                                </Text>
+                                <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.deviceCalendars')}</Text>
+                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>{t('settings.deviceCalendarsDesc')}</Text>
                             </View>
                             <Switch
                                 value={systemCalendarEnabled}
@@ -4094,14 +4087,8 @@ export default function SettingsPage() {
                                     <View>
                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                             {systemCalendarPermission === 'denied'
-                                                ? localize(
-                                                    'Calendar access is denied. Enable it in system settings, then refresh.',
-                                                    '日历权限被拒绝。请在系统设置中开启后刷新。'
-                                                )
-                                                : localize(
-                                                    'Calendar access is required to read device events.',
-                                                    '读取设备日历事件需要日历权限。'
-                                                )}
+                                                ? t('settings.calendarAccessDenied')
+                                                : t('settings.calendarAccessRequired')}
                                         </Text>
                                         <TouchableOpacity
                                             style={[
@@ -4111,7 +4098,7 @@ export default function SettingsPage() {
                                             onPress={handleRequestSystemCalendarAccess}
                                         >
                                             <Text style={[styles.backendOptionText, { color: tc.text }]}>
-                                                {localize('Grant access', '授权访问')}
+                                                {t('settings.grantCalendarAccess')}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
@@ -4121,7 +4108,7 @@ export default function SettingsPage() {
                                     </View>
                                 ) : systemCalendars.length === 0 ? (
                                     <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                        {localize('No device calendars found.', '未找到设备日历。')}
+                                        {t('settings.noDeviceCalendars')}
                                     </Text>
                                 ) : (
                                     <View>
@@ -4140,7 +4127,7 @@ export default function SettingsPage() {
                                                             {calendar.name}
                                                         </Text>
                                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]} numberOfLines={1}>
-                                                            {localize('Device calendar', '设备日历')}
+                                                            {t('settings.deviceCalendar')}
                                                         </Text>
                                                     </View>
                                                     <Switch
@@ -4350,10 +4337,10 @@ export default function SettingsPage() {
                     {syncBackend === 'off' && (
                         <View style={[styles.helpBox, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
                             <Text style={[styles.helpTitle, { color: tc.text }]}>
-                                {localize('Sync is off', '同步已关闭')}
+                                {t('settings.syncOff')}
                             </Text>
                             <Text style={[styles.helpText, { color: tc.secondaryText }]}>
-                                {localize('Turn sync back on anytime from this screen.', '您可以随时在此页面重新开启同步。')}
+                                {t('settings.syncOffDesc')}
                             </Text>
                         </View>
                     )}
