@@ -30,6 +30,7 @@ import { useTheme } from '../../contexts/theme-context';
 import { useLanguage, Language } from '../../contexts/language-context';
 
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { useMobileSyncBadge } from '@/hooks/use-mobile-sync-badge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
     DEFAULT_REASONING_EFFORT,
@@ -72,13 +73,9 @@ import {
 import { loadAIKey, saveAIKey } from '../../lib/ai-config';
 import { clearLog, ensureLogFilePath, logInfo } from '../../lib/app-log';
 import {
-    getMobileSyncActivityState,
-    getMobileSyncConfigurationStatus,
     performMobileSync,
-    subscribeMobileSyncActivityState,
 } from '../../lib/sync-service';
 import { isLikelyOfflineSyncError } from '../../lib/sync-service-utils';
-import { MOBILE_SYNC_BADGE_COLORS, resolveMobileSyncBadgeState } from '../../lib/sync-badge';
 import { requestNotificationPermission, startMobileNotifications } from '../../lib/notification-service';
 import { authorizeDropbox, getDropboxRedirectUri } from '../../lib/dropbox-oauth';
 import {
@@ -204,8 +201,11 @@ export default function SettingsPage() {
     const dropboxAppKey = typeof extraConfig?.dropboxAppKey === 'string' ? extraConfig.dropboxAppKey.trim() : '';
     const dropboxConfigured = !isFossBuild && isDropboxClientConfigured(dropboxAppKey);
     const [isSyncing, setIsSyncing] = useState(false);
-    const [syncConfigured, setSyncConfigured] = useState(false);
-    const [syncActivityState, setSyncActivityState] = useState(getMobileSyncActivityState());
+    const {
+        refreshSyncBadgeConfig,
+        syncBadgeAccessibilityLabel,
+        syncBadgeColor,
+    } = useMobileSyncBadge();
     const currentScreen = useMemo<SettingsScreen>(() => {
         const rawScreen = Array.isArray(settingsScreen) ? settingsScreen[0] : settingsScreen;
         if (!rawScreen) return 'main';
@@ -579,51 +579,20 @@ export default function SettingsPage() {
         }).catch(logSettingsError);
     }, [isFossBuild]);
 
-    const refreshSyncBadgeConfig = useCallback(async () => {
-        try {
-            const status = await getMobileSyncConfigurationStatus();
-            setSyncConfigured(status.configured);
-        } catch {
-            setSyncConfigured(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        const unsubscribe = subscribeMobileSyncActivityState(setSyncActivityState);
-        void refreshSyncBadgeConfig();
-        return unsubscribe;
-    }, [refreshSyncBadgeConfig]);
-
     useEffect(() => {
         void refreshSyncBadgeConfig();
     }, [
         refreshSyncBadgeConfig,
         syncBackend,
         syncPath,
+        webdavUrl,
+        cloudUrl,
+        cloudToken,
+        cloudProvider,
         settings.lastSyncStatus,
         settings.pendingRemoteWriteAt,
         settings.lastSyncAt,
     ]);
-
-    const syncBadgeState = useMemo(() => resolveMobileSyncBadgeState({
-        configured: syncConfigured,
-        activityState: syncActivityState,
-        pendingRemoteWriteAt: settings.pendingRemoteWriteAt,
-        lastSyncStatus: settings.lastSyncStatus,
-        lastSyncAt: settings.lastSyncAt,
-    }), [settings.lastSyncAt, settings.lastSyncStatus, settings.pendingRemoteWriteAt, syncActivityState, syncConfigured]);
-    const syncBadgeColor = syncBadgeState === 'hidden' ? undefined : MOBILE_SYNC_BADGE_COLORS[syncBadgeState];
-
-    const syncBadgeAccessibilityLabel = useMemo(() => {
-        if (syncBadgeState === 'hidden') return undefined;
-        if (syncBadgeState === 'syncing') {
-            return localize('Sync in progress', '同步进行中');
-        }
-        if (syncBadgeState === 'healthy') {
-            return localize('Sync healthy', '同步正常');
-        }
-        return localize('Sync needs attention', '同步需要关注');
-    }, [localize, syncBadgeState]);
 
     useEffect(() => {
         void loadSystemCalendarState();
