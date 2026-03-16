@@ -10,7 +10,7 @@ The free, open-source, cross-platform GTD app. Local-first, no account required.
 
 *New to GTD? Read [GTD in 15 minutes](https://hamberg.no/gtd) for a quick introduction.*
 
-[Install](#installation) · [Getting Started](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started) · [Data & Sync](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync)
+[Install](#installation) · [Getting Started](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started) · [Data & Sync](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync) · [Cloud Sync](https://github.com/dongdongbh/Mindwtr/wiki/Cloud-Sync) · [MCP Server](https://github.com/dongdongbh/Mindwtr/wiki/MCP-Server)
 
 [![CI](https://github.com/dongdongbh/Mindwtr/actions/workflows/ci.yml/badge.svg)](https://github.com/dongdongbh/Mindwtr/actions/workflows/ci.yml)
 [![GitHub license](https://img.shields.io/github/license/dongdongbh/Mindwtr?color=brightgreen)](LICENSE)
@@ -102,7 +102,7 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 
 - GTD workflow end-to-end: Capture, Clarify, Organize, Reflect, Engage.
 - Focus view combines time-based agenda with next actions.
-- Local-first data model with flexible sync options.
+- Local-first data model with file sync, WebDAV, Dropbox, and self-hosted cloud options.
 - Obsidian vault import with note deep links on desktop.
 - Optional AI copilot (BYOK + local/self-hosted compatible models).
 - Cross-platform apps for desktop and mobile, plus PWA.
@@ -348,4 +348,7 @@ You can help in several ways:
 - 🚀 [Getting Started](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started)
 - ❓ [FAQ](https://github.com/dongdongbh/Mindwtr/wiki/FAQ)
 - 🔄 [Data & Sync](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync)
+- ☁️ [Cloud Sync](https://github.com/dongdongbh/Mindwtr/wiki/Cloud-Sync)
+- 🛠️ [Cloud Deployment](https://github.com/dongdongbh/Mindwtr/wiki/Cloud-Deployment)
+- 🧠 [MCP Server](https://github.com/dongdongbh/Mindwtr/wiki/MCP-Server)
 - 📝 [Release Notes Index](docs/release-notes/README.md)

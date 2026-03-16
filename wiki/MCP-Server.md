@@ -239,6 +239,16 @@ Use this for rapid capture flows where parsing commands is more efficient than s
 
 All tools return JSON in the `content.text` field. Parse the JSON to get the actual payload.
 
+## Operational Limits
+
+These limits are useful when wiring Mindwtr into agent workflows:
+
+- `mindwtr_list_tasks` defaults to `limit: 200` and caps `limit` at `500`.
+- Task titles are capped at `500` characters for MCP task creation/update validation.
+- The SQLite layer uses a `busy_timeout` of 5 seconds, so a locked database should fail instead of hanging indefinitely.
+
+If you need more than 500 tasks, page with `limit` + `offset` instead of expecting one unbounded response.
+
 ### `mindwtr_list_tasks`
 
 **Input fields**

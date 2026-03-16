@@ -1,44 +1,61 @@
 # Mindwtr Architecture
 
-Mindwtr is a local-first GTD app with a shared core package and platform-specific shells.
+Mindwtr is a local-first GTD system built as a Bun workspace monorepo. The shared `@mindwtr/core` package owns the data model, persistence behavior, and sync rules; desktop, mobile, cloud, and MCP layers stay thin around that core.
 
-This file is a short orientation note. The full architecture reference lives in the wiki:
+## System shape
+
+- `packages/core`
+  Shared domain model, Zustand store, quick-add parsing, recurrence, sync/merge, storage adapters, and shared tests.
+- `apps/desktop`
+  Tauri + React shell. Uses the shared core store with desktop-specific UI state, native dialogs, filesystem access, and SQLite-backed persistence.
+- `apps/mobile`
+  Expo + React Native shell. Reuses the core store and sync logic with mobile-specific storage, navigation, notifications, and calendar integrations.
+- `apps/cloud`
+  Self-hosted sync endpoint. Stores one JSON namespace plus attachments per bearer token and merges incoming app data using the same shared sync semantics.
+- `apps/mcp-server`
+  Local stdio server for AI tools. Reads and optionally mutates the local SQLite database with explicit `--write` opt-in.
+
+## Data flow
+
+1. UI actions update the shared Zustand store in `packages/core`.
+2. The store sanitizes and persists the full app snapshot through a platform storage adapter.
+3. Optional sync services read remote state, merge in memory, then write back local and remote snapshots.
+4. Derived views are recomputed from canonical store data plus view filters instead of mutating persisted records for presentation.
+
+The design goal is that GTD behavior, merge logic, and validation live once in core, while platform apps handle input, rendering, and OS integration.
+
+## Persistence model
+
+- Desktop and mobile use SQLite as the primary structured store.
+- JSON snapshots remain part of the durability and sync story.
+- Attachments are treated separately from structured task/project data.
+- Deletes are soft by default using `deletedAt` tombstones so sync can converge safely across devices.
+
+Mindwtr prefers explicit repair and merge logic in the app layer over hard database-only assumptions. That is why sync-sensitive relationships are normalized and repaired by shared code instead of depending purely on foreign-key enforcement.
+
+## Sync model
+
+Sync is optional and backend-agnostic. Supported backends include file sync, WebDAV, Dropbox in supported builds, and the self-hosted cloud server.
+
+Important properties:
+
+- Merge is item-based, not whole-file overwrite.
+- Revisions and timestamps are both used for conflict resolution.
+- Tombstones prevent deleted records from being silently resurrected.
+- Attachments are merged and transferred separately from the main JSON payload.
+
+The detailed algorithm, edge cases, and tie-break rules are documented in the wiki:
 
 - [Wiki: Architecture](../wiki/Architecture.md)
 - [Wiki: Sync Algorithm](../wiki/Sync-Algorithm.md)
 - [Wiki: Data and Sync](../wiki/Data-and-Sync.md)
 - [Wiki: Performance Guide](../wiki/Performance-Guide.md)
 
-## Monorepo layout
+## Boundaries and responsibilities
 
-- `packages/core`  
-  Shared domain logic, types, sync/merge, storage adapters.
-- `apps/desktop`  
-  Tauri + React UI. Uses SQLite for primary storage.
-- `apps/mobile`  
-  Expo React Native. Uses SQLite/JSON fallback and platform storage.
-- `apps/mcp-server`  
-  Local MCP server for LLM integration.
-- `apps/cloud`  
-  Lightweight self-hosted sync server.
+- Core decides what data means.
+- Desktop/mobile decide how users interact with that data.
+- Cloud decides how remote snapshots are stored and validated.
+- MCP decides how external AI tools can safely read or write local data.
 
-## Data flow (local-first)
-
-1. UI updates state in `packages/core` store (Zustand).
-2. Store writes to local storage via a platform adapter.
-3. Sync service (optional) pushes/pulls remote JSON + attachments.
-4. Merge is LWW with soft-deletes and conflict-safe rules.
-
-## Storage
-
-- Primary: SQLite (desktop + mobile).
-- Backup: JSON snapshot (mobile + web).
-- Sync: WebDAV or self-hosted cloud endpoint.
-
-## Key concepts
-
-- Soft delete: `deletedAt` tombstones for reliable sync.
-- Recurrence: new task instances on completion.
-- Task editor layout: configurable field visibility and ordering.
-
-For the current source of truth on data flow, sync semantics, and storage tradeoffs, prefer the wiki pages above.
+That separation keeps product behavior consistent across platforms and makes most regression tests possible in shared code instead of duplicating logic per app.

@@ -32,6 +32,58 @@ Optional but useful:
 - `MINDWTR_CLOUD_RATE_MAX`
 - `MINDWTR_CLOUD_ATTACHMENT_RATE_MAX`
 
+## Environment Variables
+
+### Authentication
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `MINDWTR_CLOUD_AUTH_TOKENS` | Comma-separated allowlist of bearer tokens. | Recommended setting for production. |
+| `MINDWTR_CLOUD_TOKEN` | Legacy single-token alias. | Still supported for backward compatibility, but deprecated. |
+| `MINDWTR_CLOUD_ALLOW_ANY_TOKEN` | Allows any syntactically valid bearer token. | Explicit opt-in only. Best avoided outside controlled environments. |
+
+### Networking and storage
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `MINDWTR_CLOUD_CORS_ORIGIN` | Allowed browser origin for CORS. | `http://localhost:5173` in non-production |
+| `MINDWTR_CLOUD_DATA_DIR` | Directory for JSON namespaces, attachments, and locks. | `./data` |
+| `MINDWTR_CLOUD_TRUST_PROXY_HEADERS` | Trust `X-Forwarded-For`/proxy IP headers for auth-failure rate limiting. | `false` |
+
+### Request limits
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `MINDWTR_CLOUD_MAX_BODY_BYTES` | Max JSON request size. | `2000000` |
+| `MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES` | Max attachment upload size. | `50000000` |
+| `MINDWTR_CLOUD_REQUEST_TIMEOUT_MS` | Per-request timeout for cloud handlers. | `30000` |
+| `MINDWTR_CLOUD_MAX_TASK_TITLE_LENGTH` | Max task title length accepted by cloud task endpoints. | `500` |
+| `MINDWTR_CLOUD_MAX_ITEMS_PER_COLLECTION` | Max tasks/projects/sections/areas per uploaded collection. | `50000` |
+
+### Pagination and list shaping
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `MINDWTR_CLOUD_LIST_DEFAULT_LIMIT` | Default page size for list endpoints. | `200` |
+| `MINDWTR_CLOUD_LIST_MAX_LIMIT` | Hard cap for list endpoint page size. | `1000` |
+
+### Rate limiting
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `MINDWTR_CLOUD_RATE_WINDOW_MS` | Main rate-limit window length. | `60000` |
+| `MINDWTR_CLOUD_RATE_MAX` | Max non-attachment requests per window. | `120` |
+| `MINDWTR_CLOUD_ATTACHMENT_RATE_MAX` | Max attachment requests per window. | same as `MINDWTR_CLOUD_RATE_MAX` |
+| `MINDWTR_CLOUD_RATE_CLEANUP_MS` | Interval for pruning expired in-memory rate-limit entries. | `60000` |
+| `MINDWTR_CLOUD_RATE_MAX_KEYS` | Max distinct in-memory rate-limit keys to keep before LRU-style eviction. | `10000` |
+| `MINDWTR_CLOUD_AUTH_FAILURE_RATE_MAX` | Max unauthorized attempts per client IP/window before throttling. | `30` |
+
+Operational guidance:
+
+- Keep proxy body limits aligned with `MINDWTR_CLOUD_MAX_BODY_BYTES` and `MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES`.
+- If you enable `MINDWTR_CLOUD_TRUST_PROXY_HEADERS`, do so only behind a proxy that overwrites forwarded IP headers.
+- If you rotate from `MINDWTR_CLOUD_TOKEN` to `MINDWTR_CLOUD_AUTH_TOKENS`, remember that token changes also change the namespace key.
+
 ## Docker Runbook
 
 Example `docker-compose.yml` service:
