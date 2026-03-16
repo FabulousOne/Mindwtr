@@ -151,6 +151,68 @@ describe('cloud server utils', () => {
      expect(result.ok).toBe(true);
     });
 
+    test('rejects live records with broken project, section, or area references', () => {
+        const iso = '2024-01-01T00:00:00.000Z';
+
+        const invalidTaskProject = __cloudTestUtils.validateAppData({
+            tasks: [{
+                id: 't1',
+                title: 'Task',
+                status: 'inbox',
+                projectId: 'missing-project',
+                createdAt: iso,
+                updatedAt: iso,
+            }],
+            projects: [],
+            sections: [],
+            areas: [],
+        });
+        expect(invalidTaskProject.ok).toBe(false);
+
+        const invalidTaskSection = __cloudTestUtils.validateAppData({
+            tasks: [{
+                id: 't1',
+                title: 'Task',
+                status: 'inbox',
+                projectId: 'p1',
+                sectionId: 's1',
+                createdAt: iso,
+                updatedAt: iso,
+            }],
+            projects: [{
+                id: 'p1',
+                title: 'Project',
+                status: 'active',
+                color: '#000000',
+                order: 0,
+                tagIds: [],
+                createdAt: iso,
+                updatedAt: iso,
+            }],
+            sections: [],
+            areas: [],
+        });
+        expect(invalidTaskSection.ok).toBe(false);
+
+        const invalidProjectArea = __cloudTestUtils.validateAppData({
+            tasks: [],
+            projects: [{
+                id: 'p1',
+                title: 'Project',
+                status: 'active',
+                color: '#000000',
+                order: 0,
+                tagIds: [],
+                areaId: 'missing-area',
+                createdAt: iso,
+                updatedAt: iso,
+            }],
+            sections: [],
+            areas: [],
+        });
+        expect(invalidProjectArea.ok).toBe(false);
+    });
+
     test('accepts only core task statuses', () => {
         expect(__cloudTestUtils.asStatus('reference')).toBe('reference');
         expect(__cloudTestUtils.asStatus('todo')).toBeNull();
@@ -224,16 +286,42 @@ describe('cloud server utils', () => {
         expect(__cloudTestUtils.toRateLimitRoute('/v1/tasks')).toBe('/v1/tasks');
     });
 
-    test('enforces JSON body size limit', async () => {
-        const body = JSON.stringify({ tasks: [], projects: [] });
+    test('enforces JSON body size limit without relying on content-length', async () => {
+        const body = JSON.stringify({ tasks: [], projects: [], sections: [], areas: [], settings: {} });
         const req = new Request('http://localhost/v1/data', {
             method: 'PUT',
-            headers: { 'content-length': String(body.length) },
-            body,
+            body: new ReadableStream({
+                start(controller) {
+                    controller.enqueue(new TextEncoder().encode(body));
+                    controller.close();
+                },
+            }),
+            duplex: 'half' as RequestDuplex,
         });
-        const parsed = await __cloudTestUtils.readJsonBody(req, 10, new TextEncoder());
+        const parsed = await __cloudTestUtils.readJsonBody(req, 10);
         expect(parsed.__mindwtrError.message).toBe('Payload too large');
         expect(parsed.__mindwtrError.status).toBe(413);
+    });
+
+    test('returns request timeout when body read is aborted', async () => {
+        const controller = new AbortController();
+        const req = new Request('http://localhost/v1/data', {
+            method: 'PUT',
+            body: new ReadableStream({
+                start(streamController) {
+                    streamController.enqueue(new TextEncoder().encode('{"tasks":['));
+                },
+                cancel() {
+                    return undefined;
+                },
+            }),
+            duplex: 'half' as RequestDuplex,
+        });
+
+        controller.abort(new Error('Request timed out'));
+        const parsed = await __cloudTestUtils.readJsonBody(req, 1024, controller.signal);
+        expect(parsed.__mindwtrError.message).toBe('Request timed out');
+        expect(parsed.__mindwtrError.status).toBe(408);
     });
 
     test('normalizes attachment paths with allowlist and segment checks', () => {
@@ -728,7 +816,7 @@ describe('cloud server api', () => {
 
         expect(response.status).toBe(500);
         const body = await response.json();
-        expect(String(body.error || '')).toContain('Invalid merged data');
+        expect(body.error).toBe('Merged data failed validation');
 
         const persisted = JSON.parse(readFileSync(filePath, 'utf8'));
         expect((persisted.tasks as Array<{ id: string }>).some((task) => task.id === 'valid-task')).toBe(false);

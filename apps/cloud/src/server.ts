@@ -18,6 +18,7 @@ type Flags = Record<string, string | boolean>;
 type RateLimitState = {
     count: number;
     resetAt: number;
+    lastSeenAt: number;
 };
 
 type LogLevel = 'info' | 'warn' | 'error';
@@ -126,6 +127,65 @@ type CloudFileLock = {
     acquiredAt: number;
     heartbeatAt: number;
 };
+
+type RequestAbortError = Error & {
+    status: number;
+};
+
+type BodyReadError = {
+    __mindwtrError: {
+        message: string;
+        status: number;
+    };
+};
+
+function createRequestAbortError(message: string, status = 408): RequestAbortError {
+    const error = new Error(message) as RequestAbortError;
+    error.name = 'RequestAbortError';
+    error.status = status;
+    return error;
+}
+
+function isRequestAbortError(error: unknown): error is RequestAbortError {
+    return error instanceof Error
+        && error.name === 'RequestAbortError'
+        && typeof (error as { status?: unknown }).status === 'number';
+}
+
+function resolveRequestAbortError(signal: AbortSignal, fallbackMessage: string, fallbackStatus = 408): RequestAbortError {
+    const reason = signal.reason;
+    if (isRequestAbortError(reason)) {
+        return reason;
+    }
+    if (reason instanceof Error) {
+        const error = reason as RequestAbortError;
+        error.name = 'RequestAbortError';
+        error.status = typeof error.status === 'number' ? error.status : fallbackStatus;
+        return error;
+    }
+    return createRequestAbortError(fallbackMessage, fallbackStatus);
+}
+
+function throwIfRequestAborted(signal?: AbortSignal, fallbackMessage = 'Request timed out'): void {
+    if (!signal?.aborted) return;
+    throw resolveRequestAbortError(signal, fallbackMessage);
+}
+
+function createBodyReadError(message: string, status: number): BodyReadError {
+    return {
+        __mindwtrError: {
+            message,
+            status,
+        },
+    };
+}
+
+function isBodyReadError(value: unknown): value is BodyReadError {
+    return isRecord(value)
+        && isRecord(value.__mindwtrError)
+        && typeof value.__mindwtrError.message === 'string'
+        && typeof value.__mindwtrError.status === 'number';
+}
 
 function decodeAttachmentPath(rawPath: string): string | null {
     try {
@@ -439,7 +499,20 @@ function validateAppData(value: unknown): { ok: true; data: Record<string, unkno
         }
     }
 
+    const projectsById = new Map<string, Record<string, unknown>>();
+    const activeProjectIds = new Set<string>();
+    for (const project of projects) {
+        const projectRecord = project as Record<string, unknown>;
+        const projectId = String(projectRecord.id);
+        projectsById.set(projectId, projectRecord);
+        if (projectRecord.deletedAt == null) {
+            activeProjectIds.add(projectId);
+        }
+    }
+
     if (Array.isArray(sections)) {
+        const sectionsById = new Map<string, Record<string, unknown>>();
+        const activeSectionIds = new Set<string>();
         for (const section of sections) {
             if (!isRecord(section) || typeof section.id !== 'string' || typeof section.projectId !== 'string' || typeof section.title !== 'string') {
                 return { ok: false, error: 'Invalid data: each section must be an object with string id, projectId, and title' };
@@ -450,9 +523,53 @@ function validateAppData(value: unknown): { ok: true; data: Record<string, unkno
             if (section.deletedAt != null && !isValidIsoTimestamp(section.deletedAt)) {
                 return { ok: false, error: 'Invalid data: section deletedAt must be a valid ISO timestamp when present' };
             }
+            sectionsById.set(section.id, section);
+            if (section.deletedAt == null) {
+                activeSectionIds.add(section.id);
+                if (!activeProjectIds.has(section.projectId)) {
+                    return { ok: false, error: `Invalid data: live section ${section.id} references missing or deleted project ${section.projectId}` };
+                }
+            }
+        }
+
+        for (const task of tasks) {
+            const taskRecord = task as Record<string, unknown>;
+            if (taskRecord.deletedAt != null) continue;
+            const projectId = typeof taskRecord.projectId === 'string' ? taskRecord.projectId.trim() : '';
+            const sectionId = typeof taskRecord.sectionId === 'string' ? taskRecord.sectionId.trim() : '';
+            if (projectId && !activeProjectIds.has(projectId)) {
+                return { ok: false, error: `Invalid data: live task ${String(taskRecord.id)} references missing or deleted project ${projectId}` };
+            }
+            if (sectionId) {
+                if (!projectId) {
+                    return { ok: false, error: `Invalid data: live task ${String(taskRecord.id)} must include projectId when sectionId is present` };
+                }
+                if (!activeSectionIds.has(sectionId)) {
+                    return { ok: false, error: `Invalid data: live task ${String(taskRecord.id)} references missing or deleted section ${sectionId}` };
+                }
+                const section = sectionsById.get(sectionId);
+                const sectionProjectId = typeof section?.projectId === 'string' ? section.projectId : '';
+                if (sectionProjectId !== projectId) {
+                    return { ok: false, error: `Invalid data: live task ${String(taskRecord.id)} section ${sectionId} belongs to project ${sectionProjectId}` };
+                }
+            }
+        }
+    } else {
+        for (const task of tasks) {
+            const taskRecord = task as Record<string, unknown>;
+            if (taskRecord.deletedAt != null) continue;
+            const projectId = typeof taskRecord.projectId === 'string' ? taskRecord.projectId.trim() : '';
+            const sectionId = typeof taskRecord.sectionId === 'string' ? taskRecord.sectionId.trim() : '';
+            if (projectId && !activeProjectIds.has(projectId)) {
+                return { ok: false, error: `Invalid data: live task ${String(taskRecord.id)} references missing or deleted project ${projectId}` };
+            }
+            if (sectionId) {
+                return { ok: false, error: `Invalid data: live task ${String(taskRecord.id)} references section ${sectionId} but sections are missing` };
+            }
         }
     }
 
+    const activeAreaIds = new Set<string>();
     if (Array.isArray(areas)) {
         for (const area of areas) {
             if (!isRecord(area) || typeof area.id !== 'string' || typeof area.name !== 'string') {
@@ -467,6 +584,26 @@ function validateAppData(value: unknown): { ok: true; data: Record<string, unkno
             if (area.deletedAt != null && !isValidIsoTimestamp(area.deletedAt)) {
                 return { ok: false, error: 'Invalid data: area deletedAt must be a valid ISO timestamp when present' };
             }
+            if (area.deletedAt == null) {
+                activeAreaIds.add(area.id);
+            }
+        }
+    }
+
+    for (const project of projects) {
+        if (!isRecord(project) || project.deletedAt != null) continue;
+        const areaId = typeof project.areaId === 'string' ? project.areaId.trim() : '';
+        if (areaId && !activeAreaIds.has(areaId)) {
+            return { ok: false, error: `Invalid data: live project ${project.id} references missing or deleted area ${areaId}` };
+        }
+    }
+
+    for (const task of tasks) {
+        const taskRecord = task as Record<string, unknown>;
+        if (taskRecord.deletedAt != null) continue;
+        const areaId = typeof taskRecord.areaId === 'string' ? taskRecord.areaId.trim() : '';
+        if (areaId && !activeAreaIds.has(areaId)) {
+            return { ok: false, error: `Invalid data: live task ${String(taskRecord.id)} references missing or deleted area ${areaId}` };
         }
     }
 
@@ -716,16 +853,80 @@ function ensureWritableDir(dirPath: string): boolean {
     }
 }
 
-async function readJsonBody(req: Request, maxBodyBytes: number, encoder: TextEncoder): Promise<any> {
+async function readRequestBytes(
+    req: Request,
+    maxBodyBytes: number,
+    signal?: AbortSignal,
+): Promise<Uint8Array | BodyReadError> {
     const contentLength = Number(req.headers.get('content-length') || '0');
     if (contentLength && contentLength > maxBodyBytes) {
-        return { __mindwtrError: { message: 'Payload too large', status: 413 } };
+        return createBodyReadError('Payload too large', 413);
     }
-    const text = await req.text();
+    const stream = req.body;
+    if (!stream) {
+        return new Uint8Array();
+    }
+    try {
+        throwIfRequestAborted(signal);
+        const reader = stream.getReader();
+        const chunks: Uint8Array[] = [];
+        let totalLength = 0;
+        const onAbort = signal
+            ? () => {
+                void reader.cancel(resolveRequestAbortError(signal, 'Request timed out')).catch(() => undefined);
+            }
+            : null;
+        if (signal && onAbort) {
+            signal.addEventListener('abort', onAbort, { once: true });
+        }
+        try {
+            while (true) {
+                throwIfRequestAborted(signal);
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (!value || value.length === 0) continue;
+                totalLength += value.length;
+                if (totalLength > maxBodyBytes) {
+                    await reader.cancel().catch(() => undefined);
+                    return createBodyReadError('Payload too large', 413);
+                }
+                chunks.push(value);
+            }
+        } finally {
+            if (signal && onAbort) {
+                signal.removeEventListener('abort', onAbort);
+            }
+        }
+
+        if (chunks.length === 0) {
+            return new Uint8Array();
+        }
+        if (chunks.length === 1) {
+            return chunks[0];
+        }
+        const merged = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const chunk of chunks) {
+            merged.set(chunk, offset);
+            offset += chunk.length;
+        }
+        return merged;
+    } catch (error) {
+        if (signal?.aborted) {
+            const requestAbortError = resolveRequestAbortError(signal, 'Request timed out');
+            return createBodyReadError(requestAbortError.message, requestAbortError.status);
+        }
+        throw error;
+    }
+}
+
+async function readJsonBody(req: Request, maxBodyBytes: number, signal?: AbortSignal): Promise<any> {
+    const bytes = await readRequestBytes(req, maxBodyBytes, signal);
+    if (isBodyReadError(bytes)) {
+        return bytes;
+    }
+    const text = new TextDecoder().decode(bytes);
     if (!text.trim()) return null;
-    if (encoder.encode(text).length > maxBodyBytes) {
-        return { __mindwtrError: { message: 'Payload too large', status: 413 } };
-    }
     try {
         return JSON.parse(text);
     } catch {
@@ -764,6 +965,7 @@ type CloudServerOptions = {
     maxAttachmentPerWindow?: number;
     maxBodyBytes?: number;
     maxAttachmentBytes?: number;
+    requestTimeoutMs?: number;
     allowedAuthTokens?: Set<string> | null;
     trustProxyHeaders?: boolean;
 };
@@ -803,9 +1005,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     );
     const allowedAuthTokens = options.allowedAuthTokens ?? resolveAllowedAuthTokensFromEnv(process.env);
     const trustProxyHeaders = options.trustProxyHeaders ?? parseBoolEnv(process.env.MINDWTR_CLOUD_TRUST_PROXY_HEADERS);
-    const encoder = new TextEncoder();
     const withWriteLock = createWriteLockRunner(dataDir);
     const rateLimitCleanupMs = Number(process.env.MINDWTR_CLOUD_RATE_CLEANUP_MS || 60_000);
+    const requestTimeoutMs = Number(options.requestTimeoutMs ?? process.env.MINDWTR_CLOUD_REQUEST_TIMEOUT_MS ?? 30_000);
     const pruneExpiredRateLimits = (now: number) => {
         for (const [key, state] of rateLimits.entries()) {
             if (now > state.resetAt) {
@@ -813,10 +1015,26 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
             }
         }
     };
+    const findLeastRecentlyUsedRateLimitKey = (): string | null => {
+        let oldestKey: string | null = null;
+        let oldestSeenAt = Number.POSITIVE_INFINITY;
+        let oldestResetAt = Number.POSITIVE_INFINITY;
+        for (const [key, state] of rateLimits.entries()) {
+            if (
+                state.lastSeenAt < oldestSeenAt
+                || (state.lastSeenAt === oldestSeenAt && state.resetAt < oldestResetAt)
+            ) {
+                oldestKey = key;
+                oldestSeenAt = state.lastSeenAt;
+                oldestResetAt = state.resetAt;
+            }
+        }
+        return oldestKey;
+    };
     const ensureRateLimitCapacity = (now: number) => {
         pruneExpiredRateLimits(now);
         while (rateLimits.size >= RATE_LIMIT_MAX_KEYS) {
-            const oldestKey = rateLimits.keys().next().value;
+            const oldestKey = findLeastRecentlyUsedRateLimitKey();
             if (!oldestKey) break;
             rateLimits.delete(oldestKey);
         }
@@ -826,6 +1044,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         const state = rateLimits.get(rateKey);
         if (state && now < state.resetAt) {
             state.count += 1;
+            state.lastSeenAt = now;
             if (state.count > maxAllowed) {
                 const retryAfter = Math.ceil((state.resetAt - now) / 1000);
                 return jsonResponse(
@@ -838,7 +1057,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         if (!state && rateLimits.size >= RATE_LIMIT_MAX_KEYS) {
             ensureRateLimitCapacity(now);
         }
-        rateLimits.set(rateKey, { count: 1, resetAt: now + windowMs });
+        rateLimits.set(rateKey, { count: 1, resetAt: now + windowMs, lastSeenAt: now });
         return null;
     };
     const unauthorizedResponse = (req: Request): Response => {
@@ -884,7 +1103,12 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         hostname: host,
         port,
         async fetch(req) {
+            const requestAbortController = new AbortController();
+            const requestTimeout = setTimeout(() => {
+                requestAbortController.abort(createRequestAbortError('Request timed out', 408));
+            }, requestTimeoutMs);
             try {
+                throwIfRequestAborted(requestAbortController.signal);
                 if (req.method === 'OPTIONS') return jsonResponse({ ok: true });
 
                 const url = new URL(req.url);
@@ -934,14 +1158,15 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 }
 
                 if (req.method === 'POST' && pathname === '/v1/tasks') {
-                    const body = await readJsonBody(req, maxBodyBytes, encoder);
-                    if (body && typeof body === 'object' && '__mindwtrError' in body) {
-                        const err = (body as any).__mindwtrError;
+                    const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
+                    if (isBodyReadError(body)) {
+                        const err = body.__mindwtrError;
                         return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
                     }
                     if (!body || typeof body !== 'object') return errorResponse('Invalid JSON body');
 
                     return await withWriteLock(key, async () => {
+                        throwIfRequestAborted(requestAbortController.signal);
                         const data = loadAppData(filePath);
                         const nowIso = new Date().toISOString();
 
@@ -1002,6 +1227,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         }
 
                         data.tasks.push(task);
+                        throwIfRequestAborted(requestAbortController.signal);
                         writeData(filePath, data);
                         return jsonResponse({ task }, { status: 201 });
                     });
@@ -1014,6 +1240,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                     const status: TaskStatus = action === 'archive' ? 'archived' : 'done';
 
                     return await withWriteLock(key, async () => {
+                        throwIfRequestAborted(requestAbortController.signal);
                         const data = loadAppData(filePath);
                         const idx = data.tasks.findIndex((t) => t.id === taskId && !t.deletedAt);
                         if (idx < 0) return errorResponse('Task not found', 404);
@@ -1023,6 +1250,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         const { updatedTask, nextRecurringTask } = applyTaskUpdates(existing, { status }, nowIso);
                         data.tasks[idx] = updatedTask;
                         if (nextRecurringTask) data.tasks.push(nextRecurringTask);
+                        throwIfRequestAborted(requestAbortController.signal);
                         writeData(filePath, data);
                         return jsonResponse({ task: updatedTask });
                     });
@@ -1040,9 +1268,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                     }
 
                     if (req.method === 'PATCH') {
-                        const body = await readJsonBody(req, maxBodyBytes, encoder);
-                        if (body && typeof body === 'object' && '__mindwtrError' in body) {
-                            const err = (body as any).__mindwtrError;
+                        const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
+                        if (isBodyReadError(body)) {
+                            const err = body.__mindwtrError;
                             return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
                         }
                         if (!body || typeof body !== 'object') return errorResponse('Invalid JSON body');
@@ -1051,6 +1279,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         }
 
                         return await withWriteLock(key, async () => {
+                            throwIfRequestAborted(requestAbortController.signal);
                             const data = loadAppData(filePath);
                             const idx = data.tasks.findIndex((t) => t.id === taskId && !t.deletedAt);
                             if (idx < 0) return errorResponse('Task not found', 404);
@@ -1062,6 +1291,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                             data.tasks[idx] = updatedTask;
                             if (nextRecurringTask) data.tasks.push(nextRecurringTask);
+                            throwIfRequestAborted(requestAbortController.signal);
                             writeData(filePath, data);
                             return jsonResponse({ task: updatedTask });
                         });
@@ -1069,6 +1299,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                     if (req.method === 'DELETE') {
                         return await withWriteLock(key, async () => {
+                            throwIfRequestAborted(requestAbortController.signal);
                             const data = loadAppData(filePath);
                             const idx = data.tasks.findIndex((t) => t.id === taskId && !t.deletedAt);
                             if (idx < 0) return errorResponse('Task not found', 404);
@@ -1076,6 +1307,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                             const nowIso = new Date().toISOString();
                             const existing = data.tasks[idx];
                             data.tasks[idx] = { ...existing, deletedAt: nowIso, updatedAt: nowIso };
+                            throwIfRequestAborted(requestAbortController.signal);
                             writeData(filePath, data);
                             return jsonResponse({ ok: true });
                         });
@@ -1083,6 +1315,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 }
 
                 if (req.method === 'GET' && pathname === '/v1/projects') {
+                    throwIfRequestAborted(requestAbortController.signal);
                     const pagination = parsePagination(url.searchParams);
                     if ('error' in pagination) return errorResponse(pagination.error, 400);
                     const data = loadAppData(filePath);
@@ -1098,6 +1331,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 }
 
                 if (req.method === 'GET' && pathname === '/v1/search') {
+                    throwIfRequestAborted(requestAbortController.signal);
                     const query = url.searchParams.get('query') || '';
                     const data = loadAppData(filePath);
                     const tasks = data.tasks.filter((t) => !t.deletedAt);
@@ -1123,23 +1357,28 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                 if (req.method === 'GET') {
                     return await withWriteLock(key, async () => {
+                        throwIfRequestAborted(requestAbortController.signal);
                         if (!existsSync(filePath)) {
                             const emptyData: AppData = { tasks: [], projects: [], sections: [], areas: [], settings: {} };
+                            throwIfRequestAborted(requestAbortController.signal);
                             if (!existsSync(filePath)) writeData(filePath, emptyData);
                             return jsonResponse(emptyData);
                         }
                         const data = readData(filePath);
                         if (!data) return errorResponse('Failed to read data', 500);
                         const validated = validateAppData(data);
-                        if (!validated.ok) return errorResponse(validated.error, 500);
+                        if (!validated.ok) {
+                            logWarn('Stored cloud data failed validation', { key, error: validated.error });
+                            return errorResponse('Stored data failed validation', 500);
+                        }
                         return jsonResponse(validated.data);
                     });
                 }
 
                 if (req.method === 'PUT') {
-                    const body = await readJsonBody(req, maxBodyBytes, encoder);
-                    if (body && typeof body === 'object' && '__mindwtrError' in body) {
-                        const err = (body as any).__mindwtrError;
+                    const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
+                    if (isBodyReadError(body)) {
+                        const err = body.__mindwtrError;
                         return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
                     }
                     if (!body) return errorResponse('Missing body');
@@ -1147,13 +1386,16 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                     const validated = validateAppData(body);
                     if (!validated.ok) return errorResponse(validated.error, 400);
                     return await withWriteLock(key, async () => {
+                        throwIfRequestAborted(requestAbortController.signal);
                         const existingData = loadAppData(filePath);
                         const incomingData = validated.data as AppData;
                         const mergedData = mergeAppData(existingData, incomingData);
                         const validatedMerged = validateAppData(mergedData);
                         if (!validatedMerged.ok) {
-                            return errorResponse(`Invalid merged data: ${validatedMerged.error}`, 500);
+                            logWarn('Merged cloud data failed validation', { key, error: validatedMerged.error });
+                            return errorResponse('Merged data failed validation', 500);
                         }
+                        throwIfRequestAborted(requestAbortController.signal);
                         writeData(filePath, validatedMerged.data);
                         return jsonResponse({ ok: true });
                     });
@@ -1193,14 +1435,11 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 }
 
                 if (req.method === 'PUT') {
-                    const contentLength = Number(req.headers.get('content-length') || '0');
-                    if (contentLength && contentLength > maxAttachmentBytes) {
-                        return errorResponse('Payload too large', 413);
+                    const body = await readRequestBytes(req, maxAttachmentBytes, requestAbortController.signal);
+                    if (isBodyReadError(body)) {
+                        return errorResponse(body.__mindwtrError.message, body.__mindwtrError.status);
                     }
-                    const body = new Uint8Array(await req.arrayBuffer());
-                    if (body.length > maxAttachmentBytes) {
-                        return errorResponse('Payload too large', 413);
-                    }
+                    throwIfRequestAborted(requestAbortController.signal);
                     const wrote = writeAttachmentFileSafely(rootRealPath, filePath, body);
                     if (!wrote) return errorResponse('Invalid attachment path', 400);
                     return jsonResponse({ ok: true });
@@ -1227,6 +1466,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                 return errorResponse('Not found', 404);
             } catch (error) {
+                if (isRequestAbortError(error)) {
+                    return errorResponse(error.message, error.status);
+                }
                 if (error && typeof error === 'object' && 'code' in error) {
                     const code = (error as any).code;
                     if (code === 'EACCES') {
@@ -1236,6 +1478,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 }
                 logError('request failed', error);
                 return errorResponse('Internal server error', 500);
+            } finally {
+                clearTimeout(requestTimeout);
             }
         },
     });
