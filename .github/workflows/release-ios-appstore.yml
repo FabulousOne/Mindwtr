@@ -364,8 +364,8 @@ jobs:
             echo "::error::App profile (${APP_PROFILE_NAME}) is missing App Group ${EXPECTED_APP_GROUP}. Recreate the profile with App Groups enabled and re-upload IOS_PROVISIONING_PROFILE."
             exit 1
           fi
-          if ! printf '%s\n' "$APP_PROFILE_ICLOUD_SERVICES" | grep -Fq "CloudKit"; then
-            echo "::error::App profile (${APP_PROFILE_NAME}) is missing CloudKit iCloud service entitlement. Recreate IOS_PROVISIONING_PROFILE with iCloud + CloudKit enabled for ${EXPECTED_BUNDLE_ID}."
+          if [ -z "${APP_PROFILE_ICLOUD_SERVICES}" ] || { ! printf '%s\n' "$APP_PROFILE_ICLOUD_SERVICES" | grep -Fq "CloudKit" && ! printf '%s\n' "$APP_PROFILE_ICLOUD_SERVICES" | grep -Fxq "*"; }; then
+            echo "::error::App profile (${APP_PROFILE_NAME}) is missing CloudKit iCloud service entitlement. Expected 'CloudKit' or Apple's wildcard '*' encoding in IOS_PROVISIONING_PROFILE for ${EXPECTED_BUNDLE_ID}."
             exit 1
           fi
           if ! printf '%s\n' "$APP_PROFILE_ICLOUD_CONTAINERS" | grep -Fq "$EXPECTED_ICLOUD_CONTAINER"; then
