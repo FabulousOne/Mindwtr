@@ -39,6 +39,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: release-ios-appstore-${{ github.ref }}
   cancel-in-progress: false
@@ -52,6 +55,7 @@ jobs:
       EXPECTED_BUNDLE_ID: tech.dongdongbh.mindwtr
       EXPECTED_WIDGET_BUNDLE_ID: tech.dongdongbh.mindwtr.MindwtrWidgets
       EXPECTED_APP_GROUP: group.tech.dongdongbh.mindwtr
+      EXPECTED_ICLOUD_CONTAINER: iCloud.tech.dongdongbh.mindwtr
       ANALYTICS_HEARTBEAT_URL: ${{ secrets.ANALYTICS_HEARTBEAT_URL }}
       DROPBOX_APP_KEY: ${{ vars.DROPBOX_APP_KEY || secrets.DROPBOX_APP_KEY }}
     steps:
@@ -347,6 +351,9 @@ jobs:
           APP_PROFILE_TEAM_ID="$(profile_field "$APP_PROFILE_PLIST" "TeamIdentifier:0")"
           APP_PROFILE_APP_ID="$(profile_field "$APP_PROFILE_PLIST" "Entitlements:application-identifier")"
           APP_PROFILE_GROUPS="$(profile_field "$APP_PROFILE_PLIST" "Entitlements:com.apple.security.application-groups")"
+          APP_PROFILE_ICLOUD_SERVICES="$(profile_field "$APP_PROFILE_PLIST" "Entitlements:com.apple.developer.icloud-services")"
+          APP_PROFILE_ICLOUD_CONTAINERS="$(profile_field "$APP_PROFILE_PLIST" "Entitlements:com.apple.developer.icloud-container-identifiers")"
+          APP_PROFILE_APS_ENV="$(profile_field "$APP_PROFILE_PLIST" "Entitlements:aps-environment")"
 
           if [ "$APP_PROFILE_TEAM_ID" != "$EXPECTED_TEAM_ID" ]; then
             echo "::error::App profile TeamIdentifier (${APP_PROFILE_TEAM_ID}) does not match expected team (${EXPECTED_TEAM_ID})."
@@ -355,6 +362,18 @@ jobs:
           verify_profile_bundle "$APP_PROFILE_APP_ID" "$EXPECTED_BUNDLE_ID" "App profile"
           if ! printf '%s\n' "$APP_PROFILE_GROUPS" | grep -Fq "$EXPECTED_APP_GROUP"; then
             echo "::error::App profile (${APP_PROFILE_NAME}) is missing App Group ${EXPECTED_APP_GROUP}. Recreate the profile with App Groups enabled and re-upload IOS_PROVISIONING_PROFILE."
+            exit 1
+          fi
+          if ! printf '%s\n' "$APP_PROFILE_ICLOUD_SERVICES" | grep -Fq "CloudKit"; then
+            echo "::error::App profile (${APP_PROFILE_NAME}) is missing CloudKit iCloud service entitlement. Recreate IOS_PROVISIONING_PROFILE with iCloud + CloudKit enabled for ${EXPECTED_BUNDLE_ID}."
+            exit 1
+          fi
+          if ! printf '%s\n' "$APP_PROFILE_ICLOUD_CONTAINERS" | grep -Fq "$EXPECTED_ICLOUD_CONTAINER"; then
+            echo "::error::App profile (${APP_PROFILE_NAME}) does not include iCloud container ${EXPECTED_ICLOUD_CONTAINER}. Recreate IOS_PROVISIONING_PROFILE after adding the container in Apple Developer."
+            exit 1
+          fi
+          if [ "$APP_PROFILE_APS_ENV" != "production" ]; then
+            echo "::error::App profile (${APP_PROFILE_NAME}) has aps-environment '${APP_PROFILE_APS_ENV}' but App Store builds require 'production'. Recreate IOS_PROVISIONING_PROFILE with Push Notifications enabled."
             exit 1
           fi
 
