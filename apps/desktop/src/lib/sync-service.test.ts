@@ -3,6 +3,20 @@ import type { Attachment } from '@mindwtr/core';
 import { getFileSyncDir, hashString, normalizeSyncBackend } from './sync-service-utils';
 import { SyncService, __syncServiceTestUtils } from './sync-service';
 
+const waitForAssertion = async (assertion: () => void, maxAttempts = 200): Promise<void> => {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+            assertion();
+            return;
+        } catch (error) {
+            lastError = error;
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+    }
+    throw lastError ?? new Error('Timed out waiting for expectation');
+};
+
 afterEach(async () => {
     __syncServiceTestUtils.resetDependenciesForTests();
     await SyncService.resetForTests();
@@ -204,26 +218,28 @@ describe('SyncService orchestration', () => {
     it('re-runs a queued sync cycle after the in-flight sync finishes', async () => {
         const firstRun = createDeferred();
         const backendSpy = vi.spyOn(SyncService as any, 'getSyncBackend');
-        backendSpy
-            .mockImplementationOnce(async () => {
+        let backendCalls = 0;
+        backendSpy.mockImplementation(async () => {
+            backendCalls += 1;
+            if (backendCalls === 1) {
                 await firstRun.promise;
-                return 'off';
-            })
-            .mockResolvedValue('off');
+            }
+            return 'off';
+        });
         const snapshots: Array<ReturnType<typeof SyncService.getSyncStatus>> = [];
         const unsubscribe = SyncService.subscribeSyncStatus((status) => {
             snapshots.push({ ...status });
         });
 
         const first = SyncService.performSync();
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: true,
                 queued: false,
             });
         });
         const second = SyncService.performSync();
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: true,
                 queued: true,
@@ -234,7 +250,7 @@ describe('SyncService orchestration', () => {
         const [firstResult, secondResult] = await Promise.all([first, second]);
         expect(firstResult.success).toBe(true);
         expect(secondResult.success).toBe(true);
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: false,
                 queued: false,
@@ -250,12 +266,14 @@ describe('SyncService orchestration', () => {
     it('emits queued status updates while a sync is already in flight', async () => {
         const firstRun = createDeferred();
         const backendSpy = vi.spyOn(SyncService as any, 'getSyncBackend');
-        backendSpy
-            .mockImplementationOnce(async () => {
+        let backendCalls = 0;
+        backendSpy.mockImplementation(async () => {
+            backendCalls += 1;
+            if (backendCalls === 1) {
                 await firstRun.promise;
-                return 'off';
-            })
-            .mockResolvedValue('off');
+            }
+            return 'off';
+        });
 
         const snapshots: Array<ReturnType<typeof SyncService.getSyncStatus>> = [];
         const unsubscribe = SyncService.subscribeSyncStatus((status) => {
@@ -263,14 +281,14 @@ describe('SyncService orchestration', () => {
         });
 
         const first = SyncService.performSync();
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: true,
                 queued: false,
             });
         });
         const second = SyncService.performSync();
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: true,
                 queued: true,
@@ -278,7 +296,7 @@ describe('SyncService orchestration', () => {
         });
         firstRun.resolve();
         await Promise.all([first, second]);
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: false,
                 queued: false,
@@ -312,7 +330,7 @@ describe('SyncService orchestration', () => {
         });
 
         const resultPromise = SyncService.performSync();
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(triggered).toBe(true);
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: true,
@@ -321,7 +339,7 @@ describe('SyncService orchestration', () => {
         });
         firstRun.resolve();
         const result = await resultPromise;
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: false,
                 queued: false,
@@ -339,22 +357,25 @@ describe('SyncService orchestration', () => {
     it('runs a queued follow-up sync after an in-flight failure', async () => {
         const firstRun = createDeferred();
         const backendSpy = vi.spyOn(SyncService as any, 'getSyncBackend');
-        backendSpy
-            .mockImplementationOnce(async () => {
+        let backendCalls = 0;
+        backendSpy.mockImplementation(async () => {
+            backendCalls += 1;
+            if (backendCalls === 1) {
                 await firstRun.promise;
                 throw new Error('temporary backend failure');
-            })
-            .mockResolvedValue('off');
+            }
+            return 'off';
+        });
 
         const first = SyncService.performSync();
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: true,
                 queued: false,
             });
         });
         const second = SyncService.performSync();
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: true,
                 queued: true,
@@ -366,7 +387,7 @@ describe('SyncService orchestration', () => {
         expect(firstResult.success).toBe(false);
         expect(secondResult.success).toBe(false);
 
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(SyncService.getSyncStatus()).toMatchObject({
                 inFlight: false,
                 queued: false,

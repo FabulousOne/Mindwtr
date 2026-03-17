@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, waitFor } from '@testing-library/react';
 
 import { LanguageProvider } from '../../contexts/language-context';
 import { useObsidianStore } from '../../store/obsidian-store';
@@ -54,10 +54,10 @@ afterEach(() => {
 
 describe('ObsidianView', () => {
     it('shows setup guidance when no vault is configured', () => {
-        renderWithProviders();
+        const { getByText, getByRole } = renderWithProviders();
 
-        expect(screen.getByText('Set up an Obsidian vault')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Open settings' })).toBeInTheDocument();
+        expect(getByText('Set up an Obsidian vault')).toBeInTheDocument();
+        expect(getByRole('button', { name: 'Open settings' })).toBeInTheDocument();
     });
 
     it('renders imported tasks and source links', () => {
@@ -91,13 +91,13 @@ describe('ObsidianView', () => {
             }));
         });
 
-        renderWithProviders();
+        const { getByText, getByRole } = renderWithProviders();
 
-        expect(screen.getByText('Draft spec #writing')).toBeInTheDocument();
-        expect(screen.getByText('Projects/Alpha.md:12')).toBeInTheDocument();
-        expect(screen.getByText('[[Spec Note]]')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Open in Obsidian' })).toBeInTheDocument();
-        expect(screen.getByText('Notes scanned: 3')).toBeInTheDocument();
+        expect(getByText('Draft spec #writing')).toBeInTheDocument();
+        expect(getByText('Projects/Alpha.md:12')).toBeInTheDocument();
+        expect(getByText('[[Spec Note]]')).toBeInTheDocument();
+        expect(getByRole('button', { name: 'Open in Obsidian' })).toBeInTheDocument();
+        expect(getByText('Notes scanned: 3')).toBeInTheDocument();
     });
 
     it('rescans once when a configured vault has not been scanned in this session', async () => {

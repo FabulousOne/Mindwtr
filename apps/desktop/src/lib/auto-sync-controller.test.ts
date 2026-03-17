@@ -1,6 +1,68 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDesktopAutoSyncController } from './auto-sync-controller';
 
+const createManualScheduler = (startMs = 0) => {
+    let nowMs = startMs;
+    let nextId = 1;
+    const timers = new Map<number, { runAt: number; callback: () => void }>();
+
+    const setTimer: typeof setTimeout = ((callback: TimerHandler, delay?: number) => {
+        const id = nextId;
+        nextId += 1;
+        timers.set(id, {
+            runAt: nowMs + Math.max(0, Number(delay ?? 0)),
+            callback: () => {
+                if (typeof callback === 'function') {
+                    callback();
+                }
+            },
+        });
+        return id as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout;
+
+    const clearTimer: typeof clearTimeout = ((timerId: ReturnType<typeof setTimeout>) => {
+        timers.delete(Number(timerId));
+    }) as typeof clearTimeout;
+
+    const advanceBy = async (ms: number) => {
+        nowMs += ms;
+        while (true) {
+            const nextTimer = Array.from(timers.entries())
+                .filter(([, timer]) => timer.runAt <= nowMs)
+                .sort((left, right) => left[1].runAt - right[1].runAt || left[0] - right[0])[0];
+            if (!nextTimer) break;
+            timers.delete(nextTimer[0]);
+            nextTimer[1].callback();
+            await Promise.resolve();
+            await Promise.resolve();
+        }
+    };
+
+    return {
+        now: () => nowMs,
+        setNow: (next: number) => {
+            nowMs = next;
+        },
+        setTimer,
+        clearTimer,
+        advanceBy,
+    };
+};
+
+const waitForAssertion = async (assertion: () => void, maxAttempts = 200): Promise<void> => {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+            assertion();
+            return;
+        } catch (error) {
+            lastError = error;
+            await Promise.resolve();
+        }
+    }
+    throw lastError ?? new Error('Timed out waiting for expectation');
+};
+
 describe('createDesktopAutoSyncController', () => {
     afterEach(() => {
         vi.useRealTimers();
@@ -31,9 +93,7 @@ describe('createDesktopAutoSyncController', () => {
     });
 
     it('throttles repeated sync requests until the minimum interval elapses', async () => {
-        vi.useFakeTimers();
-        let nowMs = 10_000;
-        vi.setSystemTime(nowMs);
+        const scheduler = createManualScheduler(10_000);
 
         const performSync = vi.fn(async () => ({ success: true }));
         const controller = createDesktopAutoSyncController({
@@ -42,28 +102,27 @@ describe('createDesktopAutoSyncController', () => {
             flushPendingSave: async () => undefined,
             reportError: vi.fn(),
             isRuntimeActive: () => true,
-            now: () => nowMs,
+            now: scheduler.now,
+            setTimer: scheduler.setTimer,
+            clearTimer: scheduler.clearTimer,
         });
 
         await controller.requestSync();
         expect(performSync).toHaveBeenCalledTimes(1);
 
-        nowMs += 1_000;
-        vi.setSystemTime(nowMs);
+        scheduler.setNow(11_000);
         await controller.requestSync();
         expect(performSync).toHaveBeenCalledTimes(1);
 
-        nowMs += 4_000;
-        vi.setSystemTime(nowMs);
-        await vi.advanceTimersByTimeAsync(4_000);
+        await scheduler.advanceBy(4_000);
 
-        await vi.waitFor(() => {
+        await waitForAssertion(() => {
             expect(performSync).toHaveBeenCalledTimes(2);
         });
     });
 
     it('debounces repeated data changes before syncing', async () => {
-        vi.useFakeTimers();
+        const scheduler = createManualScheduler();
 
         const performSync = vi.fn(async () => ({ success: true }));
         const controller = createDesktopAutoSyncController({
@@ -72,18 +131,20 @@ describe('createDesktopAutoSyncController', () => {
             flushPendingSave: async () => undefined,
             reportError: vi.fn(),
             isRuntimeActive: () => true,
+            setTimer: scheduler.setTimer,
+            clearTimer: scheduler.clearTimer,
         });
 
         controller.handleDataChange();
-        await vi.advanceTimersByTimeAsync(1_999);
+        await scheduler.advanceBy(1_999);
         expect(performSync).not.toHaveBeenCalled();
 
         controller.handleDataChange();
-        await vi.advanceTimersByTimeAsync(4_999);
+        await scheduler.advanceBy(4_999);
         expect(performSync).not.toHaveBeenCalled();
 
-        await vi.advanceTimersByTimeAsync(1);
-        await vi.waitFor(() => {
+        await scheduler.advanceBy(1);
+        await waitForAssertion(() => {
             expect(performSync).toHaveBeenCalledTimes(1);
         });
     });
