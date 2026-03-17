@@ -783,7 +783,7 @@ export function ProjectsView() {
     return (
         <ErrorBoundary>
             <div className="h-full px-4 py-3">
-                <div className="mx-auto flex h-full w-full max-w-[92rem] min-w-0 gap-5 xl:gap-6">
+                <div className="mx-auto flex h-full w-full max-w-[84rem] min-w-0 gap-5 xl:gap-6 2xl:max-w-[88rem]">
                     <div className="min-w-[14.75rem] w-[clamp(15rem,19vw,19.5rem)] flex-none min-h-0">
                         <ProjectsSidebar
                             t={t}
