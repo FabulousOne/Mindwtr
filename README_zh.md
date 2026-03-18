@@ -49,9 +49,9 @@
          style="height: 50px"
          height="50" />
   </a>
-  <a href="https://snapcraft.io/mindwtr" target="_blank">
-    <img alt="Get it from the Snap Store"
-         src="https://snapcraft.io/static/images/badges/en/snap-store-black.svg"
+  <a href="https://flathub.org/apps/tech.dongdongbh.mindwtr" target="_blank">
+    <img alt="在 Flathub 获取"
+         src="https://flathub.org/api/badge?locale=zh-Hans"
          align="center"
          style="height: 50px"
          height="50" />
@@ -222,12 +222,12 @@ EOF
 sudo dnf install mindwtr
 ```
 
-**Snapcraft：**
-<a href="https://snapcraft.io/mindwtr">
-  <img src="https://img.shields.io/badge/Snapcraft-Install-82BEA0?logo=snapcraft&logoColor=white" alt="Snapcraft">
+**Flatpak（Flathub）：**
+<a href="https://flathub.org/apps/tech.dongdongbh.mindwtr">
+  <img src="https://flathub.org/api/badge?locale=zh-Hans" alt="在 Flathub 获取">
 </a>
 ```bash
-sudo snap install mindwtr
+flatpak install flathub tech.dongdongbh.mindwtr
 ```
 
 **其他方式：** 从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 获取 AppImage 或 `.deb` / `.rpm`。
