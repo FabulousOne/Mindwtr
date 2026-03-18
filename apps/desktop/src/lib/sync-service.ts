@@ -51,6 +51,7 @@ import { isTauriRuntime } from './runtime';
 import { reportError } from './report-error';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { useUiStore } from '../store/ui-store';
+import { markLocalWrite } from './local-data-watcher';
 import { ExternalCalendarService } from './external-calendar-service';
 import { webStorage } from './storage-adapter-web';
 import {
@@ -484,6 +485,11 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
 
 async function tauriInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
     return syncServiceDependencies.invoke<T>(command, args);
+}
+
+async function persistLocalDataForSync(data: AppData): Promise<void> {
+    markLocalWrite(data);
+    await tauriInvoke('save_data', { data });
 }
 
 type WebDavConfig = { url: string; username: string; password?: string; hasPassword?: boolean };
@@ -1756,7 +1762,7 @@ export class SyncService {
 
             await flushPendingSave();
             const externalData = normalizeAppData(await tauriInvoke<AppData>('read_sync_file'));
-            await tauriInvoke('save_data', { data: externalData });
+            await persistLocalDataForSync(externalData);
             await useTaskStore.getState().fetchData({ silent: true });
             const now = new Date().toISOString();
             const nextHistory = appendSyncHistory(useTaskStore.getState().settings, {
@@ -1926,7 +1932,7 @@ export class SyncService {
         const backend = await SyncService.getSyncBackend();
         const data = await tauriInvoke<AppData>('get_data');
         const cleaned = await cleanupOrphanedAttachments(data, backend);
-        await tauriInvoke('save_data', { data: cleaned });
+        await persistLocalDataForSync(cleaned);
         await useTaskStore.getState().fetchData({ silent: true });
     }
 
@@ -2284,7 +2290,7 @@ export class SyncService {
                 writeLocal: async (data) => {
                     ensureLocalSnapshotFresh();
                     if (isTauriRuntimeEnv()) {
-                        await tauriInvoke('save_data', { data });
+                        await persistLocalDataForSync(data);
                     } else {
                         await webStorage.saveData(data);
                     }
@@ -2359,7 +2365,7 @@ export class SyncService {
                         if (!nextData) return;
                         ensureLocalSnapshotFresh();
                         mergedData = nextData;
-                        await tauriInvoke('save_data', { data: mergedData });
+                        await persistLocalDataForSync(mergedData);
                         await yieldToRenderer();
                     };
 
@@ -2411,7 +2417,7 @@ export class SyncService {
                 ensureLocalSnapshotFresh();
                 ensureNetworkStillAvailable();
                 mergedData = await cleanupOrphanedAttachments(mergedData, backend);
-                await tauriInvoke('save_data', { data: mergedData });
+                await persistLocalDataForSync(mergedData);
             }
 
             // 7. Refresh UI Store
@@ -2531,6 +2537,9 @@ export const __syncServiceTestUtils = {
         syncServiceDependencies = {
             ...defaultSyncServiceDependencies,
         };
+    },
+    async persistLocalDataForTests(data: AppData) {
+        await persistLocalDataForSync(data);
     },
     clearWebdavDownloadBackoff() {
         webdavDownloadBackoff.clear();

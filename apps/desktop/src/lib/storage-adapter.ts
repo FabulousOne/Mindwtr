@@ -22,7 +22,7 @@ export const tauriStorage: StorageAdapter = {
         return invokeWithError<AppData>('load data', 'get_data');
     },
     saveData: async (data: AppData): Promise<void> => {
-        markLocalWrite();
+        markLocalWrite(data);
         await invokeWithError<void>('save data', 'save_data', { data });
     },
     queryTasks: async (options: TaskQueryOptions) => {

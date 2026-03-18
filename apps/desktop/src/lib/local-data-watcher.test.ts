@@ -118,6 +118,32 @@ afterEach(async () => {
 });
 
 describe('local-data-watcher', () => {
+    it('ignores self-written payloads after the ignore window drains', async () => {
+        externalData = {
+            ...emptyData(),
+            tasks: [
+                {
+                    id: 'local-1',
+                    title: 'Written by sync',
+                    status: 'inbox',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+            ],
+        } as AppData;
+
+        markLocalWrite(externalData);
+
+        nowMs = 1000;
+        await __localDataWatcherTestUtils.triggerChangeForTests();
+        expect(saveCalls).toHaveLength(0);
+
+        nowMs = 2200;
+        await flushScheduledTimers();
+
+        expect(saveCalls).toHaveLength(0);
+    });
+
     it('re-reads external writes that happen during ignore window', async () => {
         externalData = {
             ...emptyData(),

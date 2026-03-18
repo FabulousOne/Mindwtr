@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Attachment } from '@mindwtr/core';
+import type { AppData, Attachment } from '@mindwtr/core';
 import { getFileSyncDir, hashString, normalizeSyncBackend } from './sync-service-utils';
+
+const markLocalWriteMock = vi.hoisted(() => vi.fn());
+
+vi.mock('./local-data-watcher', () => ({
+    markLocalWrite: markLocalWriteMock,
+}));
+
 import { SyncService, __syncServiceTestUtils } from './sync-service';
 
 const waitForAssertion = async (assertion: () => void, maxAttempts = 200): Promise<void> => {
@@ -117,6 +124,27 @@ describe('SyncService testability hooks', () => {
 
         expect(backend).toBe('cloud');
         expect(invoke).toHaveBeenCalledWith('get_sync_backend', undefined);
+    });
+
+    it('marks direct sync save_data writes as local writes', async () => {
+        const invoke = vi.fn(async () => undefined);
+        const data: AppData = {
+            tasks: [],
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {},
+        };
+        markLocalWriteMock.mockReset();
+        __syncServiceTestUtils.setDependenciesForTests({
+            isTauriRuntime: () => true,
+            invoke: invoke as unknown as <T>(command: string, args?: Record<string, unknown>) => Promise<T>,
+        });
+
+        await __syncServiceTestUtils.persistLocalDataForTests(data);
+
+        expect(markLocalWriteMock).toHaveBeenCalledWith(data);
+        expect(invoke).toHaveBeenCalledWith('save_data', { data });
     });
 
     it('defaults cloud provider to selfhosted and persists selection', async () => {

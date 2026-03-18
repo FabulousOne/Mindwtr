@@ -81,6 +81,7 @@ let localDataWatcherDependencies: LocalDataWatcherDependencies = { ...defaultDep
 let unwatchFn: (() => void) | null = null;
 let ignoreUntil = 0;
 let lastKnownHash = '';
+let lastKnownPayload = '';
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let ignoreDrainTimer: ReturnType<typeof setTimeout> | null = null;
 let hasPendingChangeDuringIgnore = false;
@@ -159,16 +160,20 @@ async function mergeExternalData(externalData: AppData): Promise<void> {
         const merged = localDataWatcherDependencies.merge(normalizedLocal, externalData);
         const normalizedMerged = localDataWatcherDependencies.normalize(merged);
 
-        const localHash = await localDataWatcherDependencies.hashPayload(toStableJson(normalizedLocal));
-        const mergedHash = await localDataWatcherDependencies.hashPayload(toStableJson(normalizedMerged));
+        const localPayload = toStableJson(normalizedLocal);
+        const mergedPayload = toStableJson(normalizedMerged);
+        const localHash = await localDataWatcherDependencies.hashPayload(localPayload);
+        const mergedHash = await localDataWatcherDependencies.hashPayload(mergedPayload);
 
         if (mergedHash === localHash) {
             lastKnownHash = mergedHash;
+            lastKnownPayload = mergedPayload;
             return;
         }
 
         await localDataWatcherDependencies.persistMergedData(normalizedMerged);
         lastKnownHash = mergedHash;
+        lastKnownPayload = mergedPayload;
         localDataWatcherDependencies.logInfo('[local-data-watcher] Merged external data.json changes');
     } catch (error) {
         localDataWatcherDependencies.logWarn('[local-data-watcher] Failed to merge external data: ' + String(error));
@@ -185,10 +190,15 @@ async function handleExternalChange(): Promise<void> {
     try {
         const rawData = await localDataWatcherDependencies.readDataJson();
         const normalized = localDataWatcherDependencies.normalize(rawData);
-        const hash = await localDataWatcherDependencies.hashPayload(toStableJson(normalized));
+        const payload = toStableJson(normalized);
+
+        if (payload === lastKnownPayload) return;
+
+        const hash = await localDataWatcherDependencies.hashPayload(payload);
 
         if (hash === lastKnownHash) return;
         lastKnownHash = hash;
+        lastKnownPayload = payload;
 
         if (debounceTimer) {
             localDataWatcherDependencies.cancelSchedule(debounceTimer);
@@ -205,7 +215,15 @@ async function handleExternalChange(): Promise<void> {
     }
 }
 
-export function markLocalWrite(): void {
+export function markLocalWrite(data?: AppData): void {
+    if (data) {
+        try {
+            const normalized = localDataWatcherDependencies.normalize(data);
+            lastKnownPayload = toStableJson(normalized);
+        } catch {
+            // Best effort only.
+        }
+    }
     ignoreUntil = localDataWatcherDependencies.now() + IGNORE_WINDOW_MS;
     scheduleIgnoreDrain();
 }
@@ -265,6 +283,7 @@ export const __localDataWatcherTestUtils = {
         localDataWatcherDependencies = { ...defaultDependencies };
         ignoreUntil = 0;
         lastKnownHash = '';
+        lastKnownPayload = '';
         mergeInFlight = null;
     },
 };
