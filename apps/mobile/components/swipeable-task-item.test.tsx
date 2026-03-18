@@ -5,19 +5,20 @@ import { Alert } from 'react-native';
 
 import { SwipeableTaskItem } from './swipeable-task-item';
 
-const { updateTask } = vi.hoisted(() => ({
+const { updateTask, storeState } = vi.hoisted(() => ({
   updateTask: vi.fn(),
+  storeState: {
+    updateTask: vi.fn(),
+    projects: [] as any[],
+    areas: [] as any[],
+    settings: { features: {} },
+    getDerivedState: () => ({ focusedCount: 0 }),
+    tasks: [] as any[],
+  },
 }));
 
 vi.mock('@mindwtr/core', () => {
-  const storeState = {
-    updateTask,
-    projects: [],
-    areas: [],
-    settings: { features: {} },
-    getDerivedState: () => ({ focusedCount: 0 }),
-    tasks: [],
-  };
+  storeState.updateTask = updateTask;
   const useTaskStore = Object.assign(
     (selector?: (state: typeof storeState) => unknown) =>
       selector ? selector(storeState) : storeState,
@@ -76,6 +77,7 @@ vi.mock('lucide-react-native', () => ({
 describe('SwipeableTaskItem', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    storeState.projects = [];
   });
 
   it('confirms deletion before invoking onDelete', () => {
@@ -128,7 +130,7 @@ describe('SwipeableTaskItem', () => {
     );
     expect(onDelete).not.toHaveBeenCalled();
 
-    const alertButtons = alertSpy.mock.calls[0]?.[2] as Array<{ text?: string; onPress?: () => void }>;
+    const alertButtons = alertSpy.mock.calls[0]?.[2] as { text?: string; onPress?: () => void }[];
     const destructiveAction = alertButtons.find((button) => button.text === 'Delete');
     expect(destructiveAction?.onPress).toBeTypeOf('function');
 
@@ -137,5 +139,61 @@ describe('SwipeableTaskItem', () => {
     });
 
     expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('navigates from project, context, and tag meta labels', () => {
+    const onProjectPress = vi.fn();
+    const onContextPress = vi.fn();
+    const onTagPress = vi.fn();
+    storeState.projects = [
+      { id: 'project-1', title: 'Mindwtr', areaId: undefined },
+    ];
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SwipeableTaskItem
+          task={{
+            id: 'task-1',
+            title: 'Plan release',
+            status: 'inbox',
+            projectId: 'project-1',
+            contexts: ['@work'],
+            tags: ['#urgent'],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          } as any}
+          isDark={false}
+          tc={{
+            taskItemBg: '#111111',
+            border: '#222222',
+            text: '#ffffff',
+            secondaryText: '#999999',
+            tint: '#3b82f6',
+            warning: '#f59e0b',
+          } as any}
+          onPress={vi.fn()}
+          onStatusChange={vi.fn()}
+          onDelete={vi.fn()}
+          onProjectPress={onProjectPress}
+          onContextPress={onContextPress}
+          onTagPress={onTagPress}
+        />
+      );
+    });
+
+    const projectButton = tree.root.find((node) => node.props.accessibilityLabel === 'Open project Mindwtr');
+    const contextButton = tree.root.find((node) => node.props.accessibilityLabel === 'Open context @work');
+    const tagButton = tree.root.find((node) => node.props.accessibilityLabel === 'Open tag #urgent');
+
+    renderer.act(() => {
+      projectButton.props.onPress({ stopPropagation: vi.fn() });
+      contextButton.props.onPress({ stopPropagation: vi.fn() });
+      tagButton.props.onPress({ stopPropagation: vi.fn() });
+    });
+
+    expect(onProjectPress).toHaveBeenCalledWith('project-1');
+    expect(onContextPress).toHaveBeenCalledWith('@work');
+    expect(onTagPress).toHaveBeenCalledWith('#urgent');
   });
 });

@@ -26,6 +26,7 @@ import { useLanguage } from '../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { taskMatchesAreaFilter } from '@/lib/area-filter';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { buildCopilotConfig, isAIKeyRequired, loadAIKey } from '../lib/ai-config';
 import { logError } from '../lib/app-log';
 import {
@@ -685,6 +686,9 @@ function TaskListComponent({
         onDelete={() => deleteTask(item.id)}
         isHighlighted={item.id === highlightTaskId}
         hideStatusBadge={hideStatusBadgeForList}
+        onProjectPress={projectId ? undefined : openProjectScreen}
+        onContextPress={openContextsScreen}
+        onTagPress={openContextsScreen}
       />
     </ErrorBoundary>
   ), [
@@ -699,6 +703,7 @@ function TaskListComponent({
     themeColorsMemo,
     toggleMultiSelect,
     updateTask,
+    projectId,
   ]);
 
   const renderListItem = useCallback(({ item }: { item: ListItem }) => {
@@ -1101,6 +1106,9 @@ function TaskListComponent({
           onClose={() => setIsModalVisible(false)}
           onSave={onSaveTask}
           defaultTab={defaultEditTab}
+          onProjectNavigate={projectId ? undefined : openProjectScreen}
+          onContextNavigate={openContextsScreen}
+          onTagNavigate={openContextsScreen}
           onFocusMode={(taskId) => {
             setIsModalVisible(false);
             router.push(`/check-focus?id=${taskId}`);

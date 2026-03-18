@@ -23,6 +23,7 @@ import { TaskEditModal } from './task-edit-modal';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../lib/ai-config';
 import { logError } from '../lib/app-log';
 import { fetchExternalCalendarEvents } from '../lib/external-calendar';
@@ -537,6 +538,14 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
             }))
             .sort((a, b) => (b.tasks.length - a.tasks.length) || a.context.localeCompare(b.context));
     }, [tasks]);
+    const handleNavigateToProject = (projectId: string) => {
+        onClose();
+        openProjectScreen(projectId);
+    };
+    const handleNavigateToToken = (token: string) => {
+        onClose();
+        openContextsScreen(token);
+    };
 
     const renderTaskList = (taskList: Task[]) => (
         <ScrollView style={styles.taskList}>
@@ -549,6 +558,9 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                     onPress={() => handleTaskPress(task)}
                     onStatusChange={(status) => handleStatusChange(task.id, status)}
                     onDelete={() => handleDelete(task.id)}
+                    onProjectPress={handleNavigateToProject}
+                    onContextPress={handleNavigateToToken}
+                    onTagPress={handleNavigateToToken}
                 />
             ))}
         </ScrollView>
@@ -929,6 +941,9 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                                                             onPress={() => handleTaskPress(task)}
                                                             onStatusChange={(status) => handleStatusChange(task.id, status)}
                                                             onDelete={() => handleDelete(task.id)}
+                                                            onProjectPress={handleNavigateToProject}
+                                                            onContextPress={handleNavigateToToken}
+                                                            onTagPress={handleNavigateToToken}
                                                         />
                                                     ))}
                                                 </View>
@@ -1029,6 +1044,9 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                     onClose={() => setShowEditModal(false)}
                     onSave={(taskId, updates) => updateTask(taskId, updates)}
                     defaultTab="view"
+                    onProjectNavigate={handleNavigateToProject}
+                    onContextNavigate={handleNavigateToToken}
+                    onTagNavigate={handleNavigateToToken}
                 />
 
                 <Modal

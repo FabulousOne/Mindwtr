@@ -37,6 +37,9 @@ type TaskEditViewTabProps = {
   textDirectionStyle: Record<string, any>;
   resolvedDirection: 'ltr' | 'rtl';
   nestedScrollEnabled?: boolean;
+  onProjectPress?: (projectId: string) => void;
+  onContextPress?: (context: string) => void;
+  onTagPress?: (tag: string) => void;
 };
 
 export function TaskEditViewTab({
@@ -61,26 +64,61 @@ export function TaskEditViewTab({
   textDirectionStyle,
   resolvedDirection,
   nestedScrollEnabled,
+  onProjectPress,
+  onContextPress,
+  onTagPress,
 }: TaskEditViewTabProps) {
-  const renderViewRow = (label: string, value?: string) => {
+  const renderViewRow = (label: string, value?: string, onPress?: () => void, accessibilityLabel?: string) => {
     if (value === undefined || value === null || value === '') return null;
-    return (
-      <View style={[styles.viewRow, { backgroundColor: tc.inputBg, borderColor: tc.border }]}>
+    const content = (
+      <>
         <Text style={[styles.viewLabel, { color: tc.secondaryText }]}>{label}</Text>
         <Text style={[styles.viewValue, { color: tc.text }]}>{value}</Text>
-      </View>
+      </>
+    );
+    if (!onPress) {
+      return (
+        <View style={[styles.viewRow, { backgroundColor: tc.inputBg, borderColor: tc.border }]}>
+          {content}
+        </View>
+      );
+    }
+    return (
+      <TouchableOpacity
+        style={[styles.viewRow, { backgroundColor: tc.inputBg, borderColor: tc.border }]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? `${label}: ${value}`}
+      >
+        {content}
+      </TouchableOpacity>
     );
   };
 
-  const renderViewPills = (items: string[] | undefined) => {
+  const renderViewPills = (items: string[] | undefined, onPress?: (item: string) => void, type?: 'context' | 'tag') => {
     if (!items || items.length === 0) return null;
     return (
       <View style={styles.viewPillRow}>
-        {items.map((item) => (
-          <View key={item} style={[styles.viewPill, { borderColor: tc.border, backgroundColor: tc.inputBg }]}>
-            <Text style={[styles.viewPillText, { color: tc.text }]}>{item}</Text>
-          </View>
-        ))}
+        {items.map((item) => {
+          if (!onPress) {
+            return (
+              <View key={item} style={[styles.viewPill, { borderColor: tc.border, backgroundColor: tc.inputBg }]}>
+                <Text style={[styles.viewPillText, { color: tc.text }]}>{item}</Text>
+              </View>
+            );
+          }
+          return (
+            <TouchableOpacity
+              key={item}
+              style={[styles.viewPill, { borderColor: tc.border, backgroundColor: tc.inputBg }]}
+              onPress={() => onPress(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${type === 'tag' ? 'tag' : 'context'} ${item}`}
+            >
+              <Text style={[styles.viewPillText, { color: tc.text }]}>{item}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     );
   };
@@ -112,7 +150,12 @@ export function TaskEditViewTab({
     >
       {renderViewRow(t('taskEdit.statusLabel'), statusLabel)}
       {!isReference && prioritiesEnabled ? renderViewRow(t('taskEdit.priorityLabel'), priorityLabel) : null}
-  {renderViewRow(t('taskEdit.projectLabel'), project?.title)}
+      {renderViewRow(
+        t('taskEdit.projectLabel'),
+        project?.title,
+        project?.id && onProjectPress ? () => onProjectPress(project.id) : undefined,
+        project?.title ? `Open project ${project.title}` : undefined
+      )}
       {project?.id ? renderViewRow(t('taskEdit.sectionLabel'), section?.title) : null}
       {!project?.id ? renderViewRow(t('taskEdit.areaLabel'), area?.name) : null}
       {!isReference ? renderViewRow(t('taskEdit.startDateLabel'), mergedTask.startTime ? formatDate(mergedTask.startTime) : undefined) : null}
@@ -122,13 +165,13 @@ export function TaskEditViewTab({
       {mergedTask.contexts?.length ? (
         <View style={styles.viewSection}>
           <Text style={[styles.viewLabel, { color: tc.secondaryText }]}>{t('taskEdit.contextsLabel')}</Text>
-          {renderViewPills(mergedTask.contexts)}
+          {renderViewPills(mergedTask.contexts, onContextPress, 'context')}
         </View>
       ) : null}
       {mergedTask.tags?.length ? (
         <View style={styles.viewSection}>
           <Text style={[styles.viewLabel, { color: tc.secondaryText }]}>{t('taskEdit.tagsLabel')}</Text>
-          {renderViewPills(mergedTask.tags)}
+          {renderViewPills(mergedTask.tags, onTagPress, 'tag')}
         </View>
       ) : null}
       {mergedTask.location ? renderViewRow(t('taskEdit.locationLabel'), mergedTask.location) : null}

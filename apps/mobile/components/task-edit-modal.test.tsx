@@ -63,7 +63,7 @@ vi.mock('../lib/ai-config', () => ({
 }));
 
 vi.mock('./task-edit/TaskEditViewTab', () => ({
-  TaskEditViewTab: () => React.createElement('TaskEditViewTab'),
+  TaskEditViewTab: (props: any) => React.createElement('TaskEditViewTab', props),
 }));
 
 vi.mock('./task-edit/TaskEditFormTab', () => ({
@@ -201,7 +201,7 @@ describe('TaskEditModal', () => {
     });
 
     expect(alertSpy).toHaveBeenCalledTimes(1);
-    const buttons = (alertSpy.mock.calls[0]?.[2] ?? []) as Array<{ text?: string; onPress?: () => void }>;
+    const buttons = (alertSpy.mock.calls[0]?.[2] ?? []) as { text?: string; onPress?: () => void }[];
     expect(Array.isArray(buttons)).toBe(true);
     expect(buttons.map((button) => button.text)).toEqual([
       'common.cancel',
@@ -253,7 +253,7 @@ describe('TaskEditModal', () => {
       modal!.props.onRequestClose();
     });
 
-    const buttons = (alertSpy.mock.calls[0]?.[2] ?? []) as Array<{ text?: string; onPress?: () => void }>;
+    const buttons = (alertSpy.mock.calls[0]?.[2] ?? []) as { text?: string; onPress?: () => void }[];
 
     act(() => {
       buttons[2]?.onPress?.();
@@ -308,5 +308,49 @@ describe('TaskEditModal', () => {
         ([args]) => args?.mode === 'view'
       )
     ).toBe(true);
+  });
+
+  it('closes and delegates preview navigation actions', () => {
+    const onClose = vi.fn();
+    const onProjectNavigate = vi.fn();
+    const onContextNavigate = vi.fn();
+    const onTagNavigate = vi.fn();
+    let tree: renderer.ReactTestRenderer;
+
+    act(() => {
+      tree = renderer.create(
+        <TaskEditModal
+          visible
+          task={{
+            id: 't1',
+            title: 'Test task',
+            status: 'inbox',
+            projectId: 'project-1',
+            tags: ['#urgent'],
+            contexts: ['@home'],
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          }}
+          onClose={onClose}
+          onSave={vi.fn()}
+          onProjectNavigate={onProjectNavigate}
+          onContextNavigate={onContextNavigate}
+          onTagNavigate={onTagNavigate}
+        />
+      );
+    });
+
+    const viewTab = tree!.root.findByType('TaskEditViewTab');
+
+    act(() => {
+      viewTab.props.onProjectPress('project-1');
+      viewTab.props.onContextPress('@home');
+      viewTab.props.onTagPress('#urgent');
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(3);
+    expect(onProjectNavigate).toHaveBeenCalledWith('project-1');
+    expect(onContextNavigate).toHaveBeenCalledWith('@home');
+    expect(onTagNavigate).toHaveBeenCalledWith('#urgent');
   });
 });

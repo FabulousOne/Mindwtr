@@ -9,6 +9,7 @@ import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { useTheme } from '@/contexts/theme-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { taskMatchesAreaFilter } from '@/lib/area-filter';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { Trash2 } from 'lucide-react-native';
 
 export default function SavedSearchScreen() {
@@ -84,6 +85,9 @@ export default function SavedSearchScreen() {
       }}
       onStatusChange={(status) => updateTask(item.id, { status: status as TaskStatus })}
       onDelete={() => deleteTask(item.id)}
+      onProjectPress={openProjectScreen}
+      onContextPress={openContextsScreen}
+      onTagPress={openContextsScreen}
     />
   );
 
@@ -156,6 +160,9 @@ export default function SavedSearchScreen() {
           setEditingTask(null);
         }}
         defaultTab="view"
+        onProjectNavigate={openProjectScreen}
+        onContextNavigate={openContextsScreen}
+        onTagNavigate={openContextsScreen}
         onFocusMode={(taskId) => {
           setIsModalVisible(false);
           router.push(`/check-focus?id=${taskId}`);

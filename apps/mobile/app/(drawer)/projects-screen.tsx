@@ -21,6 +21,7 @@ import { ensureAttachmentAvailable } from '../../lib/attachment-sync';
 import { AttachmentProgressIndicator } from '../../components/AttachmentProgressIndicator';
 import { logError, logWarn } from '../../lib/app-log';
 import { AREA_FILTER_ALL, AREA_FILTER_NONE, projectMatchesAreaFilter } from '@/lib/area-filter';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 
 type ProjectSectionItem = { type: 'project'; data: Project };
 
@@ -1401,6 +1402,13 @@ export default function ProjectsScreen() {
         onClose={() => setEditingTask(null)}
         onSave={(taskId, updates) => updateTask(taskId, updates)}
         defaultTab="view"
+        onProjectNavigate={(projectId) => {
+          if (!selectedProject || selectedProject.id !== projectId) {
+            openProjectScreen(projectId);
+          }
+        }}
+        onContextNavigate={openContextsScreen}
+        onTagNavigate={openContextsScreen}
       />
 
       <Modal

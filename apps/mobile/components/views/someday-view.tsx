@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { projectMatchesAreaFilter, taskMatchesAreaFilter } from '@/lib/area-filter';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { SwipeableTaskItem } from '../swipeable-task-item';
 import { TaskEditModal } from '../task-edit-modal';
 
@@ -153,6 +154,9 @@ export function SomedayView() {
               onStatusChange={(status) => handleStatusChange(task.id, status as TaskStatus)}
               onDelete={() => deleteTask(task.id)}
               isHighlighted={task.id === highlightTaskId}
+              onProjectPress={openProjectScreen}
+              onContextPress={openContextsScreen}
+              onTagPress={openContextsScreen}
             />
           ))
         ) : deferredProjects.length === 0 ? (
@@ -172,6 +176,9 @@ export function SomedayView() {
         onClose={() => setEditingTask(null)}
         onSave={handleSaveTask}
         defaultTab="view"
+        onProjectNavigate={openProjectScreen}
+        onContextNavigate={openContextsScreen}
+        onTagNavigate={openContextsScreen}
       />
     </View>
   );

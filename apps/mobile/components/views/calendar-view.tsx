@@ -16,6 +16,7 @@ import { useTheme } from '../../contexts/theme-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { taskMatchesAreaFilter } from '@/lib/area-filter';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { useLanguage } from '../../contexts/language-context';
 import { fetchExternalCalendarEvents } from '../../lib/external-calendar';
 import { logError } from '../../lib/app-log';
@@ -763,6 +764,9 @@ export function CalendarView() {
           onClose={() => setEditingTask(null)}
           onSave={(taskId, updates) => updateTask(taskId, updates)}
           defaultTab="view"
+          onProjectNavigate={openProjectScreen}
+          onContextNavigate={openContextsScreen}
+          onTagNavigate={openContextsScreen}
         />
       </View>
     );
@@ -1046,6 +1050,9 @@ export function CalendarView() {
         onClose={() => setEditingTask(null)}
         onSave={(taskId, updates) => updateTask(taskId, updates)}
         defaultTab="view"
+        onProjectNavigate={openProjectScreen}
+        onContextNavigate={openContextsScreen}
+        onTagNavigate={openContextsScreen}
       />
     </View>
   );

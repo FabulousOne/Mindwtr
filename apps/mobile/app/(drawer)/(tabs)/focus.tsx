@@ -13,6 +13,7 @@ import { PomodoroPanel } from '@/components/pomodoro-panel';
 import { orderFocusedTasksFirst } from '@/lib/focus-screen-utils';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { projectMatchesAreaFilter, taskMatchesAreaFilter } from '@/lib/area-filter';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 
 export default function FocusScreen() {
   const { taskId, openToken } = useLocalSearchParams<{ taskId?: string; openToken?: string }>();
@@ -176,6 +177,9 @@ export default function FocusScreen() {
         isHighlighted={item.id === highlightTaskId}
         showFocusToggle
         hideStatusBadge
+        onProjectPress={openProjectScreen}
+        onContextPress={openContextsScreen}
+        onTagPress={openContextsScreen}
       />
     </View>
   );
@@ -224,6 +228,9 @@ export default function FocusScreen() {
         onClose={() => setIsModalVisible(false)}
         onSave={onSaveTask}
         defaultTab="view"
+        onProjectNavigate={openProjectScreen}
+        onContextNavigate={openContextsScreen}
+        onTagNavigate={openContextsScreen}
       />
     </View>
   );

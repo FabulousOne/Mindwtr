@@ -7,6 +7,7 @@ import { useLanguage } from '../../contexts/language-context';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { taskMatchesAreaFilter } from '@/lib/area-filter';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { ReviewModal } from '../../components/review-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logError } from '../../lib/app-log';
@@ -268,6 +269,9 @@ export default function ReviewScreen() {
             onToggleSelect={() => toggleMultiSelect(task.id)}
             onStatusChange={(status) => updateTask(task.id, { status: status as TaskStatus })}
             onDelete={() => deleteTask(task.id)}
+            onProjectPress={openProjectScreen}
+            onContextPress={openContextsScreen}
+            onTagPress={openContextsScreen}
           />
         ))}
         {sortedTasks.length === 0 && (
@@ -366,6 +370,9 @@ export default function ReviewScreen() {
         onClose={() => setIsModalVisible(false)}
         onSave={(taskId, updates) => updateTask(taskId, updates)}
         defaultTab="view"
+        onProjectNavigate={openProjectScreen}
+        onContextNavigate={openContextsScreen}
+        onTagNavigate={openContextsScreen}
         onFocusMode={(taskId) => {
           setIsModalVisible(false);
           router.push(`/check-focus?id=${taskId}`);

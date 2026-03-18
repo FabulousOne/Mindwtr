@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { projectMatchesAreaFilter, taskMatchesAreaFilter } from '@/lib/area-filter';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { SwipeableTaskItem } from '../swipeable-task-item';
 import { TaskEditModal } from '../task-edit-modal';
 import {
@@ -293,6 +294,9 @@ export function WaitingView() {
               onStatusChange={(status) => handleStatusChange(task.id, status)}
               onDelete={() => deleteTask(task.id)}
               isHighlighted={task.id === highlightTaskId}
+              onProjectPress={openProjectScreen}
+              onContextPress={openContextsScreen}
+              onTagPress={openContextsScreen}
             />
           ))
         ) : deferredProjects.length === 0 ? (
@@ -312,6 +316,9 @@ export function WaitingView() {
         onClose={() => setEditingTask(null)}
         onSave={handleSaveTask}
         defaultTab="view"
+        onProjectNavigate={openProjectScreen}
+        onContextNavigate={openContextsScreen}
+        onTagNavigate={openContextsScreen}
       />
     </View>
   );

@@ -95,6 +95,9 @@ interface TaskEditModalProps {
     onSave: (taskId: string, updates: Partial<Task>) => void;
     onFocusMode?: (taskId: string) => void;
     defaultTab?: 'task' | 'view';
+    onProjectNavigate?: (projectId: string) => void;
+    onContextNavigate?: (context: string) => void;
+    onTagNavigate?: (tag: string) => void;
 }
 
 type TaskEditTab = 'task' | 'view';
@@ -123,7 +126,17 @@ const getOrdinalTranslationKey = (value: '1' | '2' | '3' | '4' | '-1'): 'first' 
     return 'fourth';
 };
 
-function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defaultTab }: TaskEditModalProps) {
+function TaskEditModalInner({
+    visible,
+    task,
+    onClose,
+    onSave,
+    onFocusMode,
+    defaultTab,
+    onProjectNavigate,
+    onContextNavigate,
+    onTagNavigate,
+}: TaskEditModalProps) {
     const {
         tasks,
         projects,
@@ -212,6 +225,18 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
             ...(editedTask.tags ?? []),
         ])).filter(Boolean);
     }, [editedTask.tags, tasks]);
+    const handlePreviewProjectPress = useCallback((projectId: string) => {
+        onClose();
+        onProjectNavigate?.(projectId);
+    }, [onClose, onProjectNavigate]);
+    const handlePreviewContextPress = useCallback((context: string) => {
+        onClose();
+        onContextNavigate?.(context);
+    }, [onClose, onContextNavigate]);
+    const handlePreviewTagPress = useCallback((tag: string) => {
+        onClose();
+        onTagNavigate?.(tag);
+    }, [onClose, onTagNavigate]);
 
     const {
         copilotSuggestion,
@@ -2690,6 +2715,9 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
                                 textDirectionStyle={textDirectionStyle}
                                 resolvedDirection={resolvedDirection}
                                 nestedScrollEnabled
+                                onProjectPress={onProjectNavigate ? handlePreviewProjectPress : undefined}
+                                onContextPress={onContextNavigate ? handlePreviewContextPress : undefined}
+                                onTagPress={onTagNavigate ? handlePreviewTagPress : undefined}
                             />
                         </View>
                     </Animated.ScrollView>
@@ -2984,6 +3012,9 @@ const areTaskEditModalPropsEqual = (prev: TaskEditModalProps, next: TaskEditModa
     && prev.onSave === next.onSave
     && prev.onFocusMode === next.onFocusMode
     && prev.defaultTab === next.defaultTab
+    && prev.onProjectNavigate === next.onProjectNavigate
+    && prev.onContextNavigate === next.onContextNavigate
+    && prev.onTagNavigate === next.onTagNavigate
 );
 
 const TaskEditModalWithBoundary = (props: TaskEditModalProps) => {

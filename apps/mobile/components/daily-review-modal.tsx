@@ -20,6 +20,7 @@ import {
 import { useTheme } from '../contexts/theme-context';
 import { useLanguage } from '../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { SwipeableTaskItem } from './swipeable-task-item';
 import { TaskEditModal } from './task-edit-modal';
 import { InboxProcessingModal } from './inbox-processing-modal';
@@ -211,6 +212,16 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
         setIsTaskModalVisible(false);
         setEditingTask(null);
     };
+    const handleNavigateToProject = (projectId: string) => {
+        closeTask();
+        onClose();
+        openProjectScreen(projectId);
+    };
+    const handleNavigateToToken = (token: string) => {
+        closeTask();
+        onClose();
+        openContextsScreen(token);
+    };
 
     const renderTaskList = (list: Task[], options?: { showFocusToggle?: boolean; hideStatusBadge?: boolean }) => (
         <ScrollView style={styles.taskList}>
@@ -225,6 +236,9 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
                     onDelete={() => deleteTask(task.id)}
                     showFocusToggle={options?.showFocusToggle}
                     hideStatusBadge={options?.hideStatusBadge}
+                    onProjectPress={handleNavigateToProject}
+                    onContextPress={handleNavigateToToken}
+                    onTagPress={handleNavigateToToken}
                 />
             ))}
         </ScrollView>
@@ -452,6 +466,9 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
                             closeTask();
                         }}
                         defaultTab="view"
+                        onProjectNavigate={handleNavigateToProject}
+                        onContextNavigate={handleNavigateToToken}
+                        onTagNavigate={handleNavigateToToken}
                         onFocusMode={(taskId) => {
                             closeTask();
                             router.push(`/check-focus?id=${taskId}`);

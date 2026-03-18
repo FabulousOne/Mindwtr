@@ -1,12 +1,14 @@
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useTaskStore, getUsedTaskTokens, sortTasksBy, matchesHierarchicalToken, type Task, type TaskSortBy, type TaskStatus } from '@mindwtr/core';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../contexts/theme-context';
 import { useLanguage } from '../../contexts/language-context';
 
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { taskMatchesAreaFilter } from '@/lib/area-filter';
+import { openProjectScreen } from '@/lib/task-meta-navigation';
 import { TaskEditModal } from '../task-edit-modal';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SwipeableTaskItem } from '../swipeable-task-item';
@@ -16,6 +18,7 @@ export function ContextsView() {
   const { tasks, projects, updateTask, deleteTask, settings } = useTaskStore();
   const { isDark } = useTheme();
   const { t } = useLanguage();
+  const { token } = useLocalSearchParams<{ token?: string | string[] }>();
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -23,8 +26,18 @@ export function ContextsView() {
   const tc = useThemeColors();
   const { areaById, resolvedAreaFilter } = useMobileAreaFilter();
   const projectById = new Map(projects.map((project) => [project.id, project]));
+  const requestedTokens = useMemo(() => {
+    if (Array.isArray(token)) return token.filter(Boolean);
+    if (typeof token === 'string' && token.trim()) return [token];
+    return [];
+  }, [token]);
 
   const NO_CONTEXT_TOKEN = '__no_context__';
+
+  useEffect(() => {
+    if (requestedTokens.length === 0) return;
+    setSelectedContexts(requestedTokens);
+  }, [requestedTokens]);
 
   // Combine preset contexts with contexts from tasks
   const contextSourceTasks = tasks.filter((task) => (
@@ -230,6 +243,9 @@ export function ContextsView() {
                   onPress={() => setEditingTask(task)}
                   onStatusChange={(status) => handleStatusChange(task.id, status)}
                   onDelete={() => handleDelete(task.id)}
+                  onProjectPress={openProjectScreen}
+                  onContextPress={(context) => setSelectedContexts([context])}
+                  onTagPress={(tag) => setSelectedContexts([tag])}
                 />
               ))
             ) : (
@@ -265,6 +281,9 @@ export function ContextsView() {
           onClose={() => setEditingTask(null)}
           onSave={handleSaveTask}
           defaultTab="view"
+          onProjectNavigate={openProjectScreen}
+          onContextNavigate={(context) => setSelectedContexts([context])}
+          onTagNavigate={(tag) => setSelectedContexts([tag])}
         />
       </View>
     </GestureHandlerRootView>

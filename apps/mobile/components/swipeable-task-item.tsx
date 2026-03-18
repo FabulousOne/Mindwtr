@@ -25,6 +25,9 @@ export interface SwipeableTaskItemProps {
     showFocusToggle?: boolean;
     hideStatusBadge?: boolean;
     disableSwipe?: boolean;
+    onProjectPress?: (projectId: string) => void;
+    onContextPress?: (context: string) => void;
+    onTagPress?: (tag: string) => void;
 }
 
 /**
@@ -52,6 +55,9 @@ export function SwipeableTaskItem({
     showFocusToggle = false,
     hideStatusBadge = false,
     disableSwipe = false,
+    onProjectPress,
+    onContextPress,
+    onTagPress,
 }: SwipeableTaskItemProps) {
     const swipeableRef = useRef<Swipeable>(null);
     const ignorePressUntil = useRef<number>(0);
@@ -200,15 +206,59 @@ export function SwipeableTaskItem({
         }
         metaParts.push(node);
     };
+    const canNavigateMeta = !selectionMode;
+    const renderMetaItem = ({
+        key,
+        onPress,
+        accessibilityLabel,
+        children,
+    }: {
+        key: string;
+        onPress?: () => void;
+        accessibilityLabel?: string;
+        children: ReactNode;
+    }) => {
+        if (!onPress) {
+            return (
+                <View key={key} style={styles.inlineMetaItem}>
+                    {children}
+                </View>
+            );
+        }
+        return (
+            <Pressable
+                key={key}
+                onPress={(event) => {
+                    event.stopPropagation();
+                    onPress();
+                }}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel={accessibilityLabel}
+                style={styles.inlineMetaButton}
+            >
+                <View style={styles.inlineMetaItem}>
+                    {children}
+                </View>
+            </Pressable>
+        );
+    };
 
     if (project) {
         addMetaPart(
-            <View key="project" style={styles.inlineMetaItem}>
-                <View style={[styles.projectDot, { backgroundColor: projectColor || tc.tint }]} />
-                <Text style={[styles.metaText, { color: tc.secondaryText }]} numberOfLines={1}>
-                    {project.title}
-                </Text>
-            </View>,
+            renderMetaItem({
+                key: 'project',
+                onPress: canNavigateMeta && onProjectPress ? () => onProjectPress(project.id) : undefined,
+                accessibilityLabel: `Open project ${project.title}`,
+                children: (
+                    <>
+                        <View style={[styles.projectDot, { backgroundColor: projectColor || tc.tint }]} />
+                        <Text style={[styles.metaText, { color: tc.secondaryText }]} numberOfLines={1}>
+                            {project.title}
+                        </Text>
+                    </>
+                ),
+            }),
             'project'
         );
     }
@@ -217,15 +267,45 @@ export function SwipeableTaskItem({
         const ctx = task.contexts[0];
         const more = task.contexts.length - 1;
         addMetaPart(
-            <View key="context" style={styles.inlineMetaItem}>
-                <Text style={[styles.metaText, styles.contextText]} numberOfLines={1}>
-                    {ctx}
-                </Text>
-                {more > 0 && (
-                    <Text style={[styles.metaText, { color: tc.secondaryText }]}>+{more}</Text>
-                )}
-            </View>,
+            renderMetaItem({
+                key: 'context',
+                onPress: canNavigateMeta && onContextPress ? () => onContextPress(ctx) : undefined,
+                accessibilityLabel: `Open context ${ctx}`,
+                children: (
+                    <>
+                        <Text style={[styles.metaText, styles.contextText]} numberOfLines={1}>
+                            {ctx}
+                        </Text>
+                        {more > 0 && (
+                            <Text style={[styles.metaText, { color: tc.secondaryText }]}>+{more}</Text>
+                        )}
+                    </>
+                ),
+            }),
             'context'
+        );
+    }
+
+    if (task.tags?.length) {
+        const tag = task.tags[0];
+        const more = task.tags.length - 1;
+        addMetaPart(
+            renderMetaItem({
+                key: 'tag',
+                onPress: canNavigateMeta && onTagPress ? () => onTagPress(tag) : undefined,
+                accessibilityLabel: `Open tag ${tag}`,
+                children: (
+                    <>
+                        <Text style={[styles.metaText, styles.tagText]} numberOfLines={1}>
+                            {tag}
+                        </Text>
+                        {more > 0 && (
+                            <Text style={[styles.metaText, { color: tc.secondaryText }]}>+{more}</Text>
+                        )}
+                    </>
+                ),
+            }),
+            'tag'
         );
     }
 
@@ -661,6 +741,9 @@ const styles = StyleSheet.create({
         gap: 4,
         maxWidth: '100%',
     },
+    inlineMetaButton: {
+        maxWidth: '100%',
+    },
     metaText: {
         fontSize: 12,
         fontWeight: '500',
@@ -672,6 +755,9 @@ const styles = StyleSheet.create({
     },
     contextText: {
         color: '#3B82F6',
+    },
+    tagText: {
+        color: '#7C3AED',
     },
     dueText: {
         color: '#EF4444',
