@@ -136,7 +136,44 @@ function TaskListComponent({
 
   // Dynamic colors based on theme
   const themeColors = useThemeColors();
-  const themeColorsMemo = themeColors;
+  const themeColorsMemo = useMemo(
+    () => ({
+      bg: themeColors.bg,
+      cardBg: themeColors.cardBg,
+      taskItemBg: themeColors.taskItemBg,
+      text: themeColors.text,
+      secondaryText: themeColors.secondaryText,
+      icon: themeColors.icon,
+      border: themeColors.border,
+      tint: themeColors.tint,
+      onTint: themeColors.onTint,
+      tabIconDefault: themeColors.tabIconDefault,
+      tabIconSelected: themeColors.tabIconSelected,
+      inputBg: themeColors.inputBg,
+      danger: themeColors.danger,
+      success: themeColors.success,
+      warning: themeColors.warning,
+      filterBg: themeColors.filterBg,
+    }),
+    [
+      themeColors.bg,
+      themeColors.cardBg,
+      themeColors.taskItemBg,
+      themeColors.text,
+      themeColors.secondaryText,
+      themeColors.icon,
+      themeColors.border,
+      themeColors.tint,
+      themeColors.onTint,
+      themeColors.tabIconDefault,
+      themeColors.tabIconSelected,
+      themeColors.inputBg,
+      themeColors.danger,
+      themeColors.success,
+      themeColors.warning,
+      themeColors.filterBg,
+    ],
+  );
 
   const listContentStyle = useMemo(() => {
     if (!contentPaddingBottom || contentPaddingBottom <= 0) {
