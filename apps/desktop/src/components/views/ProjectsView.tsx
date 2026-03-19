@@ -752,7 +752,7 @@ export function ProjectsView() {
             if (!selectedProject) return;
             const { title: parsedTitle, props, projectTitle, invalidDateCommands } = parseQuickAdd(value, projects, new Date(), areas);
             if (invalidDateCommands && invalidDateCommands.length > 0) {
-                showToast(`Invalid date command: ${invalidDateCommands.join(', ')}`, 'error');
+                showToast(`${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`, 'error');
                 return;
             }
             const finalTitle = (parsedTitle || value).trim();

@@ -521,7 +521,7 @@ export function QuickCaptureSheet({
     if (!value.trim()) return;
     const { title, props, invalidDateCommands } = await buildTaskProps(value.trim());
     if (invalidDateCommands && invalidDateCommands.length > 0) {
-      Alert.alert(t('common.notice'), `Invalid date command: ${invalidDateCommands.join(', ')}`);
+      Alert.alert(t('common.notice'), `${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`);
       return;
     }
     if (!title.trim()) return;
@@ -751,7 +751,7 @@ export function QuickCaptureSheet({
           attachments,
         });
         if (invalidDateCommands && invalidDateCommands.length > 0) {
-          Alert.alert(t('common.notice'), `Invalid date command: ${invalidDateCommands.join(', ')}`);
+          Alert.alert(t('common.notice'), `${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`);
           return;
         }
         if (!title.trim()) return;
@@ -943,7 +943,7 @@ export function QuickCaptureSheet({
         attachments,
       });
       if (invalidDateCommands && invalidDateCommands.length > 0) {
-        Alert.alert(t('common.notice'), `Invalid date command: ${invalidDateCommands.join(', ')}`);
+        Alert.alert(t('common.notice'), `${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`);
         return;
       }
       if (!title.trim()) return;

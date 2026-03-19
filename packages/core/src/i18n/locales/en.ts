@@ -41,6 +41,7 @@ export const en: Record<string, string> = {
         'quickAdd.audioPermissionBody': 'Enable microphone access to record audio captures.',
         'quickAdd.audioErrorTitle': 'Recording failed',
         'quickAdd.audioErrorBody': 'We could not record audio. Please try again.',
+        'quickAdd.invalidDateCommand': 'Invalid date command',
 
         // Checklist
         'checklist.progress': 'Checklist progress',

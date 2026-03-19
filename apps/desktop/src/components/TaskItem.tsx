@@ -597,7 +597,7 @@ export const TaskItem = memo(function TaskItem({
         e.preventDefault();
         const { title: parsedTitle, props: parsedProps, projectTitle, invalidDateCommands } = parseQuickAdd(editTitle, projects, new Date(), areas);
         if (invalidDateCommands && invalidDateCommands.length > 0) {
-            showToast(`Invalid date command: ${invalidDateCommands.join(', ')}`, 'error');
+            showToast(`${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`, 'error');
             return;
         }
         const cleanedTitle = parsedTitle.trim() ? parsedTitle : task.title;

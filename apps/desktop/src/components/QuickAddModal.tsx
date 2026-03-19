@@ -703,7 +703,7 @@ export function QuickAddModal() {
                         <p className="text-xs text-muted-foreground">{t('quickAdd.help')}</p>
                         {parsedInput.invalidDateCommands && parsedInput.invalidDateCommands.length > 0 ? (
                             <p className="text-xs text-destructive">
-                                Invalid date command: {parsedInput.invalidDateCommands.join(', ')}
+                                {t('quickAdd.invalidDateCommand')}: {parsedInput.invalidDateCommands.join(', ')}
                             </p>
                         ) : null}
                         {scheduledLabel && (

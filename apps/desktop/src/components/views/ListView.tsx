@@ -775,7 +775,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         try {
             const { title: parsedTitle, props, projectTitle, invalidDateCommands } = parseQuickAdd(newTaskTitle, projects, new Date(), areas);
             if (invalidDateCommands && invalidDateCommands.length > 0) {
-                showToast(`Invalid date command: ${invalidDateCommands.join(', ')}`, 'error');
+                showToast(`${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`, 'error');
                 return;
             }
             const finalTitle = parsedTitle || newTaskTitle;

@@ -136,7 +136,7 @@ export default function CaptureScreen() {
     if (!value.trim()) return;
     const { title, props, invalidDateCommands } = parseQuickAdd(value, projects, new Date(), areas);
     if (invalidDateCommands && invalidDateCommands.length > 0) {
-      Alert.alert(t('common.notice'), `Invalid date command: ${invalidDateCommands.join(', ')}`);
+      Alert.alert(t('common.notice'), `${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`);
       return;
     }
     const finalTitle = title || value;

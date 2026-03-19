@@ -461,7 +461,7 @@ function TaskEditModalInner({
         const rawTitle = String(titleDraftRef.current ?? '');
         const { title: parsedTitle, props: parsedProps, projectTitle, invalidDateCommands } = parseQuickAdd(rawTitle, projects, new Date(), areas);
         if (invalidDateCommands && invalidDateCommands.length > 0) {
-            Alert.alert(t('common.notice'), `Invalid date command: ${invalidDateCommands.join(', ')}`);
+            Alert.alert(t('common.notice'), `${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`);
             return;
         }
         const existingProjectId = editedTask.projectId ?? task?.projectId;
