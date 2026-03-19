@@ -2,7 +2,7 @@ import React, { memo, useState, useMemo, useDeferredValue, useEffect, useRef, us
 import { AlertTriangle, Folder } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { shallow, useTaskStore, TaskPriority, TimeEstimate, DEFAULT_AREA_COLOR, sortTasksBy, parseQuickAdd, matchesHierarchicalToken, safeParseDate, isTaskInActiveProject, extractWaitingPerson } from '@mindwtr/core';
-import type { Task, TaskStatus } from '@mindwtr/core';
+import type { StoreActionResult, Task, TaskStatus } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { ConfirmModal } from '../ConfirmModal';
@@ -38,6 +38,38 @@ const EMPTY_ESTIMATES: TimeEstimate[] = [];
 const VIRTUALIZATION_THRESHOLD = 25;
 const VIRTUAL_ROW_ESTIMATE = 120;
 const VIRTUAL_OVERSCAN = 600;
+const RESTORE_DELETED_TASKS_FAILED_MESSAGE = 'Failed to restore deleted tasks';
+
+type ShowToast = (
+    message: string,
+    tone?: 'success' | 'error' | 'info',
+    durationMs?: number,
+    action?: { label: string; onClick: () => void }
+) => void;
+
+export async function restoreDeletedTasksWithFeedback(
+    taskIds: string[],
+    restoreTask: (taskId: string) => Promise<StoreActionResult>,
+    showToast: ShowToast,
+): Promise<void> {
+    const results = await Promise.allSettled(taskIds.map((taskId) => restoreTask(taskId)));
+    const failedRestore = results.find(
+        (result): result is PromiseRejectedResult | PromiseFulfilledResult<StoreActionResult> =>
+            result.status === 'rejected' || !result.value.success,
+    );
+
+    if (!failedRestore) return;
+
+    const message = failedRestore.status === 'rejected'
+        ? (failedRestore.reason instanceof Error ? failedRestore.reason.message : RESTORE_DELETED_TASKS_FAILED_MESSAGE)
+        : (failedRestore.value.error || RESTORE_DELETED_TASKS_FAILED_MESSAGE);
+    const error = failedRestore.status === 'rejected'
+        ? failedRestore.reason
+        : new Error(message);
+
+    reportError(RESTORE_DELETED_TASKS_FAILED_MESSAGE, error);
+    showToast(message, 'error');
+}
 
 export const ListView = memo(function ListView({ title, statusFilter }: ListViewProps) {
     const perf = usePerformanceMonitor('ListView');
@@ -719,9 +751,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                     {
                         label: t('common.undo') || 'Undo',
                         onClick: () => {
-                            taskIds.forEach((taskId) => {
-                                void restoreTask(taskId);
-                            });
+                            void restoreDeletedTasksWithFeedback(taskIds, restoreTask, showToast);
                         },
                     }
                 );

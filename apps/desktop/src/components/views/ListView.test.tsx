@@ -6,7 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../../contexts/language-context';
 import { KeybindingProvider } from '../../contexts/keybinding-context';
 import { useUiStore } from '../../store/ui-store';
-import { ListView } from './ListView';
+import { ListView, restoreDeletedTasksWithFeedback } from './ListView';
+
+const reportErrorMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../lib/report-error', () => ({
+  reportError: reportErrorMock,
+}));
 
 const deferredMockState = vi.hoisted(() => ({
   lagData: false,
@@ -94,6 +100,7 @@ const renderListView = (statusFilter: 'next' | 'done' = 'next', title = 'Next') 
 
 describe('ListView', () => {
   beforeEach(() => {
+    reportErrorMock.mockReset();
     deferredMockState.lagData = false;
     deferredMockState.lagFeedback = false;
     deferredMockState.previousData = undefined;
@@ -185,5 +192,33 @@ describe('ListView', () => {
     await waitFor(() => {
       expect(queryByText('Filtering...')).toBeInTheDocument();
     });
+  });
+
+  it('shows an error toast when a batch undo restore returns a failed result', async () => {
+    const showToast = vi.fn();
+
+    await restoreDeletedTasksWithFeedback(
+      ['1', '2'],
+      vi.fn()
+        .mockResolvedValueOnce({ success: true })
+        .mockResolvedValueOnce({ success: false, error: 'Task not found' }),
+      showToast,
+    );
+
+    expect(reportErrorMock).toHaveBeenCalledWith('Failed to restore deleted tasks', expect.any(Error));
+    expect(showToast).toHaveBeenCalledWith('Task not found', 'error');
+  });
+
+  it('does not show an error toast when batch undo restore succeeds', async () => {
+    const showToast = vi.fn();
+
+    await restoreDeletedTasksWithFeedback(
+      ['1', '2'],
+      vi.fn().mockResolvedValue({ success: true }),
+      showToast,
+    );
+
+    expect(reportErrorMock).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled();
   });
 });
