@@ -14,6 +14,7 @@ import {
   type AIProviderId,
   type TaskSortBy,
   DEFAULT_PROJECT_COLOR,
+  shallow,
 } from '@mindwtr/core';
 
 import { TaskEditModal } from './task-edit-modal';
@@ -71,23 +72,43 @@ function TaskListComponent({
 }: TaskListProps) {
   const { isDark } = useTheme();
   const { t } = useLanguage();
-  const tasks = useTaskStore((state) => state.tasks);
-  const projects = useTaskStore((state) => state.projects);
-  const sections = useTaskStore((state) => state.sections);
-  const areas = useTaskStore((state) => state.areas);
-  const addTask = useTaskStore((state) => state.addTask);
-  const addProject = useTaskStore((state) => state.addProject);
-  const updateTask = useTaskStore((state) => state.updateTask);
-  const deleteTask = useTaskStore((state) => state.deleteTask);
-  const restoreTask = useTaskStore((state) => state.restoreTask);
-  const fetchData = useTaskStore((state) => state.fetchData);
-  const batchMoveTasks = useTaskStore((state) => state.batchMoveTasks);
-  const batchDeleteTasks = useTaskStore((state) => state.batchDeleteTasks);
-  const batchUpdateTasks = useTaskStore((state) => state.batchUpdateTasks);
-  const settings = useTaskStore((state) => state.settings);
-  const updateSettings = useTaskStore((state) => state.updateSettings);
-  const highlightTaskId = useTaskStore((state) => state.highlightTaskId);
-  const setHighlightTask = useTaskStore((state) => state.setHighlightTask);
+  const {
+    tasks,
+    projects,
+    sections,
+    areas,
+    addTask,
+    addProject,
+    updateTask,
+    deleteTask,
+    restoreTask,
+    fetchData,
+    batchMoveTasks,
+    batchDeleteTasks,
+    batchUpdateTasks,
+    settings,
+    updateSettings,
+    highlightTaskId,
+    setHighlightTask,
+  } = useTaskStore((state) => ({
+    tasks: state.tasks,
+    projects: state.projects,
+    sections: state.sections,
+    areas: state.areas,
+    addTask: state.addTask,
+    addProject: state.addProject,
+    updateTask: state.updateTask,
+    deleteTask: state.deleteTask,
+    restoreTask: state.restoreTask,
+    fetchData: state.fetchData,
+    batchMoveTasks: state.batchMoveTasks,
+    batchDeleteTasks: state.batchDeleteTasks,
+    batchUpdateTasks: state.batchUpdateTasks,
+    settings: state.settings,
+    updateSettings: state.updateSettings,
+    highlightTaskId: state.highlightTaskId,
+    setHighlightTask: state.setHighlightTask,
+  }), shallow);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [aiKey, setAiKey] = useState('');
   const [copilotSuggestion, setCopilotSuggestion] = useState<{ context?: string; timeEstimate?: Task['timeEstimate']; tags?: string[] } | null>(null);
@@ -115,27 +136,7 @@ function TaskListComponent({
 
   // Dynamic colors based on theme
   const themeColors = useThemeColors();
-  const themeColorsMemo = useMemo(
-    () => themeColors,
-    [
-      themeColors.bg,
-      themeColors.cardBg,
-      themeColors.taskItemBg,
-      themeColors.text,
-      themeColors.secondaryText,
-      themeColors.icon,
-      themeColors.border,
-      themeColors.tint,
-      themeColors.onTint,
-      themeColors.tabIconDefault,
-      themeColors.tabIconSelected,
-      themeColors.inputBg,
-      themeColors.danger,
-      themeColors.success,
-      themeColors.warning,
-      themeColors.filterBg,
-    ],
-  );
+  const themeColorsMemo = themeColors;
 
   const listContentStyle = useMemo(() => {
     if (!contentPaddingBottom || contentPaddingBottom <= 0) {
@@ -314,6 +315,8 @@ function TaskListComponent({
     setItemLayoutVersion((prev) => prev + 1);
   }, []);
   const itemLayouts = useMemo(() => {
+    // itemLayoutVersion invalidates memoized offsets when ref-backed row heights change.
+    void itemLayoutVersion;
     let offset = LIST_CONTENT_VERTICAL_PADDING;
     return listItems.map((item) => {
       const key = getListItemKey(item);
