@@ -392,10 +392,12 @@ describe('cloud server utils', () => {
             return 'ok';
         });
 
+        expect(withWriteLock.getPendingLockCount()).toBe(1);
         await expect(first).rejects.toThrow('boom');
         await expect(second).resolves.toBe('ok');
         expect(failingCalls).toBe(1);
         expect(succeedingCalls).toBe(1);
+        expect(withWriteLock.getPendingLockCount()).toBe(0);
     });
 
     test('writeData atomically replaces the JSON file and cleans up temp files', () => {

@@ -996,16 +996,30 @@ type CloudServerHandle = {
     port: number;
 };
 
-function createWriteLockRunner(dataDir?: string) {
+type WriteLockRunner = {
+    <T>(key: string, fn: () => Promise<T>): Promise<T>;
+    getPendingLockCount: () => number;
+};
+
+function createWriteLockRunner(dataDir?: string): WriteLockRunner {
     const writeLocks = new Map<string, Promise<void>>();
-    return async <T>(key: string, fn: () => Promise<T>) => {
+    const withWriteLock = async <T>(key: string, fn: () => Promise<T>) => {
         const current = writeLocks.get(key) ?? Promise.resolve();
         const run = current.catch(() => undefined).then(() => (
             dataDir ? withCloudFileLock(dataDir, key, fn) : fn()
         ));
-        writeLocks.set(key, run.then(() => undefined, () => undefined));
-        return run;
+        const queueTail = run.then(() => undefined, () => undefined);
+        writeLocks.set(key, queueTail);
+        try {
+            return await run;
+        } finally {
+            if (writeLocks.get(key) === queueTail) {
+                writeLocks.delete(key);
+            }
+        }
     };
+    withWriteLock.getPendingLockCount = () => writeLocks.size;
+    return withWriteLock;
 }
 
 export async function startCloudServer(options: CloudServerOptions = {}): Promise<CloudServerHandle> {
