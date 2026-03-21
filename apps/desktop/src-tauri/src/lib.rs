@@ -267,6 +267,7 @@ struct AppConfigToml {
     webdav_password: Option<String>,
     cloud_url: Option<String>,
     cloud_token: Option<String>,
+    dropbox_tokens: Option<String>,
     obsidian_config: Option<String>,
     external_calendars: Option<String>,
     ai_key_openai: Option<String>,
@@ -2240,6 +2241,8 @@ fn read_config_toml(path: &Path) -> AppConfigToml {
             config.cloud_url = parse_toml_string_value(value);
         } else if key == "cloud_token" {
             config.cloud_token = parse_toml_string_value(value);
+        } else if key == "dropbox_tokens" {
+            config.dropbox_tokens = parse_toml_string_value(value);
         } else if key == "obsidian_config" {
             config.obsidian_config = parse_toml_string_value(value);
         } else if key == "external_calendars" {
@@ -2351,6 +2354,12 @@ fn write_config_toml_with_header(
             serialize_toml_string_value(cloud_token)
         ));
     }
+    if let Some(dropbox_tokens) = &config.dropbox_tokens {
+        lines.push(format!(
+            "dropbox_tokens = {}",
+            serialize_toml_string_value(dropbox_tokens)
+        ));
+    }
     if let Some(obsidian_config) = &config.obsidian_config {
         lines.push(format!(
             "obsidian_config = {}",
@@ -2407,6 +2416,9 @@ fn merge_config(base: &mut AppConfigToml, overrides: AppConfigToml) {
     if overrides.cloud_token.is_some() {
         base.cloud_token = overrides.cloud_token;
     }
+    if overrides.dropbox_tokens.is_some() {
+        base.dropbox_tokens = overrides.dropbox_tokens;
+    }
     if overrides.obsidian_config.is_some() {
         base.obsidian_config = overrides.obsidian_config;
     }
@@ -2447,6 +2459,10 @@ fn split_config_for_secrets(config: &AppConfigToml) -> (AppConfigToml, AppConfig
         secrets_config.cloud_token = Some(value);
         public_config.cloud_token = None;
     }
+    if let Some(value) = config.dropbox_tokens.clone() {
+        secrets_config.dropbox_tokens = Some(value);
+        public_config.dropbox_tokens = None;
+    }
     if let Some(value) = config.external_calendars.clone() {
         secrets_config.external_calendars = Some(value);
         public_config.external_calendars = None;
@@ -2475,6 +2491,7 @@ fn config_has_values(config: &AppConfigToml) -> bool {
         || config.webdav_password.is_some()
         || config.cloud_url.is_some()
         || config.cloud_token.is_some()
+        || config.dropbox_tokens.is_some()
         || config.obsidian_config.is_some()
         || config.external_calendars.is_some()
         || config.ai_key_openai.is_some()
@@ -2510,6 +2527,12 @@ fn migrate_legacy_secrets(app: &tauri::AppHandle, config: &mut AppConfigToml) {
     if let Some(value) = config.cloud_token.clone() {
         if set_keyring_secret(app, KEYRING_CLOUD_TOKEN, Some(value)).is_ok() {
             config.cloud_token = None;
+            migrated = true;
+        }
+    }
+    if let Some(value) = config.dropbox_tokens.clone() {
+        if set_keyring_secret(app, KEYRING_DROPBOX_TOKENS, Some(value)).is_ok() {
+            config.dropbox_tokens = None;
             migrated = true;
         }
     }
@@ -2861,7 +2884,18 @@ fn refresh_dropbox_token(client_id: &str, refresh_token: &str) -> Result<(String
 }
 
 fn read_dropbox_tokens(app: &tauri::AppHandle) -> Result<Option<DropboxTokenBundle>, String> {
-    let Some(raw) = get_keyring_secret(app, KEYRING_DROPBOX_TOKENS)? else {
+    let mut config = read_config(app);
+    let mut raw = get_keyring_secret(app, KEYRING_DROPBOX_TOKENS).unwrap_or(None);
+    if raw.is_none() {
+        if let Some(legacy) = config.dropbox_tokens.clone() {
+            if set_keyring_secret(app, KEYRING_DROPBOX_TOKENS, Some(legacy.clone())).is_ok() {
+                config.dropbox_tokens = None;
+                write_config_files(&get_config_path(app), &get_secrets_path(app), &config)?;
+            }
+            raw = Some(legacy);
+        }
+    }
+    let Some(raw) = raw else {
         return Ok(None);
     };
     let parsed: DropboxTokenBundle = serde_json::from_str(&raw).map_err(|_| {
@@ -2881,11 +2915,34 @@ fn read_dropbox_tokens(app: &tauri::AppHandle) -> Result<Option<DropboxTokenBund
 fn write_dropbox_tokens(app: &tauri::AppHandle, tokens: &DropboxTokenBundle) -> Result<(), String> {
     let payload = serde_json::to_string(tokens)
         .map_err(|error| format!("Failed to serialize Dropbox tokens: {error}"))?;
-    set_keyring_secret(app, KEYRING_DROPBOX_TOKENS, Some(payload))
+    let config_path = get_config_path(app);
+    let secrets_path = get_secrets_path(app);
+    let mut config = read_config(app);
+    match set_keyring_secret(app, KEYRING_DROPBOX_TOKENS, Some(payload.clone())) {
+        Ok(_) => {
+            if config.dropbox_tokens.is_some() {
+                config.dropbox_tokens = None;
+                write_config_files(&config_path, &secrets_path, &config)?;
+            }
+            Ok(())
+        }
+        Err(_error) => {
+            config.dropbox_tokens = Some(payload);
+            write_config_files(&config_path, &secrets_path, &config)
+        }
+    }
 }
 
 fn clear_dropbox_tokens(app: &tauri::AppHandle) -> Result<(), String> {
-    set_keyring_secret(app, KEYRING_DROPBOX_TOKENS, None)
+    let _ = set_keyring_secret(app, KEYRING_DROPBOX_TOKENS, None);
+    let config_path = get_config_path(app);
+    let secrets_path = get_secrets_path(app);
+    let mut config = read_config(app);
+    if config.dropbox_tokens.is_some() {
+        config.dropbox_tokens = None;
+        write_config_files(&config_path, &secrets_path, &config)?;
+    }
+    Ok(())
 }
 
 fn get_valid_dropbox_access_token(
@@ -4857,5 +4914,56 @@ fn show_main_and_emit(app: &tauri::AppHandle) {
         let _ = window.emit("quick-add", ());
     } else {
         let _ = app.emit("quick-add", ());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_test_dir(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "mindwtr-{name}-{}-{nanos}",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn write_config_files_stores_dropbox_tokens_in_secrets_file() {
+        let dir = unique_test_dir("dropbox-tokens");
+        fs::create_dir_all(&dir).expect("should create temp config dir");
+
+        let config_path = dir.join("config.toml");
+        let secrets_path = dir.join("secrets.toml");
+        let tokens = DropboxTokenBundle {
+            client_id: "client-id".to_string(),
+            access_token: "access-token".to_string(),
+            refresh_token: "refresh-token".to_string(),
+            expires_at: 1_763_683_200,
+        };
+        let payload = serde_json::to_string(&tokens).expect("should serialize Dropbox tokens");
+        let config = AppConfigToml {
+            sync_backend: Some("dropbox".to_string()),
+            dropbox_tokens: Some(payload.clone()),
+            ..AppConfigToml::default()
+        };
+
+        write_config_files(&config_path, &secrets_path, &config)
+            .expect("should write config and secrets files");
+
+        let public_config = read_config_toml(&config_path);
+        let secrets_config = read_config_toml(&secrets_path);
+
+        assert_eq!(public_config.sync_backend.as_deref(), Some("dropbox"));
+        assert_eq!(public_config.dropbox_tokens, None);
+        assert_eq!(secrets_config.dropbox_tokens, Some(payload));
+
+        let _ = fs::remove_dir_all(dir);
     }
 }
