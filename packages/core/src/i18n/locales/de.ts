@@ -577,6 +577,11 @@ export const deOverrides: Record<string, string> = {
         'process.newContextPlaceholder': 'Neuer Kontext ...',
         'process.remaining': 'Elemente verbleiben',
         'process.btn': 'Posteingang verabeiten',
+        'process.modeGuided': 'Geführt',
+        'process.modeQuick': 'Schnell',
+        'process.quickDesc': 'Überprüfen Sie die Details, wählen Sie das Ergebnis und wechseln Sie direkt zum nächsten Element.',
+        'process.quickApplyHint': 'Wenden Sie diese Auswahl an und fahren Sie mit dem nächsten Posteingangseintrag fort.',
+        'process.quickMoveHint': 'Verschieben Sie dieses Element und fahren Sie mit dem nächsten Posteingangseintrag fort.',
         
         // Settings
         'settings.title': 'Einstellungen',

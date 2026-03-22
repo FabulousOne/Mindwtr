@@ -610,6 +610,11 @@ export const en: Record<string, string> = {
         'process.newContextPlaceholder': 'New context...',
         'process.remaining': 'items remaining',
         'process.btn': 'Process Inbox',
+        'process.modeGuided': 'Guided',
+        'process.modeQuick': 'Quick',
+        'process.quickDesc': 'Review the details, choose the outcome, and move straight to the next item.',
+        'process.quickApplyHint': 'Apply these choices and continue to the next inbox item.',
+        'process.quickMoveHint': 'Move this item and continue to the next inbox item.',
 
         // Settings
         'settings.title': 'Settings',
