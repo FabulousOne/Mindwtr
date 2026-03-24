@@ -5,6 +5,7 @@ import { AudioPcmStreamAdapter } from 'whisper.rn/realtime-transcription/adapter
 import { RealtimeTranscriber, type RealtimeTranscriberEvent } from 'whisper.rn/realtime-transcription/index.js';
 import type { AudioCaptureMode, AudioFieldStrategy } from '@mindwtr/core';
 import { logInfo, logWarn } from './app-log';
+import { buildMultipartAudioPart, loadModuleFromCandidates } from './speech-to-text.helpers';
 
 type SpeechProvider = 'openai' | 'gemini' | 'whisper';
 
@@ -65,6 +66,12 @@ let whisperContextCache: { modelPath: string; context: WhisperContextLike } | nu
 let whisperNativeLogEnabled = false;
 type WhisperModule = typeof import('whisper.rn');
 let whisperModuleCache: WhisperModule | null = null;
+const WHISPER_MODULE_CANDIDATES = [
+  'whisper.rn/src/index',
+  'whisper.rn/lib/commonjs/index',
+  'whisper.rn/lib/commonjs/index.js',
+  'whisper.rn/index',
+] as const;
 
 type RNFSModule = typeof import('react-native-fs');
 let rnfsModuleCache: RNFSModule | null | undefined;
@@ -95,14 +102,16 @@ const getRNFSModule = (): RNFSModule | null => {
 const getWhisperModule = () => {
   if (whisperModuleCache) return whisperModuleCache;
   try {
-    // whisper.rn ships a broken root export map in 0.5.x, so load the built CJS entry directly.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('whisper.rn/lib/commonjs/index.js') as WhisperModule;
+    // Prefer the React Native source entry, but keep CJS fallbacks for release bundles.
+    const { module: mod } = loadModuleFromCandidates(WHISPER_MODULE_CANDIDATES, (candidate) => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      return require(candidate) as WhisperModule;
+    });
     whisperModuleCache = mod;
     return mod;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Whisper module unavailable: ${message}`);
+    throw new Error(`Whisper module unavailable after trying ${WHISPER_MODULE_CANDIDATES.join(', ')}: ${message}`);
   }
 };
 
@@ -268,17 +277,35 @@ const fetchJson = async (url: string, init: RequestInit, options?: FetchOptions)
   }
 };
 
+const buildOpenAIMultipartPart = async (audioUri: string) => {
+  const file = new File(audioUri);
+  const name = file.name || `audio${getExtension(audioUri)}`;
+  const type = file.type || getMimeType(audioUri);
+  let bytes: Uint8Array | null = null;
+  try {
+    bytes = await file.bytes();
+  } catch {
+    // Fall back to the React Native uri upload object below.
+  }
+  return buildMultipartAudioPart({
+    uri: audioUri,
+    name,
+    type,
+    bytes,
+  });
+};
+
 const transcribeOpenAI = async (audioUri: string, config: SpeechToTextConfig) => {
   if (!config.apiKey) {
     throw new Error('OpenAI API key missing');
   }
-  const file = new File(audioUri);
   const form = new FormData();
-  form.append('file', {
-    uri: audioUri,
-    name: file.name || `audio${getExtension(audioUri)}`,
-    type: getMimeType(audioUri),
-  } as any);
+  const { part, fileName } = await buildOpenAIMultipartPart(audioUri);
+  if (fileName) {
+    form.append('file', part as Blob, fileName);
+  } else {
+    form.append('file', part as any);
+  }
   form.append('model', config.model);
   const language = resolveLanguage(config.language);
   if (language !== 'auto') {
