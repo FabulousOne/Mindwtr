@@ -404,6 +404,44 @@ function getClientIp(req: Request, trustProxyHeaders = false): string {
     return 'unknown';
 }
 
+function normalizeRateLimitIdentity(value: string | null | undefined): string | null {
+    const normalized = String(value || '').trim();
+    if (!normalized || normalized.toLowerCase() === 'unknown') return null;
+    return normalized;
+}
+
+function getAuthFailureRateKey(
+    req: Request,
+    options: {
+        trustProxyHeaders?: boolean;
+        requestIpAddress?: string | null;
+        token?: string | null;
+        authHeader?: string | null;
+    } = {},
+): string {
+    const trustedProxyIp = normalizeRateLimitIdentity(getClientIp(req, options.trustProxyHeaders));
+    if (trustedProxyIp) {
+        return `auth-failure:ip:${trustedProxyIp}`;
+    }
+
+    const requestIpAddress = normalizeRateLimitIdentity(options.requestIpAddress);
+    if (requestIpAddress) {
+        return `auth-failure:ip:${requestIpAddress}`;
+    }
+
+    const token = normalizeRateLimitIdentity(options.token);
+    if (token) {
+        return `auth-failure:token:${tokenToKey(token)}`;
+    }
+
+    const authHeader = normalizeRateLimitIdentity(options.authHeader);
+    if (authHeader) {
+        return `auth-failure:header:${tokenToKey(authHeader)}`;
+    }
+
+    return 'auth-failure:unknown';
+}
+
 function parseAllowedAuthTokens(rawValue?: string): Set<string> | null {
     const tokens = String(rawValue || '')
         .split(',')
@@ -978,6 +1016,7 @@ export const __cloudTestUtils = {
     resolveAllowedAuthTokensFromEnv,
     isAuthorizedToken,
     getClientIp,
+    getAuthFailureRateKey,
     toRateLimitRoute,
     validateAppData,
     asStatus,
@@ -1110,8 +1149,18 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         rateLimits.set(rateKey, { count: 1, resetAt: now + windowMs, lastSeenAt: now });
         return null;
     };
-    const unauthorizedResponse = (req: Request): Response => {
-        const authRateKey = `auth-failure:${getClientIp(req, trustProxyHeaders)}`;
+    const unauthorizedResponse = (req: Request, token?: string | null): Response => {
+        const requestIp = (() => {
+            const bunServer = server as { requestIP?: (request: Request) => { address?: string | null } | null };
+            if (typeof bunServer.requestIP !== 'function') return null;
+            return bunServer.requestIP(req)?.address ?? null;
+        })();
+        const authRateKey = getAuthFailureRateKey(req, {
+            trustProxyHeaders,
+            requestIpAddress: requestIp,
+            token,
+            authHeader: req.headers.get('authorization'),
+        });
         const authRateLimitResponse = checkRateLimit(authRateKey, AUTH_FAILURE_RATE_MAX);
         if (authRateLimitResponse) {
             return authRateLimitResponse;
@@ -1176,7 +1225,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
             ) {
                 const token = getToken(req);
                 if (!token) return unauthorizedResponse(req);
-                if (!isAuthorizedToken(token, allowedAuthTokens)) return unauthorizedResponse(req);
+                if (!isAuthorizedToken(token, allowedAuthTokens)) return unauthorizedResponse(req, token);
                 const key = tokenToKey(token);
                 const routeKey = toRateLimitRoute(pathname);
                 const rateKey = `${key}:${req.method}:${routeKey}`;
@@ -1422,7 +1471,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
             if (pathname === '/v1/data') {
                 const token = getToken(req);
                 if (!token) return unauthorizedResponse(req);
-                if (!isAuthorizedToken(token, allowedAuthTokens)) return unauthorizedResponse(req);
+                if (!isAuthorizedToken(token, allowedAuthTokens)) return unauthorizedResponse(req, token);
                 const key = tokenToKey(token);
                 const dataRateKey = `${key}:${req.method}:${toRateLimitRoute(pathname)}`;
                 const dataRateLimitResponse = checkRateLimit(dataRateKey, maxPerWindow);
@@ -1479,7 +1528,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
             if (pathname.startsWith('/v1/attachments/')) {
                 const token = getToken(req);
                 if (!token) return unauthorizedResponse(req);
-                if (!isAuthorizedToken(token, allowedAuthTokens)) return unauthorizedResponse(req);
+                if (!isAuthorizedToken(token, allowedAuthTokens)) return unauthorizedResponse(req, token);
                 const key = tokenToKey(token);
                 const attachmentRateKey = `${key}:${req.method}:${toRateLimitRoute(pathname)}`;
                 const attachmentRateLimitResponse = checkRateLimit(attachmentRateKey, maxAttachmentPerWindow);
