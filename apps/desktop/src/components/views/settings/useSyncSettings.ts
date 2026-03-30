@@ -3,11 +3,20 @@ import { SyncService, type CloudProvider } from '../../../lib/sync-service';
 import { useUiStore } from '../../../store/ui-store';
 import { logError } from '../../../lib/app-log';
 import { markSettingsOpenTrace, measureSettingsOpenStep } from '../../../lib/settings-open-diagnostics';
-import type { SyncBackend } from '@mindwtr/core';
+import { CLOCK_SKEW_THRESHOLD_MS, type SyncBackend } from '@mindwtr/core';
 
 export type { SyncBackend };
 export type DropboxTestState = 'idle' | 'success' | 'error';
 export type WebDavTestState = 'idle' | 'success' | 'error';
+
+const formatClockSkew = (ms: number): string => {
+    if (!Number.isFinite(ms) || ms <= 0) return '0 ms';
+    if (ms < 1000) return `${Math.round(ms)} ms`;
+    const seconds = ms / 1000;
+    if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)} s`;
+    const minutes = seconds / 60;
+    return `${minutes.toFixed(1)} min`;
+};
 
 type UseSyncSettingsOptions = {
     isTauri: boolean;
@@ -413,7 +422,30 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
             if (result.skipped === 'requeued') {
                 showToast('Local changes arrived during sync. Retry queued.', 'info');
             } else if (result.success) {
+                const maxClockSkewMs = Math.max(
+                    result.stats?.tasks.maxClockSkewMs ?? 0,
+                    result.stats?.projects.maxClockSkewMs ?? 0,
+                    result.stats?.sections.maxClockSkewMs ?? 0,
+                    result.stats?.areas.maxClockSkewMs ?? 0
+                );
+                const timestampAdjustments = (result.stats?.tasks.timestampAdjustments ?? 0)
+                    + (result.stats?.projects.timestampAdjustments ?? 0)
+                    + (result.stats?.sections.timestampAdjustments ?? 0)
+                    + (result.stats?.areas.timestampAdjustments ?? 0);
                 showToast('Sync completed', 'success');
+                if (maxClockSkewMs > CLOCK_SKEW_THRESHOLD_MS) {
+                    showToast(
+                        `Large device clock skew detected during sync (${formatClockSkew(maxClockSkewMs)}). Check time settings on each device.`,
+                        'info',
+                        7000
+                    );
+                } else if (timestampAdjustments > 0) {
+                    showToast(
+                        `Adjusted ${timestampAdjustments} future-dated timestamp${timestampAdjustments === 1 ? '' : 's'} during sync. Check device clocks if this repeats.`,
+                        'info',
+                        7000
+                    );
+                }
                 if (isTauri) {
                     setSnapshots(await SyncService.listDataSnapshots());
                 }

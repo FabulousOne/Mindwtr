@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+    CLOCK_SKEW_THRESHOLD_MS,
     cloudGetJson,
     useTaskStore,
     webdavGetJson,
@@ -526,12 +527,42 @@ export function SyncSettingsScreen() {
                 return;
             }
             if (result.success) {
-                const conflictCount = (result.stats?.tasks.conflicts || 0) + (result.stats?.projects.conflicts || 0);
+                const conflictCount = (result.stats?.tasks.conflicts || 0)
+                    + (result.stats?.projects.conflicts || 0)
+                    + (result.stats?.sections.conflicts || 0)
+                    + (result.stats?.areas.conflicts || 0);
+                const maxResultClockSkewMs = Math.max(
+                    result.stats?.tasks.maxClockSkewMs || 0,
+                    result.stats?.projects.maxClockSkewMs || 0,
+                    result.stats?.sections.maxClockSkewMs || 0,
+                    result.stats?.areas.maxClockSkewMs || 0,
+                );
+                const resultTimestampAdjustments = (result.stats?.tasks.timestampAdjustments || 0)
+                    + (result.stats?.projects.timestampAdjustments || 0)
+                    + (result.stats?.sections.timestampAdjustments || 0)
+                    + (result.stats?.areas.timestampAdjustments || 0);
+                const warningDetails = [
+                    maxResultClockSkewMs > CLOCK_SKEW_THRESHOLD_MS
+                        ? localize(
+                            `Large device clock skew detected (${formatClockSkew(maxResultClockSkewMs)}). Check time settings on each device.`,
+                            `检测到较大的设备时钟偏差（${formatClockSkew(maxResultClockSkewMs)}）。请检查各设备的时间设置。`
+                        )
+                        : null,
+                    resultTimestampAdjustments > 0
+                        ? localize(
+                            `Adjusted ${resultTimestampAdjustments} future-dated timestamp${resultTimestampAdjustments === 1 ? '' : 's'} during sync.`,
+                            `同步期间已调整 ${resultTimestampAdjustments} 个未来时间戳。`
+                        )
+                        : null,
+                ].filter(Boolean);
                 Alert.alert(
                     localize('Success', '成功'),
-                    conflictCount > 0
-                        ? localize(`Sync completed with ${conflictCount} conflicts (resolved automatically).`, `同步完成，发现 ${conflictCount} 个冲突（已自动处理）。`)
-                        : localize('Sync completed!', '同步完成！')
+                    [
+                        conflictCount > 0
+                            ? localize(`Sync completed with ${conflictCount} conflicts (resolved automatically).`, `同步完成，发现 ${conflictCount} 个冲突（已自动处理）。`)
+                            : localize('Sync completed!', '同步完成！'),
+                        ...warningDetails,
+                    ].join('\n\n')
                 );
             } else {
                 throw new Error(result.error || 'Unknown error');
