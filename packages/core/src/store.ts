@@ -4,7 +4,7 @@ export { shallow } from 'zustand/shallow';
 import type { AppData } from './types';
 import type { StorageAdapter } from './storage';
 import { noopStorage } from './storage';
-import { logError } from './logger';
+import { logError, logWarn } from './logger';
 import type { TaskStore } from './store-types';
 import { sanitizeAppDataForStorage } from './store-helpers';
 import { markCoreStartupPhase } from './startup-profiler';
@@ -48,19 +48,53 @@ const getSaveRetryDelayMs = (attempt: number): number => {
     const cappedAttempt = Math.max(0, attempt - 1);
     return Math.min(MAX_SAVE_RETRY_DELAY_MS, INITIAL_SAVE_RETRY_DELAY_MS * (2 ** cappedAttempt));
 };
-const getSaveQueueOverflowMessage = (droppedCount: number): string =>
-    `Save queue overflow: dropped ${droppedCount} stale snapshot(s) while keeping the newest state.`;
+const getSaveQueueOverflowMessage = ({
+    droppedCount,
+    droppedFromVersion,
+    droppedToVersion,
+    keptFromVersion,
+    keptToVersion,
+}: {
+    droppedCount: number;
+    droppedFromVersion: number;
+    droppedToVersion: number;
+    keptFromVersion: number;
+    keptToVersion: number;
+}): string => (
+    `Save queue overflow: dropped ${droppedCount} queued save(s) `
+    + `(versions ${droppedFromVersion}-${droppedToVersion}) while keeping versions ${keptFromVersion}-${keptToVersion}.`
+);
 
 const enforcePendingSaveCap = () => {
     if (pendingSaves.length <= MAX_PENDING_SAVES) return;
     const overflow = pendingSaves.length - MAX_PENDING_SAVES;
-    // Keep only the newest saves — oldest are stale and safe to drop.
     const dropped = pendingSaves.splice(0, overflow);
+    const firstDroppedVersion = dropped[0]?.version ?? 0;
+    const lastDroppedVersion = dropped[dropped.length - 1]?.version ?? firstDroppedVersion;
+    const keptFirstVersion = pendingSaves[0]?.version ?? lastDroppedVersion;
+    const keptLastVersion = pendingSaves[pendingSaves.length - 1]?.version ?? keptFirstVersion;
+    const message = getSaveQueueOverflowMessage({
+        droppedCount: overflow,
+        droppedFromVersion: firstDroppedVersion,
+        droppedToVersion: lastDroppedVersion,
+        keptFromVersion: keptFirstVersion,
+        keptToVersion: keptLastVersion,
+    });
+    logWarn('Save queue overflow', {
+        scope: 'store',
+        category: 'storage',
+        context: {
+            droppedCount: overflow,
+            droppedFromVersion: firstDroppedVersion,
+            droppedToVersion: lastDroppedVersion,
+            keptFromVersion: keptFirstVersion,
+            keptToVersion: keptLastVersion,
+        },
+    });
     const callbacks = dropped
         .flatMap((item) => item.onErrorCallbacks)
         .filter((callback): callback is (msg: string) => void => typeof callback === 'function');
     if (callbacks.length > 0) {
-        const message = getSaveQueueOverflowMessage(overflow);
         for (const callback of callbacks) {
             try {
                 callback(message);

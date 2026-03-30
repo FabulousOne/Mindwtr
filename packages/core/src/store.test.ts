@@ -729,6 +729,48 @@ describe('TaskStore', () => {
         expect(saved.tasks[0].projectId).toBe(project.id);
     });
 
+    it('logs dropped save versions when the pending queue overflows', async () => {
+        let resolveFirstSave: (() => void) | null = null;
+        mockStorage.saveData = vi.fn().mockImplementation(() => {
+            if (!resolveFirstSave) {
+                return new Promise<void>((resolve) => {
+                    resolveFirstSave = resolve;
+                });
+            }
+            return Promise.resolve();
+        });
+        setStorageAdapter(mockStorage);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+        const { addTask, updateTask } = useTaskStore.getState();
+        await addTask('Overflow Task');
+        await Promise.resolve();
+
+        const taskId = useTaskStore.getState()._allTasks[0].id;
+        for (let index = 0; index < 110; index += 1) {
+            await updateTask(taskId, { title: `Overflow Task ${index}` });
+        }
+
+        expect(useTaskStore.getState().error).toContain('Save queue overflow');
+        expect(useTaskStore.getState().error).toContain('versions');
+        expect(warnSpy).toHaveBeenCalledWith(
+            'Save queue overflow',
+            expect.objectContaining({
+                scope: 'store',
+                category: 'storage',
+                context: expect.objectContaining({
+                    droppedCount: expect.any(Number),
+                    droppedFromVersion: expect.any(Number),
+                    droppedToVersion: expect.any(Number),
+                }),
+            })
+        );
+
+        resolveFirstSave?.();
+        await Promise.resolve();
+        await flushPendingSave();
+    });
+
     it('retries failed saves with the latest queued snapshot', async () => {
         let rejectFirstSave: ((reason?: unknown) => void) | null = null;
         mockStorage.saveData = vi.fn().mockImplementation(() => {
