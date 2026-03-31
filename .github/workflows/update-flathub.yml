@@ -52,7 +52,7 @@ jobs:
             echo "message=" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Verify Flathub token
+      - name: Verify Flathub automation secrets
         if: steps.stability.outputs.skip != 'true'
         env:
           FLATHUB_REPO_TOKEN: ${{ secrets.FLATHUB_REPO_TOKEN }}

@@ -14,12 +14,12 @@ If you choose to use sync features (for example File Sync, WebDAV, self-hosted s
 - **Other providers via File Sync:** iCloud Drive, Google Drive, OneDrive, Syncthing, and similar tools can still be used indirectly through File Sync.
 
 **3. Anonymous Usage Analytics (Heartbeat)**
-In official non-FOSS builds, Mindwtr may send a small heartbeat event at most once per day to help us measure app health and adoption (for example DAU/MAU and distribution-channel usage).
+In official non-FOSS builds, and in the official Flathub desktop build, Mindwtr may send a small heartbeat event at most once per day to help us measure app health and adoption (for example DAU/MAU and distribution-channel usage).
 
 - **What may be sent:** platform (for example iOS/Android/macOS/Windows/Linux), app version, distribution channel (for example App Store/Play Store/winget/Homebrew), coarse device class (for example phone/tablet/desktop), coarse OS major version (for example iOS 18 or Android 15), locale (for example en-US), and an app-generated random identifier.
 - **Country data:** country may be derived server-side from edge network metadata during request handling.
 - **What is not sent in the heartbeat payload:** task/project/note content, AI prompt content, email address, name, contacts, or files.
-- **FOSS builds:** heartbeat analytics is disabled.
+- **FOSS builds:** heartbeat analytics is disabled by default. Exception: the official Flathub desktop build sends the same anonymous heartbeat so we can measure Linux adoption and distribution-channel usage. Android FOSS builds do not send heartbeat analytics.
 
 **4. Third-Party Services (AI)**
 If you use optional AI features with your own API key (BYOK):
