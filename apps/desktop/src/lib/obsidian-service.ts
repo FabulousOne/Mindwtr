@@ -140,7 +140,7 @@ export class ObsidianService {
 
     static async scanVault(config: ObsidianConfig): Promise<ObsidianScanResult> {
         if (!isTauriRuntime()) {
-            return { tasks: [], scannedFileCount: 0, scannedRelativePaths: [], warnings: [] };
+            return { tasks: [], scannedFileCount: 0, scannedRelativePaths: [], warnings: [], importMode: 'inline' };
         }
 
         const { exists, readDir, readTextFile, stat } = await import('@tauri-apps/plugin-fs');
@@ -167,6 +167,7 @@ export class ObsidianService {
                 warning: null,
                 isTracked: false,
                 relativeFilePath,
+                detectedTaskNotes: false,
             };
         }
 
@@ -290,6 +291,17 @@ export class ObsidianService {
         await tauriInvoke('obsidian_toggle_task', task);
     }
 
+    static async toggleTaskNotesTask(task: {
+        vaultPath: string;
+        relativeFilePath: string;
+        setCompleted: boolean;
+    }): Promise<void> {
+        if (!isTauriRuntime()) {
+            throw new Error('Obsidian write-back is only available on desktop.');
+        }
+        await tauriInvoke('obsidian_toggle_tasknotes', task);
+    }
+
     static async createTask(task: {
         vaultPath: string;
         relativeFilePath: string;
@@ -299,6 +311,17 @@ export class ObsidianService {
             throw new Error('Obsidian task creation is only available on desktop.');
         }
         await tauriInvoke('obsidian_create_task', task);
+    }
+
+    static async createTaskNotesTask(task: {
+        vaultPath: string;
+        folder: string;
+        title: string;
+    }): Promise<string> {
+        if (!isTauriRuntime()) {
+            throw new Error('Obsidian task creation is only available on desktop.');
+        }
+        return tauriInvoke<string>('obsidian_create_tasknotes', task);
     }
 }
 

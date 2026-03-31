@@ -48,6 +48,8 @@ export const useObsidianSettings = ({
     const [enabled, setEnabled] = useState(false);
     const [scanFoldersText, setScanFoldersText] = useState('/');
     const [inboxFile, setInboxFile] = useState('Mindwtr/Inbox.md');
+    const [taskNotesIncludeArchived, setTaskNotesIncludeArchived] = useState(false);
+    const [newTaskFormat, setNewTaskFormat] = useState<'auto' | 'inline' | 'tasknotes'>('auto');
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -59,7 +61,9 @@ export const useObsidianSettings = ({
         setEnabled(config.enabled);
         setScanFoldersText(config.scanFolders.join('\n'));
         setInboxFile(config.inboxFile);
-    }, [config.enabled, config.inboxFile, config.scanFolders, config.vaultPath]);
+        setTaskNotesIncludeArchived(config.taskNotesIncludeArchived);
+        setNewTaskFormat(config.newTaskFormat);
+    }, [config.enabled, config.inboxFile, config.newTaskFormat, config.scanFolders, config.taskNotesIncludeArchived, config.vaultPath]);
 
     const hasConfiguredVault = Boolean((vaultPath || '').trim());
 
@@ -92,6 +96,8 @@ export const useObsidianSettings = ({
                 enabled,
                 scanFolders: parseScanFoldersInput(scanFoldersText),
                 inboxFile,
+                taskNotesIncludeArchived,
+                newTaskFormat,
             });
             showSaved();
         } catch (error) {
@@ -99,7 +105,7 @@ export const useObsidianSettings = ({
         } finally {
             setIsSaving(false);
         }
-    }, [enabled, inboxFile, messages.saveFailed, saveConfig, scanFoldersText, showSaved, showToast, vaultPath]);
+    }, [enabled, inboxFile, messages.saveFailed, newTaskFormat, saveConfig, scanFoldersText, showSaved, showToast, taskNotesIncludeArchived, vaultPath]);
 
     const handleRemove = useCallback(async () => {
         try {
@@ -108,6 +114,8 @@ export const useObsidianSettings = ({
             setEnabled(false);
             setScanFoldersText('/');
             setInboxFile('Mindwtr/Inbox.md');
+            setTaskNotesIncludeArchived(false);
+            setNewTaskFormat('auto');
             showSaved();
         } catch (error) {
             showToast(toErrorMessage(error, messages.removeFailed), 'error');
@@ -141,6 +149,10 @@ export const useObsidianSettings = ({
         setObsidianScanFoldersText: setScanFoldersText,
         obsidianInboxFile: inboxFile,
         setObsidianInboxFile: setInboxFile,
+        obsidianTaskNotesIncludeArchived: taskNotesIncludeArchived,
+        setObsidianTaskNotesIncludeArchived: setTaskNotesIncludeArchived,
+        obsidianNewTaskFormat: newTaskFormat,
+        setObsidianNewTaskFormat: setNewTaskFormat,
         obsidianLastScannedAt: config.lastScannedAt,
         obsidianHasVaultMarker: hasVaultMarker,
         obsidianVaultWarning: vaultWarning,

@@ -30,6 +30,7 @@ export * from './search';
 export * from './hierarchy-utils';
 export * from './markdown';
 export * from './obsidian-parser';
+export * from './tasknotes-parser';
 export * from './webdav';
 export * from './cloud';
 export * from './retry-utils';

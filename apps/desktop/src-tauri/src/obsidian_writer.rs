@@ -5,6 +5,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use tempfile::Builder;
+use time::{format_description, OffsetDateTime};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LineRecord {
@@ -207,6 +208,177 @@ fn atomic_write_text(path: &Path, content: &str) -> Result<(), String> {
     }
 }
 
+fn is_frontmatter_boundary(line: &str) -> bool {
+    line.trim() == "---"
+}
+
+fn find_frontmatter_range(lines: &[LineRecord]) -> Option<(usize, usize)> {
+    if !matches!(lines.first(), Some(first) if is_frontmatter_boundary(&first.content)) {
+        return None;
+    }
+
+    for (index, line) in lines.iter().enumerate().skip(1) {
+        if is_frontmatter_boundary(&line.content) {
+            return Some((0, index));
+        }
+    }
+
+    None
+}
+
+fn find_frontmatter_field_line(
+    lines: &[LineRecord],
+    frontmatter_start: usize,
+    frontmatter_end: usize,
+    field: &str,
+) -> Option<usize> {
+    let prefix = format!("{field}:");
+    lines
+        .iter()
+        .enumerate()
+        .skip(frontmatter_start + 1)
+        .take(frontmatter_end.saturating_sub(frontmatter_start + 1))
+        .find_map(|(index, line)| {
+            line.content
+                .trim_start()
+                .starts_with(&prefix)
+                .then_some(index)
+        })
+}
+
+fn split_yaml_comment(input: &str) -> (&str, &str) {
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    let mut previous_was_whitespace = true;
+
+    for (index, ch) in input.char_indices() {
+        match ch {
+            '\'' if !in_double_quote => in_single_quote = !in_single_quote,
+            '"' if !in_single_quote => in_double_quote = !in_double_quote,
+            '#' if !in_single_quote && !in_double_quote && previous_was_whitespace => {
+                return (input[..index].trim_end(), &input[index..]);
+            }
+            _ => {}
+        }
+        previous_was_whitespace = ch.is_whitespace();
+    }
+
+    (input.trim_end(), "")
+}
+
+fn replace_frontmatter_scalar_line(line: &str, field: &str, new_value: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+    let prefix = format!("{field}:");
+    if !trimmed.starts_with(&prefix) {
+        return None;
+    }
+
+    let indent = &line[..line.len() - trimmed.len()];
+    let remainder = &trimmed[prefix.len()..];
+    let (_, comment) = split_yaml_comment(remainder);
+    let suffix = if comment.is_empty() {
+        String::new()
+    } else {
+        format!(" {comment}")
+    };
+
+    Some(format!("{indent}{field}: {new_value}{suffix}"))
+}
+
+fn replace_frontmatter_scalar_field(
+    lines: &mut [LineRecord],
+    frontmatter_start: usize,
+    frontmatter_end: usize,
+    field: &str,
+    new_value: &str,
+) -> Result<(), String> {
+    let index = find_frontmatter_field_line(lines, frontmatter_start, frontmatter_end, field)
+        .ok_or_else(|| format!("Field '{field}' was not found in the TaskNotes frontmatter."))?;
+    let updated = replace_frontmatter_scalar_line(&lines[index].content, field, new_value)
+        .ok_or_else(|| format!("Field '{field}' could not be updated."))?;
+    lines[index].content = updated;
+    Ok(())
+}
+
+fn upsert_frontmatter_scalar_field(
+    lines: &mut Vec<LineRecord>,
+    frontmatter_start: usize,
+    frontmatter_end: usize,
+    field: &str,
+    new_value: &str,
+    line_ending: &str,
+) -> Result<(), String> {
+    if let Some(index) =
+        find_frontmatter_field_line(lines, frontmatter_start, frontmatter_end, field)
+    {
+        let updated = replace_frontmatter_scalar_line(&lines[index].content, field, new_value)
+            .ok_or_else(|| format!("Field '{field}' could not be updated."))?;
+        lines[index].content = updated;
+        return Ok(());
+    }
+
+    lines.insert(
+        frontmatter_end,
+        LineRecord {
+            content: format!("{field}: {new_value}"),
+            ending: line_ending.to_string(),
+        },
+    );
+    Ok(())
+}
+
+fn remove_frontmatter_field(
+    lines: &mut Vec<LineRecord>,
+    frontmatter_start: usize,
+    frontmatter_end: usize,
+    field: &str,
+) {
+    if let Some(index) =
+        find_frontmatter_field_line(lines, frontmatter_start, frontmatter_end, field)
+    {
+        lines.remove(index);
+    }
+}
+
+fn current_yyyy_mm_dd() -> Result<String, String> {
+    let format = format_description::parse("[year]-[month]-[day]")
+        .map_err(|error| format!("Failed to prepare date formatter: {error}"))?;
+    OffsetDateTime::now_utc()
+        .format(&format)
+        .map_err(|error| format!("Failed to format the completion date: {error}"))
+}
+
+fn sanitize_tasknotes_filename(title: &str) -> String {
+    let filtered = title
+        .chars()
+        .filter(|ch| !matches!(ch, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+        .collect::<String>();
+    filtered
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_matches('.')
+        .trim()
+        .to_string()
+}
+
+fn escape_yaml_double_quoted(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn build_tasknotes_content(title: &str, line_ending: &str) -> String {
+    [
+        "---".to_string(),
+        "tags:".to_string(),
+        "  - task".to_string(),
+        format!("title: \"{}\"", escape_yaml_double_quoted(title)),
+        "status: open".to_string(),
+        "---".to_string(),
+        String::new(),
+    ]
+    .join(line_ending)
+}
+
 #[tauri::command]
 pub(crate) fn obsidian_toggle_task(
     vault_path: String,
@@ -231,6 +403,55 @@ pub(crate) fn obsidian_toggle_task(
         .ok_or_else(|| "Task line is out of bounds.".to_string())?;
     let updated_line = toggle_task_line(current, set_completed)?;
     lines[actual_line - 1].content = updated_line;
+
+    atomic_write_text(&absolute_path, &rebuild_lines(&lines))
+}
+
+#[tauri::command]
+pub(crate) fn obsidian_toggle_tasknotes(
+    vault_path: String,
+    relative_file_path: String,
+    set_completed: bool,
+) -> Result<(), String> {
+    let normalized_relative_path = normalize_obsidian_relative_path(&relative_file_path)?;
+    if !is_obsidian_markdown_relative_path(&normalized_relative_path) {
+        return Err("TaskNotes files must be Markdown files ending in .md.".to_string());
+    }
+
+    let absolute_path = join_obsidian_vault_path(&vault_path, &normalized_relative_path)?;
+    let content = fs::read_to_string(&absolute_path)
+        .map_err(|error| format!("Failed to read the TaskNotes file: {error}"))?;
+    let line_ending = detect_line_ending(&content);
+    let mut lines = split_lines_preserving_endings(&content);
+    let (frontmatter_start, frontmatter_end) = find_frontmatter_range(&lines)
+        .ok_or_else(|| "TaskNotes files must start with YAML frontmatter.".to_string())?;
+
+    replace_frontmatter_scalar_field(
+        &mut lines,
+        frontmatter_start,
+        frontmatter_end,
+        "status",
+        if set_completed { "done" } else { "open" },
+    )?;
+
+    if set_completed {
+        let completed_date = current_yyyy_mm_dd()?;
+        upsert_frontmatter_scalar_field(
+            &mut lines,
+            frontmatter_start,
+            frontmatter_end,
+            "completedDate",
+            &completed_date,
+            line_ending,
+        )?;
+    } else {
+        remove_frontmatter_field(
+            &mut lines,
+            frontmatter_start,
+            frontmatter_end,
+            "completedDate",
+        );
+    }
 
     atomic_write_text(&absolute_path, &rebuild_lines(&lines))
 }
@@ -271,6 +492,41 @@ pub(crate) fn obsidian_create_task(
     };
 
     atomic_write_text(&absolute_path, &next_content)
+}
+
+#[tauri::command]
+pub(crate) fn obsidian_create_tasknotes(
+    vault_path: String,
+    folder: String,
+    title: String,
+) -> Result<String, String> {
+    let normalized_folder = normalize_obsidian_relative_path(&folder)?;
+    if normalized_folder.is_empty() {
+        return Err("Choose a TaskNotes folder before creating a task.".to_string());
+    }
+
+    let trimmed_title = title.trim();
+    if trimmed_title.is_empty() {
+        return Err("Enter a task title before adding it to Obsidian.".to_string());
+    }
+
+    let safe_filename = sanitize_tasknotes_filename(trimmed_title);
+    if safe_filename.is_empty() {
+        return Err("Could not generate a valid TaskNotes filename from that title.".to_string());
+    }
+
+    let mut relative_path = format!("{normalized_folder}/{safe_filename}.md");
+    let mut absolute_path = join_obsidian_vault_path(&vault_path, &relative_path)?;
+
+    if absolute_path.exists() {
+        let suffix = OffsetDateTime::now_utc().unix_timestamp();
+        relative_path = format!("{normalized_folder}/{safe_filename} {suffix}.md");
+        absolute_path = join_obsidian_vault_path(&vault_path, &relative_path)?;
+    }
+
+    let content = build_tasknotes_content(trimmed_title, "\n");
+    atomic_write_text(&absolute_path, &content)?;
+    Ok(relative_path)
 }
 
 #[cfg(test)]
@@ -366,5 +622,71 @@ mod tests {
         let content = fs::read_to_string(temp.path().join("Mindwtr/Inbox.md"))
             .expect("should read inbox note");
         assert_eq!(content, "- [ ] Capture from Mindwtr\n- [ ] Second task\n");
+    }
+
+    #[test]
+    fn toggle_tasknotes_updates_status_and_completed_date() {
+        let temp = tempdir().expect("should create temp vault");
+        let file_path = temp.path().join("TaskNotes/Review.md");
+        fs::create_dir_all(file_path.parent().expect("should have parent"))
+            .expect("should create tasknotes folder");
+        fs::write(&file_path, "---\nstatus: open\npriority: high\n---\nBody\n")
+            .expect("should create tasknote");
+
+        obsidian_toggle_tasknotes(
+            temp.path().to_string_lossy().to_string(),
+            "TaskNotes/Review.md".to_string(),
+            true,
+        )
+        .expect("should update tasknotes status");
+
+        let updated = fs::read_to_string(&file_path).expect("should read updated tasknote");
+        assert!(updated.contains("status: done"));
+        assert!(updated.contains("completedDate: "));
+        assert!(updated.contains("priority: high"));
+        assert!(updated.ends_with("---\nBody\n"));
+    }
+
+    #[test]
+    fn toggle_tasknotes_removes_completed_date_when_marking_incomplete() {
+        let temp = tempdir().expect("should create temp vault");
+        let file_path = temp.path().join("TaskNotes/Review.md");
+        fs::create_dir_all(file_path.parent().expect("should have parent"))
+            .expect("should create tasknotes folder");
+        fs::write(
+            &file_path,
+            "---\nstatus: done\ncompletedDate: 2025-01-20\n---\nBody\n",
+        )
+        .expect("should create tasknote");
+
+        obsidian_toggle_tasknotes(
+            temp.path().to_string_lossy().to_string(),
+            "TaskNotes/Review.md".to_string(),
+            false,
+        )
+        .expect("should clear tasknotes completion");
+
+        let updated = fs::read_to_string(&file_path).expect("should read updated tasknote");
+        assert!(updated.contains("status: open"));
+        assert!(!updated.contains("completedDate:"));
+        assert!(updated.ends_with("---\nBody\n"));
+    }
+
+    #[test]
+    fn create_tasknotes_creates_a_markdown_file() {
+        let temp = tempdir().expect("should create temp vault");
+        let relative_path = obsidian_create_tasknotes(
+            temp.path().to_string_lossy().to_string(),
+            "TaskNotes".to_string(),
+            "Review rollout / demo?".to_string(),
+        )
+        .expect("should create a tasknotes file");
+
+        assert_eq!(relative_path, "TaskNotes/Review rollout demo.md");
+        let content = fs::read_to_string(temp.path().join(&relative_path))
+            .expect("should read created tasknotes file");
+        assert!(content.contains("tags:"));
+        assert!(content.contains("title: \"Review rollout / demo?\""));
+        assert!(content.contains("status: open"));
     }
 }

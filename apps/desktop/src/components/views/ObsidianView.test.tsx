@@ -24,18 +24,21 @@ beforeEach(() => {
     act(() => {
         useObsidianStore.setState((state) => ({
             ...state,
-            config: {
-                vaultPath: null,
-                vaultName: '',
-                scanFolders: ['/'],
-                inboxFile: 'Mindwtr/Inbox.md',
-                lastScannedAt: null,
-                enabled: false,
-            },
-            tasks: [],
-            scannedFileCount: 0,
-            scannedRelativePaths: [],
-            hasScannedThisSession: true,
+                config: {
+                    vaultPath: null,
+                    vaultName: '',
+                    scanFolders: ['/'],
+                    inboxFile: 'Mindwtr/Inbox.md',
+                    taskNotesIncludeArchived: false,
+                    newTaskFormat: 'auto',
+                    lastScannedAt: null,
+                    enabled: false,
+                },
+                tasks: [],
+                scannedFileCount: 0,
+                scannedRelativePaths: [],
+                importMode: 'inline',
+                hasScannedThisSession: true,
             hasVaultMarker: null,
             isInitialized: true,
             isLoadingConfig: false,
@@ -73,10 +76,13 @@ describe('ObsidianView', () => {
                     vaultName: 'Vault',
                     scanFolders: ['/'],
                     inboxFile: 'Mindwtr/Inbox.md',
+                    taskNotesIncludeArchived: false,
+                    newTaskFormat: 'auto',
                     lastScannedAt: '2026-03-14T11:00:00.000Z',
                     enabled: true,
                 },
                 scannedFileCount: 3,
+                importMode: 'inline',
                 isWatching: true,
                 tasks: [{
                     id: 'obsidian-1',
@@ -93,6 +99,7 @@ describe('ObsidianView', () => {
                         fileModifiedAt: '2026-03-14T10:00:00.000Z',
                         noteTags: ['project/alpha'],
                     },
+                    format: 'inline',
                 }],
             }));
         });
@@ -119,9 +126,12 @@ describe('ObsidianView', () => {
                     vaultName: 'Vault',
                     scanFolders: ['/'],
                     inboxFile: 'Mindwtr/Inbox.md',
+                    taskNotesIncludeArchived: false,
+                    newTaskFormat: 'auto',
                     lastScannedAt: null,
                     enabled: true,
                 },
+                importMode: 'inline',
                 hasScannedThisSession: false,
                 rescan,
             }));
@@ -132,5 +142,63 @@ describe('ObsidianView', () => {
         await waitFor(() => {
             expect(rescan).toHaveBeenCalledTimes(1);
         });
+    });
+
+    it('renders tasknotes metadata when tasknotes tasks are present', () => {
+        act(() => {
+            useObsidianStore.setState((state) => ({
+                ...state,
+                config: {
+                    vaultPath: '/Vault',
+                    vaultName: 'Vault',
+                    scanFolders: ['/'],
+                    inboxFile: 'Mindwtr/Inbox.md',
+                    taskNotesIncludeArchived: false,
+                    newTaskFormat: 'auto',
+                    lastScannedAt: '2026-03-14T11:00:00.000Z',
+                    enabled: true,
+                },
+                scannedFileCount: 1,
+                importMode: 'tasknotes',
+                tasks: [{
+                    id: 'obsidian-tasknotes-1',
+                    text: 'Review quarterly report',
+                    completed: false,
+                    tags: ['work'],
+                    wikiLinks: [],
+                    nestingLevel: 0,
+                    source: {
+                        vaultName: 'Vault',
+                        vaultPath: '/Vault',
+                        relativeFilePath: 'TaskNotes/Review quarterly report.md',
+                        lineNumber: 0,
+                        fileModifiedAt: '2026-03-14T10:00:00.000Z',
+                        noteTags: ['work'],
+                    },
+                    format: 'tasknotes',
+                    taskNotesData: {
+                        rawStatus: 'in-progress',
+                        mindwtrStatus: 'next',
+                        priority: 'high',
+                        dueDate: '2025-01-15',
+                        scheduledDate: '2025-01-14',
+                        contexts: ['office'],
+                        projects: ['Q1 Planning'],
+                        timeEstimateMinutes: 120,
+                        recurrenceRule: 'FREQ=WEEKLY;BYDAY=MO',
+                        completedDate: null,
+                        bodyPreview: 'Key points to review',
+                    },
+                }],
+            }));
+        });
+
+        const { getAllByText, getByText } = renderWithProviders();
+
+        expect(getAllByText('TaskNotes').length).toBeGreaterThan(0);
+        expect(getByText('Q1 Planning')).toBeInTheDocument();
+        expect(getByText('@office')).toBeInTheDocument();
+        expect(getByText(/120m/)).toBeInTheDocument();
+        expect(getByText(/Creates a new TaskNotes file in/)).toBeInTheDocument();
     });
 });

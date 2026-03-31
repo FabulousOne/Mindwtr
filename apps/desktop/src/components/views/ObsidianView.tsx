@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, CheckSquare2, ExternalLink, Loader2, Plus, RefreshCw, Settings, Square, Tags } from 'lucide-react';
+import {
+    BookOpen,
+    CalendarDays,
+    CheckSquare2,
+    Clock3,
+    ExternalLink,
+    FileText,
+    FolderKanban,
+    Loader2,
+    Plus,
+    RefreshCw,
+    Settings,
+    Square,
+    Tags,
+} from 'lucide-react';
 
-import { safeFormatDate } from '@mindwtr/core';
+import { DEFAULT_TASKNOTES_FOLDER, safeFormatDate, type ObsidianTask } from '@mindwtr/core';
 
 import { ObsidianService } from '../../lib/obsidian-service';
 import { cn } from '../../lib/utils';
@@ -16,12 +30,41 @@ const navigateToSettings = () => {
 const pageShellClassName = 'h-full px-4 py-3';
 const pageContentClassName = 'mx-auto w-full max-w-[84rem] min-w-0 2xl:max-w-[88rem]';
 
+const resolveTaskNotesCreationFolder = (tasks: ObsidianTask[]): string => {
+    const folders = tasks
+        .filter((task) => task.format === 'tasknotes')
+        .map((task) => {
+            const parts = task.source.relativeFilePath.split('/');
+            parts.pop();
+            return parts.join('/');
+        })
+        .filter(Boolean);
+    if (folders.length === 0) {
+        return DEFAULT_TASKNOTES_FOLDER;
+    }
+
+    const counts = new Map<string, number>();
+    for (const folder of folders) {
+        counts.set(folder, (counts.get(folder) || 0) + 1);
+    }
+
+    return [...counts.entries()]
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0]
+        || DEFAULT_TASKNOTES_FOLDER;
+};
+
+const formatTaskNotesDate = (value: string | null | undefined): string | null => {
+    if (!value) return null;
+    return safeFormatDate(value, value.includes('T') ? 'PPp' : 'PP', value);
+};
+
 export function ObsidianView() {
     const { t } = useLanguage();
     const showToast = useUiStore((state) => state.showToast);
     const config = useObsidianStore((state) => state.config);
     const tasks = useObsidianStore((state) => state.tasks);
     const scannedFileCount = useObsidianStore((state) => state.scannedFileCount);
+    const importMode = useObsidianStore((state) => state.importMode);
     const hasScannedThisSession = useObsidianStore((state) => state.hasScannedThisSession);
     const isInitialized = useObsidianStore((state) => state.isInitialized);
     const isLoadingConfig = useObsidianStore((state) => state.isLoadingConfig);
@@ -35,6 +78,9 @@ export function ObsidianView() {
     const [newTaskText, setNewTaskText] = useState('');
     const [isCreatingTask, setIsCreatingTask] = useState(false);
     const [pendingTaskIds, setPendingTaskIds] = useState<Record<string, true>>({});
+
+    const effectiveNewTaskFormat = config.newTaskFormat === 'auto' ? importMode : config.newTaskFormat;
+    const taskNotesCreationFolder = resolveTaskNotesCreationFolder(tasks);
 
     const resolveText = useCallback((key: string, fallback: string) => {
         const value = t(key);
@@ -104,13 +150,21 @@ export function ObsidianView() {
         if (!config.vaultPath) return;
         setPendingTaskIds((current) => ({ ...current, [task.id]: true }));
         try {
-            await ObsidianService.toggleTask({
-                vaultPath: config.vaultPath,
-                relativeFilePath: task.source.relativeFilePath,
-                lineNumber: task.source.lineNumber,
-                taskText: task.text,
-                setCompleted: !task.completed,
-            });
+            if (task.format === 'tasknotes') {
+                await ObsidianService.toggleTaskNotesTask({
+                    vaultPath: config.vaultPath,
+                    relativeFilePath: task.source.relativeFilePath,
+                    setCompleted: !task.completed,
+                });
+            } else {
+                await ObsidianService.toggleTask({
+                    vaultPath: config.vaultPath,
+                    relativeFilePath: task.source.relativeFilePath,
+                    lineNumber: task.source.lineNumber,
+                    taskText: task.text,
+                    setCompleted: !task.completed,
+                });
+            }
             if (!isWatching) {
                 await rescan();
             }
@@ -136,11 +190,19 @@ export function ObsidianView() {
         if (!trimmed || !config.vaultPath) return;
         setIsCreatingTask(true);
         try {
-            await ObsidianService.createTask({
-                vaultPath: config.vaultPath,
-                relativeFilePath: config.inboxFile,
-                taskText: trimmed,
-            });
+            if (effectiveNewTaskFormat === 'tasknotes') {
+                await ObsidianService.createTaskNotesTask({
+                    vaultPath: config.vaultPath,
+                    folder: taskNotesCreationFolder,
+                    title: trimmed,
+                });
+            } else {
+                await ObsidianService.createTask({
+                    vaultPath: config.vaultPath,
+                    relativeFilePath: config.inboxFile,
+                    taskText: trimmed,
+                });
+            }
             setNewTaskText('');
             if (!isWatching) {
                 await rescan();
@@ -156,7 +218,17 @@ export function ObsidianView() {
         } finally {
             setIsCreatingTask(false);
         }
-    }, [config.inboxFile, config.vaultPath, isWatching, newTaskText, rescan, resolveText, showToast]);
+    }, [
+        config.inboxFile,
+        config.vaultPath,
+        effectiveNewTaskFormat,
+        isWatching,
+        newTaskText,
+        rescan,
+        resolveText,
+        showToast,
+        taskNotesCreationFolder,
+    ]);
 
     if (!isInitialized || isLoadingConfig) {
         return (
@@ -272,7 +344,19 @@ export function ObsidianView() {
                                     {resolveText('obsidian.addTask', 'Add task to Obsidian')}
                                 </label>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    {resolveText('obsidian.addTaskHint', 'Writes to')} <span className="font-mono">{config.inboxFile}</span>
+                                    {effectiveNewTaskFormat === 'tasknotes'
+                                        ? (
+                                            <>
+                                                {resolveText('obsidian.addTaskNotesHint', 'Creates a new TaskNotes file in')}{' '}
+                                                <span className="font-mono">{taskNotesCreationFolder}</span>
+                                            </>
+                                        )
+                                        : (
+                                            <>
+                                                {resolveText('obsidian.addTaskHint', 'Writes to')}{' '}
+                                                <span className="font-mono">{config.inboxFile}</span>
+                                            </>
+                                        )}
                                 </p>
                             </div>
                             <div className="flex flex-1 flex-col gap-2 sm:flex-row">
@@ -287,7 +371,9 @@ export function ObsidianView() {
                                             void handleCreateTask();
                                         }
                                     }}
-                                    placeholder={resolveText('obsidian.addTaskPlaceholder', 'Capture a task into your Obsidian inbox note...')}
+                                    placeholder={effectiveNewTaskFormat === 'tasknotes'
+                                        ? resolveText('obsidian.addTaskNotesPlaceholder', 'Create a new TaskNotes task...')
+                                        : resolveText('obsidian.addTaskPlaceholder', 'Capture a task into your Obsidian inbox note...')}
                                     className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                                 <button
@@ -359,6 +445,10 @@ export function ObsidianView() {
                     <section className="space-y-3">
                         {tasks.map((task) => {
                             const isPending = Boolean(pendingTaskIds[task.id]);
+                            const taskNotesData = task.taskNotesData;
+                            const dueLabel = formatTaskNotesDate(taskNotesData?.dueDate);
+                            const scheduledLabel = formatTaskNotesDate(taskNotesData?.scheduledDate);
+                            const completedLabel = formatTaskNotesDate(taskNotesData?.completedDate);
                             return (
                                 <article
                                     key={task.id}
@@ -375,6 +465,31 @@ export function ObsidianView() {
                                                     <Square className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
                                                 )}
                                                 <div className="min-w-0">
+                                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                                        <span
+                                                            className={cn(
+                                                                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                                                task.format === 'tasknotes'
+                                                                    ? 'border-sky-200 bg-sky-50 text-sky-700'
+                                                                    : 'border-border/70 bg-background text-muted-foreground'
+                                                            )}
+                                                        >
+                                                            {task.format === 'tasknotes' ? <FileText className="h-3 w-3" /> : <CheckSquare2 className="h-3 w-3" />}
+                                                            {task.format === 'tasknotes'
+                                                                ? resolveText('obsidian.taskNotesBadge', 'TaskNotes')
+                                                                : resolveText('obsidian.inlineBadge', 'Inline')}
+                                                        </span>
+                                                        {taskNotesData?.mindwtrStatus && (
+                                                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                                {taskNotesData.mindwtrStatus}
+                                                            </span>
+                                                        )}
+                                                        {taskNotesData?.priority && (
+                                                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                                                                {taskNotesData.priority}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <p className={cn(
                                                         'text-sm leading-6 text-foreground',
                                                         task.completed && 'text-muted-foreground line-through'
@@ -382,8 +497,68 @@ export function ObsidianView() {
                                                         {task.text}
                                                     </p>
                                                     <p className="mt-2 text-xs text-muted-foreground">
-                                                        {task.source.relativeFilePath}:{task.source.lineNumber}
+                                                        {task.format === 'tasknotes'
+                                                            ? task.source.relativeFilePath
+                                                            : `${task.source.relativeFilePath}:${task.source.lineNumber}`}
                                                     </p>
+                                                    {taskNotesData && (
+                                                        <div className="mt-3 space-y-2">
+                                                            {(dueLabel || scheduledLabel || completedLabel || taskNotesData.timeEstimateMinutes) && (
+                                                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                                    {dueLabel && (
+                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+                                                                            <CalendarDays className="h-3 w-3" />
+                                                                            {resolveText('obsidian.due', 'Due')}: {dueLabel}
+                                                                        </span>
+                                                                    )}
+                                                                    {scheduledLabel && (
+                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+                                                                            <CalendarDays className="h-3 w-3" />
+                                                                            {resolveText('obsidian.scheduled', 'Scheduled')}: {scheduledLabel}
+                                                                        </span>
+                                                                    )}
+                                                                    {completedLabel && task.completed && (
+                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+                                                                            <CalendarDays className="h-3 w-3" />
+                                                                            {resolveText('obsidian.completed', 'Completed')}: {completedLabel}
+                                                                        </span>
+                                                                    )}
+                                                                    {taskNotesData.timeEstimateMinutes && (
+                                                                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+                                                                            <Clock3 className="h-3 w-3" />
+                                                                            {taskNotesData.timeEstimateMinutes}m
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {(taskNotesData.contexts.length > 0 || taskNotesData.projects.length > 0) && (
+                                                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                                    {taskNotesData.contexts.map((context) => (
+                                                                        <span
+                                                                            key={`${task.id}-context-${context}`}
+                                                                            className="rounded-full border border-border/70 bg-background px-2.5 py-1"
+                                                                        >
+                                                                            @{context}
+                                                                        </span>
+                                                                    ))}
+                                                                    {taskNotesData.projects.map((project) => (
+                                                                        <span
+                                                                            key={`${task.id}-project-${project}`}
+                                                                            className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-2.5 py-1"
+                                                                        >
+                                                                            <FolderKanban className="h-3 w-3" />
+                                                                            {project}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {taskNotesData.bodyPreview && (
+                                                                <p className="text-xs leading-5 text-muted-foreground">
+                                                                    {taskNotesData.bodyPreview}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                             {(task.tags.length > 0 || task.wikiLinks.length > 0) && (

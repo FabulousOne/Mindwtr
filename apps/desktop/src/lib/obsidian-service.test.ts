@@ -111,6 +111,8 @@ describe('obsidian-service helpers', () => {
             vaultName: 'Vault',
             scanFolders: ['/'],
             inboxFile: 'Mindwtr/Inbox.md',
+            taskNotesIncludeArchived: false,
+            newTaskFormat: 'auto',
             lastScannedAt: null,
             enabled: true,
         }, {
@@ -128,7 +130,7 @@ describe('obsidian-service helpers', () => {
         expect(invokeMock).toHaveBeenLastCalledWith('stop_obsidian_watcher', undefined);
     });
 
-    it('invokes the desktop write commands for task toggle and creation', async () => {
+    it('invokes the desktop write commands for inline and tasknotes flows', async () => {
         isTauriRuntimeMock.mockReturnValue(true);
         invokeMock.mockResolvedValue(undefined);
 
@@ -144,6 +146,16 @@ describe('obsidian-service helpers', () => {
             relativeFilePath: 'Mindwtr/Inbox.md',
             taskText: 'Capture task',
         });
+        await ObsidianService.toggleTaskNotesTask({
+            vaultPath: '/Vault',
+            relativeFilePath: 'TaskNotes/Capture.md',
+            setCompleted: true,
+        });
+        await ObsidianService.createTaskNotesTask({
+            vaultPath: '/Vault',
+            folder: 'TaskNotes',
+            title: 'Capture task note',
+        });
 
         expect(invokeMock).toHaveBeenNthCalledWith(1, 'obsidian_toggle_task', {
             vaultPath: '/Vault',
@@ -156,6 +168,16 @@ describe('obsidian-service helpers', () => {
             vaultPath: '/Vault',
             relativeFilePath: 'Mindwtr/Inbox.md',
             taskText: 'Capture task',
+        });
+        expect(invokeMock).toHaveBeenNthCalledWith(3, 'obsidian_toggle_tasknotes', {
+            vaultPath: '/Vault',
+            relativeFilePath: 'TaskNotes/Capture.md',
+            setCompleted: true,
+        });
+        expect(invokeMock).toHaveBeenNthCalledWith(4, 'obsidian_create_tasknotes', {
+            vaultPath: '/Vault',
+            folder: 'TaskNotes',
+            title: 'Capture task note',
         });
     });
 });

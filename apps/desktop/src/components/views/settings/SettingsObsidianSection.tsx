@@ -12,6 +12,15 @@ type Labels = {
     obsidianScanFoldersHint: string;
     obsidianInboxFile: string;
     obsidianInboxFileHint: string;
+    obsidianTaskNotes: string;
+    obsidianTaskNotesDesc: string;
+    obsidianTaskNotesIncludeArchived: string;
+    obsidianTaskNotesIncludeArchivedHint: string;
+    obsidianNewTaskFormat: string;
+    obsidianNewTaskFormatHint: string;
+    obsidianNewTaskFormatAuto: string;
+    obsidianNewTaskFormatInline: string;
+    obsidianNewTaskFormatTaskNotes: string;
     obsidianWatching: string;
     obsidianWatcherUnavailable: string;
     obsidianSave: string;
@@ -31,6 +40,8 @@ type SettingsObsidianSectionProps = {
     obsidianEnabled: boolean;
     obsidianScanFoldersText: string;
     obsidianInboxFile: string;
+    obsidianTaskNotesIncludeArchived: boolean;
+    obsidianNewTaskFormat: 'auto' | 'inline' | 'tasknotes';
     obsidianLastScannedAt: string | null;
     obsidianHasVaultMarker: boolean | null;
     obsidianVaultWarning: string | null;
@@ -42,6 +53,8 @@ type SettingsObsidianSectionProps = {
     onObsidianEnabledChange: (value: boolean) => void;
     onObsidianScanFoldersTextChange: (value: string) => void;
     onObsidianInboxFileChange: (value: string) => void;
+    onObsidianTaskNotesIncludeArchivedChange: (value: boolean) => void;
+    onObsidianNewTaskFormatChange: (value: 'auto' | 'inline' | 'tasknotes') => void;
     onBrowseObsidianVault: () => Promise<void> | void;
     onSaveObsidian: () => Promise<void> | void;
     onRemoveObsidian: () => Promise<void> | void;
@@ -55,6 +68,8 @@ export function SettingsObsidianSection({
     obsidianEnabled,
     obsidianScanFoldersText,
     obsidianInboxFile,
+    obsidianTaskNotesIncludeArchived,
+    obsidianNewTaskFormat,
     obsidianLastScannedAt,
     obsidianHasVaultMarker,
     obsidianVaultWarning,
@@ -66,6 +81,8 @@ export function SettingsObsidianSection({
     onObsidianEnabledChange,
     onObsidianScanFoldersTextChange,
     onObsidianInboxFileChange,
+    onObsidianTaskNotesIncludeArchivedChange,
+    onObsidianNewTaskFormatChange,
     onBrowseObsidianVault,
     onSaveObsidian,
     onRemoveObsidian,
@@ -150,6 +167,51 @@ export function SettingsObsidianSection({
                     className="bg-muted p-2 rounded text-sm font-mono border border-border focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <p className="text-xs text-muted-foreground">{t.obsidianInboxFileHint}</p>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+                <div className="space-y-1">
+                    <div className="text-sm font-medium">{t.obsidianTaskNotes}</div>
+                    <p className="text-xs text-muted-foreground">{t.obsidianTaskNotesDesc}</p>
+                </div>
+
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <p className="text-sm font-medium">{t.obsidianTaskNotesIncludeArchived}</p>
+                        <p className="text-xs text-muted-foreground">{t.obsidianTaskNotesIncludeArchivedHint}</p>
+                    </div>
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={obsidianTaskNotesIncludeArchived}
+                        onClick={() => onObsidianTaskNotesIncludeArchivedChange(!obsidianTaskNotesIncludeArchived)}
+                        className={cn(
+                            'relative inline-flex h-5 w-9 items-center rounded-full border transition-colors',
+                            obsidianTaskNotesIncludeArchived ? 'bg-primary border-primary' : 'bg-muted/50 border-border',
+                        )}
+                    >
+                        <span
+                            className={cn(
+                                'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                                obsidianTaskNotesIncludeArchived ? 'translate-x-4' : 'translate-x-1',
+                            )}
+                        />
+                    </button>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium">{t.obsidianNewTaskFormat}</label>
+                    <select
+                        value={obsidianNewTaskFormat}
+                        onChange={(event) => onObsidianNewTaskFormatChange(event.target.value as 'auto' | 'inline' | 'tasknotes')}
+                        className="bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                        <option value="auto">{t.obsidianNewTaskFormatAuto}</option>
+                        <option value="inline">{t.obsidianNewTaskFormatInline}</option>
+                        <option value="tasknotes">{t.obsidianNewTaskFormatTaskNotes}</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground">{t.obsidianNewTaskFormatHint}</p>
+                </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">

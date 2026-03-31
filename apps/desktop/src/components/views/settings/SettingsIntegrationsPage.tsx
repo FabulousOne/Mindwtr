@@ -30,6 +30,15 @@ type Labels = {
     obsidianScanFoldersHint: string;
     obsidianInboxFile: string;
     obsidianInboxFileHint: string;
+    obsidianTaskNotes: string;
+    obsidianTaskNotesDesc: string;
+    obsidianTaskNotesIncludeArchived: string;
+    obsidianTaskNotesIncludeArchivedHint: string;
+    obsidianNewTaskFormat: string;
+    obsidianNewTaskFormatHint: string;
+    obsidianNewTaskFormatAuto: string;
+    obsidianNewTaskFormatInline: string;
+    obsidianNewTaskFormatTaskNotes: string;
     obsidianWatching: string;
     obsidianWatcherUnavailable: string;
     obsidianSave: string;
@@ -62,6 +71,8 @@ type SettingsIntegrationsPageProps = {
     obsidianEnabled: boolean;
     obsidianScanFoldersText: string;
     obsidianInboxFile: string;
+    obsidianTaskNotesIncludeArchived: boolean;
+    obsidianNewTaskFormat: 'auto' | 'inline' | 'tasknotes';
     obsidianLastScannedAt: string | null;
     obsidianHasVaultMarker: boolean | null;
     obsidianVaultWarning: string | null;
@@ -73,6 +84,8 @@ type SettingsIntegrationsPageProps = {
     onObsidianEnabledChange: (value: boolean) => void;
     onObsidianScanFoldersTextChange: (value: string) => void;
     onObsidianInboxFileChange: (value: string) => void;
+    onObsidianTaskNotesIncludeArchivedChange: (value: boolean) => void;
+    onObsidianNewTaskFormatChange: (value: 'auto' | 'inline' | 'tasknotes') => void;
     onBrowseObsidianVault: () => Promise<void> | void;
     onSaveObsidian: () => Promise<void> | void;
     onRemoveObsidian: () => Promise<void> | void;
@@ -99,6 +112,8 @@ export function SettingsIntegrationsPage({
     obsidianEnabled,
     obsidianScanFoldersText,
     obsidianInboxFile,
+    obsidianTaskNotesIncludeArchived,
+    obsidianNewTaskFormat,
     obsidianLastScannedAt,
     obsidianHasVaultMarker,
     obsidianVaultWarning,
@@ -110,6 +125,8 @@ export function SettingsIntegrationsPage({
     onObsidianEnabledChange,
     onObsidianScanFoldersTextChange,
     onObsidianInboxFileChange,
+    onObsidianTaskNotesIncludeArchivedChange,
+    onObsidianNewTaskFormatChange,
     onBrowseObsidianVault,
     onSaveObsidian,
     onRemoveObsidian,
@@ -141,6 +158,8 @@ export function SettingsIntegrationsPage({
                 obsidianEnabled={obsidianEnabled}
                 obsidianScanFoldersText={obsidianScanFoldersText}
                 obsidianInboxFile={obsidianInboxFile}
+                obsidianTaskNotesIncludeArchived={obsidianTaskNotesIncludeArchived}
+                obsidianNewTaskFormat={obsidianNewTaskFormat}
                 obsidianLastScannedAt={obsidianLastScannedAt}
                 obsidianHasVaultMarker={obsidianHasVaultMarker}
                 obsidianVaultWarning={obsidianVaultWarning}
@@ -152,6 +171,8 @@ export function SettingsIntegrationsPage({
                 onObsidianEnabledChange={onObsidianEnabledChange}
                 onObsidianScanFoldersTextChange={onObsidianScanFoldersTextChange}
                 onObsidianInboxFileChange={onObsidianInboxFileChange}
+                onObsidianTaskNotesIncludeArchivedChange={onObsidianTaskNotesIncludeArchivedChange}
+                onObsidianNewTaskFormatChange={onObsidianNewTaskFormatChange}
                 onBrowseObsidianVault={onBrowseObsidianVault}
                 onSaveObsidian={onSaveObsidian}
                 onRemoveObsidian={onRemoveObsidian}

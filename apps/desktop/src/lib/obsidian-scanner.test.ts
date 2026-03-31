@@ -49,15 +49,18 @@ describe('scanObsidianVault', () => {
             scanFolders: ['/'],
         }, nodeFsDeps);
 
-        expect(result.scannedFileCount).toBe(8);
-        expect(result.scannedRelativePaths).toHaveLength(8);
-        expect(result.tasks).toHaveLength(13);
+        expect(result.scannedFileCount).toBe(12);
+        expect(result.scannedRelativePaths).toHaveLength(12);
+        expect(result.importMode).toBe('tasknotes');
+        expect(result.tasks).toHaveLength(3);
         expect(result.warnings).toEqual([]);
         expect(result.tasks.map((task) => task.source.relativeFilePath)).not.toContain('.trash/Deleted.md');
         expect(result.tasks.map((task) => task.source.relativeFilePath)).not.toContain('.obsidian/.gitkeep');
+        expect(result.tasks.every((task) => task.format === 'tasknotes')).toBe(true);
         expect(result.scannedRelativePaths).not.toContain('.trash/Deleted.md');
-        expect(result.tasks[0]?.source.relativeFilePath).toBe('Daily/2026-03-14.md');
-        expect(result.tasks[result.tasks.length - 1]?.source.relativeFilePath).toBe('Unicode-任务.md');
+        expect(result.scannedRelativePaths).not.toContain('TaskNotes/Views/tasks-default.md');
+        expect(result.tasks[0]?.source.relativeFilePath).toBe('TaskNotes/Boolean status.md');
+        expect(result.tasks[result.tasks.length - 1]?.source.relativeFilePath).toBe('TaskNotes/Review quarterly report.md');
     });
 
     it('respects configured scan folders', async () => {
@@ -69,6 +72,7 @@ describe('scanObsidianVault', () => {
 
         expect(result.scannedFileCount).toBe(2);
         expect(result.tasks).toHaveLength(6);
+        expect(result.importMode).toBe('inline');
         expect(result.warnings).toEqual([]);
         expect([...new Set(result.tasks.map((task) => task.source.relativeFilePath))]).toEqual([
             'Projects/Alpha.md',
@@ -90,8 +94,10 @@ describe('scanObsidianVault', () => {
 
         expect(hiddenResult.scannedFileCount).toBe(2);
         expect(hiddenResult.tasks).toHaveLength(6);
+        expect(hiddenResult.importMode).toBe('inline');
         expect(hiddenResult.warnings).toEqual(['Skipped invalid scan folder: .obsidian']);
         expect(singleFileResult.scannedFileCount).toBe(1);
+        expect(singleFileResult.importMode).toBe('inline');
         expect(singleFileResult.tasks.map((task) => task.text)).toEqual([
             'Buy groceries #errands',
             'Pay rent [[Bills]]',
@@ -126,6 +132,7 @@ describe('scanObsidianVault', () => {
 
         expect(result.scannedFileCount).toBe(0);
         expect(result.tasks).toHaveLength(0);
+        expect(result.importMode).toBe('inline');
         expect(result.warnings).toEqual(['Skipped large Markdown file: Huge.md']);
     });
 
@@ -158,6 +165,7 @@ describe('scanObsidianVault', () => {
         }, deps);
 
         expect(result.warnings).toHaveLength(MAX_OBSIDIAN_SCAN_WARNINGS);
+        expect(result.importMode).toBe('inline');
         expect(result.warnings[0]).toBe('Skipped large Markdown file: Huge-0.md');
         expect(result.warnings[result.warnings.length - 1]).toBe(
             `Skipped large Markdown file: Huge-${MAX_OBSIDIAN_SCAN_WARNINGS - 1}.md`
@@ -173,9 +181,27 @@ describe('scanObsidianVault', () => {
 
         expect(result.isTracked).toBe(true);
         expect(result.warning).toBeNull();
+        expect(result.detectedTaskNotes).toBe(false);
         expect(result.tasks.map((task) => task.text)).toEqual([
             'Follow up on [[Meeting Notes 2026-03-14]] #work #urgent',
             'Review [[Project Alpha|Alpha project]] proposal',
+        ]);
+    });
+
+    it('can include archived tasknotes files when configured', async () => {
+        const result = await scanObsidianVault({
+            vaultPath: fixtureRoot,
+            enabled: true,
+            scanFolders: ['TaskNotes'],
+            taskNotesIncludeArchived: true,
+        }, nodeFsDeps);
+
+        expect(result.importMode).toBe('tasknotes');
+        expect(result.tasks.map((task) => task.text)).toEqual([
+            'Archived task',
+            'Close support thread',
+            'Buy groceries',
+            'Review quarterly report',
         ]);
     });
 });
@@ -201,6 +227,8 @@ describe('normalizeObsidianConfig', () => {
             vaultName: '',
             scanFolders: ['/'],
             inboxFile: DEFAULT_OBSIDIAN_INBOX_FILE,
+            taskNotesIncludeArchived: false,
+            newTaskFormat: 'auto',
             lastScannedAt: null,
             enabled: false,
         });
@@ -215,6 +243,8 @@ describe('normalizeObsidianConfig', () => {
             enabled: true,
             scanFolders: ['Projects', 'Daily'],
             inboxFile: DEFAULT_OBSIDIAN_INBOX_FILE,
+            taskNotesIncludeArchived: false,
+            newTaskFormat: 'auto',
         });
     });
 });

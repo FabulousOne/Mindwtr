@@ -1,14 +1,20 @@
 import {
     normalizeObsidianRelativePath,
     parseObsidianTasksFromMarkdown,
+    parseTaskNotesFile,
     type ObsidianTask,
 } from '@mindwtr/core';
+
+export type ObsidianImportMode = 'inline' | 'tasknotes';
+export type ObsidianNewTaskFormat = 'auto' | 'inline' | 'tasknotes';
 
 export type ObsidianConfig = {
     vaultPath: string | null;
     vaultName: string;
     scanFolders: string[];
     inboxFile: string;
+    taskNotesIncludeArchived: boolean;
+    newTaskFormat: ObsidianNewTaskFormat;
     lastScannedAt: string | null;
     enabled: boolean;
 };
@@ -18,6 +24,7 @@ export type ObsidianScanResult = {
     scannedFileCount: number;
     scannedRelativePaths: string[];
     warnings: string[];
+    importMode: ObsidianImportMode;
 };
 
 export type ObsidianFileScanResult = {
@@ -25,6 +32,7 @@ export type ObsidianFileScanResult = {
     warning: string | null;
     isTracked: boolean;
     relativeFilePath: string;
+    detectedTaskNotes: boolean;
 };
 
 type ScannerDirEntry = {
@@ -50,6 +58,7 @@ export type ObsidianScannerDependencies = {
 
 const DEFAULT_SCAN_FOLDERS = ['/'];
 export const DEFAULT_OBSIDIAN_INBOX_FILE = 'Mindwtr/Inbox.md';
+export const DEFAULT_OBSIDIAN_NEW_TASK_FORMAT: ObsidianNewTaskFormat = 'auto';
 export const MAX_OBSIDIAN_MARKDOWN_BYTES = 5 * 1024 * 1024;
 export const MAX_OBSIDIAN_SCAN_WARNINGS = 100;
 const MAX_OBSIDIAN_SCAN_DEPTH = 32;
@@ -152,6 +161,12 @@ export const sanitizeObsidianInboxFile = (value: string | null | undefined): str
     }
 };
 
+export const sanitizeObsidianNewTaskFormat = (value: string | null | undefined): ObsidianNewTaskFormat => {
+    return value === 'inline' || value === 'tasknotes' || value === 'auto'
+        ? value
+        : DEFAULT_OBSIDIAN_NEW_TASK_FORMAT;
+};
+
 export const sanitizeScanFolders = (folders: string[] | null | undefined): string[] => {
     const source = Array.isArray(folders) ? folders : DEFAULT_SCAN_FOLDERS;
     const sanitized = source.map(sanitizeScanFolder);
@@ -170,6 +185,8 @@ export const normalizeObsidianConfig = (config: Partial<ObsidianConfig> | null |
         vaultName: deriveVaultName(vaultPath),
         scanFolders,
         inboxFile: sanitizeObsidianInboxFile(config?.inboxFile),
+        taskNotesIncludeArchived: config?.taskNotesIncludeArchived === true,
+        newTaskFormat: sanitizeObsidianNewTaskFormat(config?.newTaskFormat),
         lastScannedAt,
         enabled,
     };
@@ -241,6 +258,7 @@ const readAndParseObsidianMarkdownFile = async (
             warning: null,
             isTracked: false,
             relativeFilePath: safeNormalizeRelativePath(relativePath),
+            detectedTaskNotes: false,
         };
     }
 
@@ -256,6 +274,7 @@ const readAndParseObsidianMarkdownFile = async (
                     : `Skipped invalid Obsidian path: ${relativePath}`,
             isTracked: false,
             relativeFilePath: String(relativePath || '').trim(),
+            detectedTaskNotes: false,
         };
     }
 
@@ -265,6 +284,7 @@ const readAndParseObsidianMarkdownFile = async (
             warning: null,
             isTracked: false,
             relativeFilePath: normalizedRelativePath,
+            detectedTaskNotes: false,
         };
     }
     if (shouldSkipRelativePath(normalizedRelativePath)) {
@@ -273,6 +293,7 @@ const readAndParseObsidianMarkdownFile = async (
             warning: null,
             isTracked: false,
             relativeFilePath: normalizedRelativePath,
+            detectedTaskNotes: false,
         };
     }
     if (!isPathWithinVault(vaultPath, absolutePath)) {
@@ -281,6 +302,7 @@ const readAndParseObsidianMarkdownFile = async (
             warning: `Skipped file outside the configured vault: ${normalizedRelativePath}`,
             isTracked: false,
             relativeFilePath: normalizedRelativePath,
+            detectedTaskNotes: false,
         };
     }
     if (!(await deps.exists(absolutePath))) {
@@ -289,6 +311,7 @@ const readAndParseObsidianMarkdownFile = async (
             warning: null,
             isTracked: false,
             relativeFilePath: normalizedRelativePath,
+            detectedTaskNotes: false,
         };
     }
 
@@ -299,6 +322,7 @@ const readAndParseObsidianMarkdownFile = async (
             warning: null,
             isTracked: false,
             relativeFilePath: normalizedRelativePath,
+            detectedTaskNotes: false,
         };
     }
     if ((fileInfo.size ?? 0) > MAX_OBSIDIAN_MARKDOWN_BYTES) {
@@ -307,11 +331,30 @@ const readAndParseObsidianMarkdownFile = async (
             warning: `Skipped large Markdown file: ${normalizedRelativePath}`,
             isTracked: false,
             relativeFilePath: normalizedRelativePath,
+            detectedTaskNotes: false,
         };
     }
 
     const markdown = await deps.readTextFile(absolutePath);
     const fileModifiedAt = fileInfo.mtime?.toISOString() ?? new Date(0).toISOString();
+    const taskNotesResult = parseTaskNotesFile(markdown, {
+        vaultName: config.vaultName,
+        vaultPath,
+        relativeFilePath: normalizedRelativePath,
+        fileModifiedAt,
+        includeArchived: config.taskNotesIncludeArchived,
+    });
+
+    if (taskNotesResult.skipInlineParsing) {
+        return {
+            tasks: taskNotesResult.task ? [taskNotesResult.task] : [],
+            warning: null,
+            isTracked: taskNotesResult.matchesTaskNotesFormat,
+            relativeFilePath: normalizedRelativePath,
+            detectedTaskNotes: taskNotesResult.matchesTaskNotesFormat,
+        };
+    }
+
     const parsed = parseObsidianTasksFromMarkdown(markdown, {
         vaultName: config.vaultName,
         vaultPath,
@@ -323,6 +366,7 @@ const readAndParseObsidianMarkdownFile = async (
         warning: null,
         isTracked: true,
         relativeFilePath: normalizedRelativePath,
+        detectedTaskNotes: false,
     };
 };
 
@@ -339,6 +383,7 @@ export async function scanObsidianFile(
             warning: null,
             isTracked: false,
             relativeFilePath: safeNormalizeRelativePath(relativeFilePath),
+            detectedTaskNotes: false,
         };
     }
     const absolutePath = resolveObsidianAbsolutePath(vaultPath, relativeFilePath);
@@ -352,15 +397,17 @@ export async function scanObsidianVault(
     const config = normalizeObsidianConfig(rawConfig);
     const vaultPath = config.vaultPath;
     if (!config.enabled || !vaultPath) {
-        return { tasks: [], scannedFileCount: 0, scannedRelativePaths: [], warnings: [] };
+        return { tasks: [], scannedFileCount: 0, scannedRelativePaths: [], warnings: [], importMode: 'inline' };
     }
 
-    const tasks: ObsidianTask[] = [];
+    const inlineTasks: ObsidianTask[] = [];
+    const taskNotesTasks: ObsidianTask[] = [];
     const warnings: string[] = [];
     const seenFiles = new Set<string>();
     const visitedDirectories = new Set<string>();
     const scannedRelativePaths: string[] = [];
     let scannedFileCount = 0;
+    let detectedTaskNotes = false;
 
     const scanMarkdownFile = async (absolutePath: string, relativePath: string): Promise<void> => {
         const fileResult = await readAndParseObsidianMarkdownFile(config, absolutePath, relativePath, deps);
@@ -378,7 +425,12 @@ export async function scanObsidianVault(
         seenFiles.add(normalizedRelativePath);
         scannedFileCount += 1;
         scannedRelativePaths.push(normalizedRelativePath);
-        tasks.push(...fileResult.tasks);
+        detectedTaskNotes = detectedTaskNotes || fileResult.detectedTaskNotes;
+        if (fileResult.detectedTaskNotes) {
+            taskNotesTasks.push(...fileResult.tasks);
+        } else {
+            inlineTasks.push(...fileResult.tasks);
+        }
     };
 
     const walkDirectory = async (absoluteDirPath: string, relativeDirPath: string, depth: number): Promise<void> => {
@@ -441,9 +493,10 @@ export async function scanObsidianVault(
     }
 
     return {
-        tasks: sortObsidianTasks(tasks),
+        tasks: sortObsidianTasks(detectedTaskNotes ? taskNotesTasks : inlineTasks),
         scannedFileCount,
         scannedRelativePaths: [...scannedRelativePaths].sort((left, right) => left.localeCompare(right)),
         warnings,
+        importMode: detectedTaskNotes ? 'tasknotes' : 'inline',
     };
 }

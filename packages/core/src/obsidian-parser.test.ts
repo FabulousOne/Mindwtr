@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+    buildObsidianFileTaskId,
     buildObsidianTaskId,
     normalizeObsidianRelativePath,
     parseObsidianTasksFromMarkdown,
@@ -31,6 +32,7 @@ describe('parseObsidianTasksFromMarkdown', () => {
             ['Pay rent [[Bills]]', true],
             ['Review docs #writing/reference', false],
         ]);
+        expect(result.tasks.every((task) => task.format === 'inline')).toBe(true);
     });
 
     it('extracts inline tags and wiki links', () => {
@@ -82,6 +84,7 @@ describe('parseObsidianTasksFromMarkdown', () => {
     it('builds deterministic ids from file path and line number', () => {
         expect(buildObsidianTaskId('Projects/Alpha.md', 10)).toBe(buildObsidianTaskId('Projects/Alpha.md', 10));
         expect(buildObsidianTaskId('Projects/Alpha.md', 10)).not.toBe(buildObsidianTaskId('Projects/Alpha.md', 11));
+        expect(buildObsidianFileTaskId('TaskNotes/Alpha.md')).toBe(buildObsidianFileTaskId('TaskNotes/Alpha.md'));
     });
 
     it('rejects parent traversal and absolute relative paths', () => {

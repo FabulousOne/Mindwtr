@@ -964,6 +964,10 @@ export function SettingsView() {
         setObsidianScanFoldersText,
         obsidianInboxFile,
         setObsidianInboxFile,
+        obsidianTaskNotesIncludeArchived,
+        setObsidianTaskNotesIncludeArchived,
+        obsidianNewTaskFormat,
+        setObsidianNewTaskFormat,
         obsidianLastScannedAt,
         obsidianHasVaultMarker,
         obsidianVaultWarning,
@@ -1152,6 +1156,8 @@ export function SettingsView() {
                     obsidianEnabled={obsidianEnabled}
                     obsidianScanFoldersText={obsidianScanFoldersText}
                     obsidianInboxFile={obsidianInboxFile}
+                    obsidianTaskNotesIncludeArchived={obsidianTaskNotesIncludeArchived}
+                    obsidianNewTaskFormat={obsidianNewTaskFormat}
                     obsidianLastScannedAt={obsidianLastScannedAt}
                     obsidianHasVaultMarker={obsidianHasVaultMarker}
                     obsidianVaultWarning={obsidianVaultWarning}
@@ -1163,6 +1169,8 @@ export function SettingsView() {
                     onObsidianEnabledChange={setObsidianEnabled}
                     onObsidianScanFoldersTextChange={setObsidianScanFoldersText}
                     onObsidianInboxFileChange={setObsidianInboxFile}
+                    onObsidianTaskNotesIncludeArchivedChange={setObsidianTaskNotesIncludeArchived}
+                    onObsidianNewTaskFormatChange={setObsidianNewTaskFormat}
                     onBrowseObsidianVault={onBrowseObsidianVault}
                     onSaveObsidian={onSaveObsidian}
                     onRemoveObsidian={onRemoveObsidian}

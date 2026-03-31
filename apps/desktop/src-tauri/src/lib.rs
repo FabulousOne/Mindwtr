@@ -66,7 +66,10 @@ use install::{
 use logging::{append_log_line, clear_log_file, log_ai_debug};
 use obsidian_paths::default_obsidian_inbox_file;
 use obsidian_watcher::{start_obsidian_watcher, stop_obsidian_watcher, ObsidianWatcherState};
-use obsidian_writer::{obsidian_create_task, obsidian_toggle_task};
+use obsidian_writer::{
+    obsidian_create_task, obsidian_create_tasknotes, obsidian_toggle_task,
+    obsidian_toggle_tasknotes,
+};
 use platform::{
     cloudkit_account_status, cloudkit_consume_pending_remote_change, cloudkit_delete_records,
     cloudkit_ensure_subscription, cloudkit_ensure_zone, cloudkit_fetch_all_records,
@@ -344,6 +347,10 @@ fn default_obsidian_scan_folders() -> Vec<String> {
     vec!["/".to_string()]
 }
 
+fn default_obsidian_new_task_format() -> String {
+    "auto".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ObsidianConfigPayload {
@@ -353,6 +360,10 @@ struct ObsidianConfigPayload {
     scan_folders: Vec<String>,
     #[serde(default = "default_obsidian_inbox_file")]
     inbox_file: String,
+    #[serde(default)]
+    task_notes_include_archived: bool,
+    #[serde(default = "default_obsidian_new_task_format")]
+    new_task_format: String,
     last_scanned_at: Option<String>,
     enabled: bool,
 }
@@ -364,6 +375,8 @@ impl Default for ObsidianConfigPayload {
             vault_name: String::new(),
             scan_folders: default_obsidian_scan_folders(),
             inbox_file: default_obsidian_inbox_file(),
+            task_notes_include_archived: false,
+            new_task_format: default_obsidian_new_task_format(),
             last_scanned_at: None,
             enabled: false,
         }
@@ -743,7 +756,9 @@ pub fn run() {
             start_obsidian_watcher,
             stop_obsidian_watcher,
             obsidian_toggle_task,
+            obsidian_toggle_tasknotes,
             obsidian_create_task,
+            obsidian_create_tasknotes,
             get_webdav_config,
             get_webdav_password,
             set_webdav_config,

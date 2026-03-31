@@ -8,6 +8,7 @@ import {
 import {
     isObsidianFileInScanFolders,
     normalizeObsidianConfig,
+    type ObsidianImportMode,
     sortObsidianTasks,
 } from '../lib/obsidian-scanner';
 import { useUiStore } from './ui-store';
@@ -25,6 +26,7 @@ type ObsidianStoreState = {
     scannedFileCount: number;
     scannedRelativePaths: string[];
     warnings: string[];
+    importMode: ObsidianImportMode;
     hasScannedThisSession: boolean;
     hasVaultMarker: boolean | null;
     isLoadingConfig: boolean;
@@ -83,7 +85,8 @@ const normalizeEventPaths = (paths: string[], config: ObsidianConfig): string[] 
 
 const scanConfigChanged = (left: ObsidianConfig, right: ObsidianConfig): boolean => {
     return left.vaultPath !== right.vaultPath
-        || left.scanFolders.join('\n') !== right.scanFolders.join('\n');
+        || left.scanFolders.join('\n') !== right.scanFolders.join('\n')
+        || left.taskNotesIncludeArchived !== right.taskNotesIncludeArchived;
 };
 
 export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set, get) => ({
@@ -92,6 +95,7 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
     scannedFileCount: 0,
     scannedRelativePaths: [],
     warnings: [],
+    importMode: 'inline',
     hasScannedThisSession: false,
     hasVaultMarker: null,
     isLoadingConfig: false,
@@ -119,6 +123,7 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
                         tasks: [],
                         scannedFileCount: 0,
                         scannedRelativePaths: [],
+                        importMode: 'inline',
                         hasScannedThisSession: false,
                     }),
                 isInitialized: true,
@@ -153,6 +158,7 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
                     tasks: [],
                     scannedFileCount: 0,
                     scannedRelativePaths: [],
+                    importMode: 'inline',
                 }
                 : {}),
         });
@@ -162,6 +168,7 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
                 scannedFileCount: 0,
                 scannedRelativePaths: [],
                 warnings: [],
+                importMode: 'inline',
                 hasScannedThisSession: false,
                 isWatching: false,
                 watcherError: null,
@@ -195,6 +202,7 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
             scannedFileCount: 0,
             scannedRelativePaths: [],
             warnings: [],
+            importMode: 'inline',
             hasScannedThisSession: false,
             hasVaultMarker: null,
             isWatching: false,
@@ -218,6 +226,7 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
                 scannedFileCount: 0,
                 scannedRelativePaths: [],
                 warnings: [],
+                importMode: 'inline',
                 hasScannedThisSession: false,
             });
             return;
@@ -237,6 +246,7 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
                 scannedFileCount: result.scannedFileCount,
                 scannedRelativePaths: result.scannedRelativePaths,
                 warnings: result.warnings,
+                importMode: result.importMode,
                 hasScannedThisSession: true,
                 isScanning: false,
                 error: null,
@@ -244,6 +254,7 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
         } catch (error) {
             set({
                 warnings: [],
+                importMode: 'inline',
                 hasScannedThisSession: true,
                 isScanning: false,
                 error: toErrorMessage(error, 'Failed to scan Obsidian vault.'),
@@ -326,9 +337,20 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
         let nextTasks = get().tasks.filter((task) => !deletedSet.has(task.source.relativeFilePath));
         const nextRelativePaths = new Set(get().scannedRelativePaths);
         const warnings: string[] = [];
+        const currentImportMode = get().importMode;
+        const currentTaskNotesPaths = new Set(
+            get().tasks
+                .filter((task) => task.format === 'tasknotes')
+                .map((task) => task.source.relativeFilePath)
+        );
+        let touchedExistingTaskNotesFile = false;
+        let shouldRescan = false;
 
         for (const deletedPath of deleted) {
             nextRelativePaths.delete(deletedPath);
+            if (currentTaskNotesPaths.has(deletedPath)) {
+                touchedExistingTaskNotesFile = true;
+            }
         }
 
         let changedCount = 0;
@@ -340,14 +362,52 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
                 nextTasks = nextTasks.filter((task) => task.source.relativeFilePath !== changedPath);
                 nextRelativePaths.delete(changedPath);
 
+                if (currentImportMode === 'inline' && fileResult.detectedTaskNotes) {
+                    shouldRescan = true;
+                    changedCount += 1;
+                    break;
+                }
+
+                if (currentImportMode === 'tasknotes' && currentTaskNotesPaths.has(changedPath) && !fileResult.detectedTaskNotes) {
+                    touchedExistingTaskNotesFile = true;
+                }
+
                 if (fileResult.isTracked) {
-                    nextTasks.push(...fileResult.tasks);
+                    if (currentImportMode === 'tasknotes') {
+                        if (fileResult.detectedTaskNotes) {
+                            nextTasks.push(...fileResult.tasks);
+                        }
+                    } else {
+                        nextTasks.push(...fileResult.tasks);
+                    }
                     nextRelativePaths.add(fileResult.relativeFilePath);
                 }
                 changedCount += 1;
             } catch (error) {
                 warnings.push(toErrorMessage(error, `Failed to refresh ${changedPath}.`));
             }
+        }
+
+        if (!shouldRescan && currentImportMode === 'tasknotes' && touchedExistingTaskNotesFile) {
+            const hasRemainingTaskNotes = nextTasks.some((task) => task.format === 'tasknotes');
+            if (!hasRemainingTaskNotes) {
+                shouldRescan = true;
+            }
+        }
+
+        if (!shouldRescan && currentImportMode === 'tasknotes' && get().tasks.length === 0) {
+            shouldRescan = true;
+        }
+
+        if (shouldRescan) {
+            await get().rescan();
+            const nextState = get();
+            return {
+                changedCount: changed.length,
+                deletedCount: deleted.length,
+                warnings: nextState.error ? [nextState.error] : nextState.warnings,
+                skippedBeforeInitialScan: false,
+            };
         }
 
         set({

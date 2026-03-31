@@ -490,6 +490,14 @@ fn normalize_obsidian_scan_folders(scan_folders: Vec<String>) -> Vec<String> {
     }
 }
 
+fn normalize_obsidian_new_task_format(value: String) -> String {
+    match value.trim() {
+        "inline" => "inline".to_string(),
+        "tasknotes" => "tasknotes".to_string(),
+        _ => "auto".to_string(),
+    }
+}
+
 fn normalize_obsidian_config_payload(payload: ObsidianConfigPayload) -> ObsidianConfigPayload {
     let vault_path = payload.vault_path.and_then(|value| {
         let trimmed = value.trim().to_string();
@@ -526,6 +534,8 @@ fn normalize_obsidian_config_payload(payload: ObsidianConfigPayload) -> Obsidian
         vault_name,
         scan_folders: normalize_obsidian_scan_folders(payload.scan_folders),
         inbox_file: normalize_obsidian_inbox_file(&payload.inbox_file),
+        task_notes_include_archived: payload.task_notes_include_archived,
+        new_task_format: normalize_obsidian_new_task_format(payload.new_task_format),
         last_scanned_at,
     }
 }

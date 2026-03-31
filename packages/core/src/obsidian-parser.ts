@@ -1,3 +1,10 @@
+import type { TaskPriority, TaskStatus } from './types';
+import {
+    parseObsidianFrontmatterProperties,
+    type ObsidianFrontmatterProperties,
+    splitObsidianFrontmatter,
+} from './obsidian-frontmatter';
+
 export type ObsidianSourceRef = {
     vaultName: string;
     vaultPath: string;
@@ -5,6 +12,23 @@ export type ObsidianSourceRef = {
     lineNumber: number;
     fileModifiedAt: string;
     noteTags: string[];
+};
+
+export type ObsidianTaskFormat = 'inline' | 'tasknotes';
+export type ObsidianTaskNotesStatus = Extract<TaskStatus, 'inbox' | 'next' | 'waiting' | 'someday' | 'done' | 'archived'>;
+
+export type ObsidianTaskNotesData = {
+    rawStatus: string;
+    mindwtrStatus: ObsidianTaskNotesStatus;
+    priority: TaskPriority | null;
+    dueDate: string | null;
+    scheduledDate: string | null;
+    contexts: string[];
+    projects: string[];
+    timeEstimateMinutes: number | null;
+    recurrenceRule: string | null;
+    completedDate: string | null;
+    bodyPreview: string | null;
 };
 
 export type ObsidianTask = {
@@ -15,12 +39,14 @@ export type ObsidianTask = {
     wikiLinks: string[];
     nestingLevel: number;
     source: ObsidianSourceRef;
+    format: ObsidianTaskFormat;
+    taskNotesData?: ObsidianTaskNotesData;
 };
 
 export type ObsidianFrontmatter = {
     tags: string[];
     due?: string;
-    properties: Record<string, string | string[]>;
+    properties: ObsidianFrontmatterProperties;
 };
 
 export type ParseObsidianTasksOptions = {
@@ -35,40 +61,18 @@ export type ParseObsidianTasksResult = {
     frontmatter: ObsidianFrontmatter;
 };
 
-const FRONTMATTER_BOUNDARY_RE = /^---\s*$/;
 const FENCE_RE = /^\s*(`{3,}|~{3,})/;
 const TASK_RE = /^([ \t]*)(?:[-*+])\s+\[( |x|X)\]\s+(.+)$/;
 const WIKI_LINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 const TAG_RE = /(^|\s)#([\p{L}\p{N}_/.:-]+)/gu;
 
-const stripYamlQuotes = (value: string): string => {
-    const trimmed = value.trim();
-    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith('\'') && trimmed.endsWith('\''))) {
-        return trimmed.slice(1, -1);
-    }
-    return trimmed;
-};
-
-const parseYamlScalar = (value: string): string | string[] => {
-    const trimmed = value.trim();
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-        return trimmed
-            .slice(1, -1)
-            .split(',')
-            .map((item) => stripYamlQuotes(item))
-            .map((item) => item.trim())
-            .filter(Boolean);
-    }
-    return stripYamlQuotes(trimmed);
-};
-
-const normalizeTagValue = (value: string): string => {
+export const normalizeObsidianTagValue = (value: string): string => {
     const trimmed = value.trim();
     if (!trimmed) return '';
     return trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
 };
 
-const uniqueStrings = (items: string[]): string[] => {
+export const uniqueObsidianStrings = (items: string[]): string[] => {
     const seen = new Set<string>();
     const result: string[] = [];
     for (const item of items) {
@@ -102,15 +106,24 @@ export const normalizeObsidianRelativePath = (value: string): string => {
     return segments.filter((segment) => segment !== '.').join('/');
 };
 
-export const buildObsidianTaskId = (relativeFilePath: string, lineNumber: number): string => {
-    const normalizedLineNumber = Number.isFinite(lineNumber) ? Math.max(0, Math.floor(lineNumber)) : 0;
-    const source = `${normalizeObsidianRelativePath(relativeFilePath)}:${normalizedLineNumber}`;
+const hashObsidianSource = (source: string): string => {
     let hash = 0x811c9dc5;
     for (let index = 0; index < source.length; index += 1) {
         hash ^= source.charCodeAt(index);
         hash = Math.imul(hash, 0x01000193);
     }
-    return `obsidian-${normalizedLineNumber}-${(hash >>> 0).toString(36)}`;
+    return (hash >>> 0).toString(36);
+};
+
+export const buildObsidianTaskId = (relativeFilePath: string, lineNumber: number): string => {
+    const normalizedLineNumber = Number.isFinite(lineNumber) ? Math.max(0, Math.floor(lineNumber)) : 0;
+    const source = `${normalizeObsidianRelativePath(relativeFilePath)}:${normalizedLineNumber}`;
+    return `obsidian-${normalizedLineNumber}-${hashObsidianSource(source)}`;
+};
+
+export const buildObsidianFileTaskId = (relativeFilePath: string, format: ObsidianTaskFormat = 'tasknotes'): string => {
+    const source = `${format}:${normalizeObsidianRelativePath(relativeFilePath)}`;
+    return `obsidian-file-${hashObsidianSource(source)}`;
 };
 
 export const extractObsidianTags = (text: string): string[] => {
@@ -118,10 +131,10 @@ export const extractObsidianTags = (text: string): string[] => {
     let match: RegExpExecArray | null;
     TAG_RE.lastIndex = 0;
     while ((match = TAG_RE.exec(text)) !== null) {
-        const value = normalizeTagValue(match[2] || '');
+        const value = normalizeObsidianTagValue(match[2] || '');
         if (value) tags.push(value);
     }
-    return uniqueStrings(tags);
+    return uniqueObsidianStrings(tags);
 };
 
 export const extractObsidianWikiLinks = (text: string): string[] => {
@@ -129,60 +142,23 @@ export const extractObsidianWikiLinks = (text: string): string[] => {
     let match: RegExpExecArray | null;
     WIKI_LINK_RE.lastIndex = 0;
     while ((match = WIKI_LINK_RE.exec(text)) !== null) {
-        const value = stripYamlQuotes(match[1] || '').trim();
+        const value = (match[1] || '').trim();
         if (value) links.push(value);
     }
-    return uniqueStrings(links);
+    return uniqueObsidianStrings(links);
 };
 
-const parseObsidianFrontmatter = (input: string): ObsidianFrontmatter => {
-    const properties: Record<string, string | string[]> = {};
-    let currentArrayKey: string | null = null;
-    for (const rawLine of input.split(/\r?\n/)) {
-        const line = rawLine.trimEnd();
-        if (!line.trim() || line.trimStart().startsWith('#')) {
-            continue;
-        }
-        const listItemMatch = line.match(/^\s*-\s*(.+)$/);
-        if (listItemMatch && currentArrayKey) {
-            const current = properties[currentArrayKey];
-            const item = stripYamlQuotes(listItemMatch[1] || '').trim();
-            if (!item) continue;
-            if (Array.isArray(current)) {
-                current.push(item);
-            } else if (typeof current === 'string' && current.trim()) {
-                properties[currentArrayKey] = [current, item];
-            } else {
-                properties[currentArrayKey] = [item];
-            }
-            continue;
-        }
+export const parseObsidianNoteFrontmatter = (input: string): ObsidianFrontmatter => {
+    const properties = parseObsidianFrontmatterProperties(input);
 
-        const match = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-        if (!match) {
-            currentArrayKey = null;
-            continue;
-        }
-
-        const key = match[1];
-        const rawValue = match[2] ?? '';
-        if (!rawValue.trim()) {
-            properties[key] = [];
-            currentArrayKey = key;
-            continue;
-        }
-
-        const parsed = parseYamlScalar(rawValue);
-        properties[key] = parsed;
-        currentArrayKey = Array.isArray(parsed) ? key : null;
-    }
-
-    const noteTags = uniqueStrings([
+    const noteTags = uniqueObsidianStrings([
         ...((Array.isArray(properties.tags) ? properties.tags : typeof properties.tags === 'string' ? [properties.tags] : [])
-            .map(normalizeTagValue)
+            .filter((value): value is string => typeof value === 'string')
+            .map(normalizeObsidianTagValue)
             .filter(Boolean)),
         ...((Array.isArray(properties.tag) ? properties.tag : typeof properties.tag === 'string' ? [properties.tag] : [])
-            .map(normalizeTagValue)
+            .filter((value): value is string => typeof value === 'string')
+            .map(normalizeObsidianTagValue)
             .filter(Boolean)),
     ]);
 
@@ -193,35 +169,6 @@ const parseObsidianFrontmatter = (input: string): ObsidianFrontmatter => {
         tags: noteTags,
         ...(due ? { due } : {}),
         properties,
-    };
-};
-
-const splitFrontmatter = (
-    markdown: string
-): { frontmatter: ObsidianFrontmatter; bodyLines: string[]; bodyStartLineNumber: number } => {
-    const lines = markdown.replace(/\r\n/g, '\n').split('\n');
-    if (!FRONTMATTER_BOUNDARY_RE.test(lines[0] || '')) {
-        return {
-            frontmatter: { tags: [], properties: {} },
-            bodyLines: lines,
-            bodyStartLineNumber: 1,
-        };
-    }
-
-    for (let index = 1; index < lines.length; index += 1) {
-        if (!FRONTMATTER_BOUNDARY_RE.test(lines[index] || '')) continue;
-        const frontmatter = parseObsidianFrontmatter(lines.slice(1, index).join('\n'));
-        return {
-            frontmatter,
-            bodyLines: lines.slice(index + 1),
-            bodyStartLineNumber: index + 2,
-        };
-    }
-
-    return {
-        frontmatter: { tags: [], properties: {} },
-        bodyLines: lines,
-        bodyStartLineNumber: 1,
     };
 };
 
@@ -245,12 +192,26 @@ export const parseObsidianTasksFromMarkdown = (
     options: ParseObsidianTasksOptions
 ): ParseObsidianTasksResult => {
     const normalizedRelativePath = normalizeObsidianRelativePath(options.relativeFilePath);
-    const { frontmatter, bodyLines, bodyStartLineNumber } = splitFrontmatter(markdown);
+    const split = splitObsidianFrontmatter(markdown);
+    const frontmatter: ObsidianFrontmatter = {
+        tags: uniqueObsidianStrings([
+            ...((Array.isArray(split.properties.tags) ? split.properties.tags : typeof split.properties.tags === 'string' ? [split.properties.tags] : [])
+                .filter((value): value is string => typeof value === 'string')
+                .map(normalizeObsidianTagValue)
+                .filter(Boolean)),
+            ...((Array.isArray(split.properties.tag) ? split.properties.tag : typeof split.properties.tag === 'string' ? [split.properties.tag] : [])
+                .filter((value): value is string => typeof value === 'string')
+                .map(normalizeObsidianTagValue)
+                .filter(Boolean)),
+        ]),
+        ...(typeof split.properties.due === 'string' && split.properties.due.trim() ? { due: split.properties.due.trim() } : {}),
+        properties: split.properties,
+    };
     const tasks: ObsidianTask[] = [];
     let inFence = false;
 
-    for (let index = 0; index < bodyLines.length; index += 1) {
-        const line = bodyLines[index] ?? '';
+    for (let index = 0; index < split.bodyLines.length; index += 1) {
+        const line = split.bodyLines[index] ?? '';
         if (FENCE_RE.test(line)) {
             inFence = !inFence;
             continue;
@@ -262,8 +223,8 @@ export const parseObsidianTasksFromMarkdown = (
         const text = (match[3] || '').trim();
         if (!text) continue;
 
-        const lineNumber = bodyStartLineNumber + index;
-        const taskTags = uniqueStrings([...extractObsidianTags(text), ...frontmatter.tags]);
+        const lineNumber = split.bodyStartLineNumber + index;
+        const taskTags = uniqueObsidianStrings([...extractObsidianTags(text), ...frontmatter.tags]);
         tasks.push({
             id: buildObsidianTaskId(normalizedRelativePath, lineNumber),
             text,
@@ -279,6 +240,7 @@ export const parseObsidianTasksFromMarkdown = (
                 fileModifiedAt: options.fileModifiedAt,
                 noteTags: frontmatter.tags,
             },
+            format: 'inline',
         });
     }
 
