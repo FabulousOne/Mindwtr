@@ -94,6 +94,23 @@ describe('todoist import', () => {
         expect(result.parsedProjects[1]?.sections).toEqual(['Errands']);
     });
 
+    it('warns when a Todoist CSV ends with an unclosed quoted field', () => {
+        const csv = [
+            'TYPE,CONTENT,DESCRIPTION',
+            'task,Valid task,Imported cleanly',
+            'task,"Broken task',
+        ].join('\n');
+
+        const result = parseTodoistImportSource({
+            fileName: 'Broken.csv',
+            text: csv,
+        });
+
+        expect(result.valid).toBe(true);
+        expect(result.parsedProjects[0]?.tasks.map((task) => task.title)).toEqual(['Valid task', 'Broken task']);
+        expect(result.warnings).toContain('1 Todoist CSV file ended with an unclosed quoted field and was imported best-effort.');
+    });
+
     it('imports parsed Todoist projects into new Mindwtr projects and preserves a recovery-friendly warning trail', () => {
         const existingProject: Project = {
             id: 'project-existing',

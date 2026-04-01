@@ -24,6 +24,7 @@ type TodoistWarningCounters = {
     noteWithoutTask: number;
     orphanSubtasks: number;
     recurringTasks: number;
+    unclosedQuotedFiles: number;
     unknownRowTypes: number;
     unparsedDates: number;
 };
@@ -126,6 +127,7 @@ const createWarningCounters = (): TodoistWarningCounters => ({
     noteWithoutTask: 0,
     orphanSubtasks: 0,
     recurringTasks: 0,
+    unclosedQuotedFiles: 0,
     unknownRowTypes: 0,
     unparsedDates: 0,
 });
@@ -143,6 +145,7 @@ const buildTodoistWarnings = (counters: TodoistWarningCounters): string[] => {
     appendWarning(warnings, counters.orphanSubtasks, '1 Todoist subtask had no parent task and was imported as a normal task.', '{count} Todoist subtasks had no parent task and were imported as normal tasks.');
     appendWarning(warnings, counters.nonCsvEntries, '1 non-CSV file inside the Todoist ZIP was skipped.', '{count} non-CSV files inside the Todoist ZIP were skipped.');
     appendWarning(warnings, counters.nestedZipFiles, '1 nested ZIP file inside the Todoist archive was skipped.', '{count} nested ZIP files inside the Todoist archive were skipped.');
+    appendWarning(warnings, counters.unclosedQuotedFiles, '1 Todoist CSV file ended with an unclosed quoted field and was imported best-effort.', '{count} Todoist CSV files ended with unclosed quoted fields and were imported best-effort.');
     appendWarning(warnings, counters.invalidCsvFiles, '1 Todoist CSV file could not be parsed and was skipped.', '{count} Todoist CSV files could not be parsed and were skipped.');
     appendWarning(warnings, counters.emptyFiles, '1 Todoist file contained no tasks.', '{count} Todoist files contained no tasks.');
     appendWarning(warnings, counters.unknownRowTypes, '1 Todoist row had an unknown TYPE value and was skipped.', '{count} Todoist rows had unknown TYPE values and were skipped.');
@@ -191,7 +194,7 @@ const detectDelimiter = (text: string): string => {
     return semicolonCount > commaCount ? ';' : ',';
 };
 
-const parseCsvRows = (text: string, delimiter: string): string[][] => {
+const parseCsvRows = (text: string, delimiter: string): { rows: string[][]; hasUnclosedQuote: boolean } => {
     const rows: string[][] = [];
     let currentRow: string[] = [];
     let currentCell = '';
@@ -241,7 +244,10 @@ const parseCsvRows = (text: string, delimiter: string): string[][] => {
         rows.push(currentRow);
     }
 
-    return rows.filter((row) => row.some((cell) => cell.length > 0));
+    return {
+        rows: rows.filter((row) => row.some((cell) => cell.length > 0)),
+        hasUnclosedQuote: inQuotes,
+    };
 };
 
 const normalizeHeaderCell = (value: string): string => value.trim().toUpperCase();
@@ -410,7 +416,10 @@ const parseTodoistRows = (
     counters: TodoistWarningCounters
 ): ParsedTodoistProject => {
     const delimiter = detectDelimiter(csvText);
-    const rows = parseCsvRows(sanitizeCsvText(csvText), delimiter);
+    const { rows, hasUnclosedQuote } = parseCsvRows(sanitizeCsvText(csvText), delimiter);
+    if (hasUnclosedQuote) {
+        counters.unclosedQuotedFiles += 1;
+    }
     if (rows.length === 0) {
         counters.emptyFiles += 1;
         return {
