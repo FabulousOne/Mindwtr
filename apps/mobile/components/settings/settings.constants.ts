@@ -73,7 +73,7 @@ export type MobileExtraConfig = {
     dropboxAppKey?: string;
 };
 
-export type CloudProvider = 'selfhosted' | 'dropbox';
+export type CloudProvider = 'selfhosted' | 'dropbox' | 'cloudkit';
 
 export const isValidHttpUrl = (value: string): boolean => {
     if (!value.trim()) return false;

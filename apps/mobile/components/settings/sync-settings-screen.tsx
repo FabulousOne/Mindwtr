@@ -17,7 +17,7 @@ import {
 import { useMobileSyncBadge } from '@/hooks/use-mobile-sync-badge';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { pickAndParseSyncFolder } from '@/lib/storage-file';
-import { isCloudKitAvailable } from '@/lib/cloudkit-sync';
+import { getCloudKitAccountStatus, isCloudKitAvailable } from '@/lib/cloudkit-sync';
 import {
     exportCurrentDataBackup,
     importTodoistData,
@@ -90,6 +90,7 @@ export function SyncSettingsScreen() {
     const dropboxConfigured = !isFossBuild && isDropboxClientConfigured(dropboxAppKey);
     const isExpoGo = Constants.appOwnership === 'expo';
     const supportsNativeICloudSync = Platform.OS === 'ios' && isCloudKitAvailable();
+    type CloudKitAccountStatus = 'available' | 'noAccount' | 'restricted' | 'temporarilyUnavailable' | 'unknown';
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncPath, setSyncPath] = useState<string | null>(null);
     const [syncBackend, setSyncBackend] = useState<'file' | 'webdav' | 'cloud' | 'cloudkit' | 'off'>('off');
@@ -102,6 +103,7 @@ export function SyncSettingsScreen() {
     const [cloudProvider, setCloudProvider] = useState<CloudProvider>('selfhosted');
     const [dropboxConnected, setDropboxConnected] = useState(false);
     const [dropboxBusy, setDropboxBusy] = useState(false);
+    const [cloudKitAccountStatus, setCloudKitAccountStatus] = useState<CloudKitAccountStatus>('unknown');
     const [syncOptionsOpen, setSyncOptionsOpen] = useState(false);
     const [syncHistoryExpanded, setSyncHistoryExpanded] = useState(false);
     const [backupAction, setBackupAction] = useState<null | 'export' | 'restore' | 'import' | 'snapshot'>(null);
@@ -130,9 +132,8 @@ export function SyncSettingsScreen() {
     const isBackupBusy = backupAction !== null;
     const webdavUrlError = webdavUrl.trim() ? !isValidHttpUrl(webdavUrl.trim()) : false;
     const cloudUrlError = cloudUrl.trim() ? !isValidHttpUrl(cloudUrl.trim()) : false;
-    const backendOptions: typeof syncBackend[] = supportsNativeICloudSync
-        ? ['off', 'cloudkit', 'file', 'webdav', 'cloud']
-        : ['off', 'file', 'webdav', 'cloud'];
+    const backendOptions: ('off' | 'file' | 'webdav' | 'cloud')[] = ['off', 'file', 'webdav', 'cloud'];
+    const isCloudSyncSelected = syncBackend === 'cloud' || syncBackend === 'cloudkit';
 
     useEffect(() => {
         AsyncStorage.multiGet([
@@ -169,16 +170,38 @@ export function SyncSettingsScreen() {
             if (password) setWebdavPassword(password);
             if (cloudSyncUrl) setCloudUrl(cloudSyncUrl);
             if (cloudSyncToken) setCloudToken(cloudSyncToken);
-            const resolvedCloudProvider =
-                storedCloudProvider === 'dropbox' && !isFossBuild
-                    ? 'dropbox'
-                    : 'selfhosted';
+            const resolvedCloudProvider: CloudProvider =
+                ((resolvedBackend === 'cloudkit' || storedCloudProvider === 'cloudkit') && supportsNativeICloudSync)
+                    ? 'cloudkit'
+                    : storedCloudProvider === 'dropbox' && !isFossBuild
+                        ? 'dropbox'
+                        : 'selfhosted';
             setCloudProvider(resolvedCloudProvider);
             if (isFossBuild && storedCloudProvider === 'dropbox') {
                 AsyncStorage.setItem(CLOUD_PROVIDER_KEY, 'selfhosted').catch(logSettingsError);
             }
+            if (!supportsNativeICloudSync && storedCloudProvider === 'cloudkit') {
+                AsyncStorage.setItem(CLOUD_PROVIDER_KEY, 'selfhosted').catch(logSettingsError);
+            }
         }).catch(logSettingsError);
     }, [isFossBuild, supportsNativeICloudSync]);
+
+    const refreshCloudKitAccountStatus = useCallback(async () => {
+        if (!supportsNativeICloudSync) {
+            setCloudKitAccountStatus('unknown');
+            return;
+        }
+        setCloudKitAccountStatus(await getCloudKitAccountStatus());
+    }, [supportsNativeICloudSync]);
+
+    useEffect(() => {
+        void refreshCloudKitAccountStatus();
+    }, [refreshCloudKitAccountStatus]);
+
+    useEffect(() => {
+        if (syncBackend !== 'cloudkit') return;
+        void refreshCloudKitAccountStatus();
+    }, [refreshCloudKitAccountStatus, syncBackend]);
 
     useEffect(() => {
         void refreshSyncBadgeConfig();
@@ -342,6 +365,59 @@ export function SyncSettingsScreen() {
             </View>
         );
     };
+
+    const getCloudKitStatusDetails = (status: CloudKitAccountStatus) => {
+        switch (status) {
+            case 'available':
+                return {
+                    label: localize('Signed in to iCloud', '已登录 iCloud'),
+                    helpText: localize(
+                        'Syncs your tasks, projects, and areas across Apple devices using CloudKit. No Mindwtr account setup is required. Tap "Sync now" to force an immediate merge.',
+                        '通过 CloudKit 在 Apple 设备间同步任务、项目和领域。无需额外注册 Mindwtr 账号。点击“立即同步”可手动触发一次合并。'
+                    ),
+                    syncEnabled: true,
+                };
+            case 'noAccount':
+                return {
+                    label: localize('iCloud sign-in required', '需要登录 iCloud'),
+                    helpText: localize(
+                        'This device is not signed into iCloud. Open iOS Settings, sign into your Apple Account, enable iCloud for Mindwtr, then come back and tap "Sync now".',
+                        '这台设备尚未登录 iCloud。请打开 iOS“设置”，登录 Apple 账户并为 Mindwtr 启用 iCloud，然后返回这里点击“立即同步”。'
+                    ),
+                    syncEnabled: false,
+                };
+            case 'restricted':
+                return {
+                    label: localize('iCloud restricted', 'iCloud 已受限'),
+                    helpText: localize(
+                        'CloudKit is restricted on this device. Check Screen Time, MDM, or iCloud restrictions, then try again.',
+                        '这台设备上的 CloudKit 已被限制。请检查屏幕使用时间、设备管理或 iCloud 限制后再试。'
+                    ),
+                    syncEnabled: false,
+                };
+            case 'temporarilyUnavailable':
+                return {
+                    label: localize('iCloud temporarily unavailable', 'iCloud 暂时不可用'),
+                    helpText: localize(
+                        'iCloud is temporarily unavailable. Wait a moment, then tap "Sync now" again.',
+                        'iCloud 当前暂时不可用。请稍后再点击“立即同步”。'
+                    ),
+                    syncEnabled: false,
+                };
+            case 'unknown':
+            default:
+                return {
+                    label: localize('iCloud status unavailable', 'iCloud 状态未知'),
+                    helpText: localize(
+                        'Syncs your tasks, projects, and areas across Apple devices using CloudKit. If sync does not start, verify that iCloud is enabled for this device and app, then tap "Sync now".',
+                        '通过 CloudKit 在 Apple 设备间同步任务、项目和领域。如果同步没有开始，请确认此设备和该应用已启用 iCloud，然后点击“立即同步”。'
+                    ),
+                    syncEnabled: true,
+                };
+        }
+    };
+
+    const cloudKitStatusDetails = getCloudKitStatusDetails(cloudKitAccountStatus);
 
     const handleBackup = async () => {
         setBackupAction('export');
@@ -715,6 +791,13 @@ export function SyncSettingsScreen() {
                     [WEBDAV_PASSWORD_KEY, webdavPassword],
                 ]);
             } else if (syncBackend === 'cloudkit') {
+                const accountStatus = await getCloudKitAccountStatus();
+                setCloudKitAccountStatus(accountStatus);
+                const statusDetails = getCloudKitStatusDetails(accountStatus);
+                if (!statusDetails.syncEnabled) {
+                    Alert.alert(localize('iCloud unavailable', 'iCloud 不可用'), statusDetails.helpText);
+                    return;
+                }
                 await AsyncStorage.setItem(SYNC_BACKEND_KEY, 'cloudkit');
             } else if (syncBackend === 'cloud') {
                 if (cloudProvider === 'dropbox') {
@@ -932,12 +1015,12 @@ export function SyncSettingsScreen() {
                             <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                 {syncBackend === 'off'
                                     ? t('settings.syncBackendOff')
-                                    : syncBackend === 'cloudkit'
-                                        ? 'iCloud (CloudKit)'
-                                        : syncBackend === 'webdav'
+                                    : syncBackend === 'webdav'
                                             ? t('settings.syncBackendWebdav')
-                                            : syncBackend === 'cloud'
-                                                ? t('settings.syncBackendCloud')
+                                            : isCloudSyncSelected
+                                                ? cloudProvider === 'cloudkit'
+                                                    ? 'iCloud (CloudKit)'
+                                                    : t('settings.syncBackendCloud')
                                                 : t('settings.syncBackendFile')}
                             </Text>
                         </View>
@@ -947,20 +1030,35 @@ export function SyncSettingsScreen() {
                                     key={backend}
                                     style={[
                                         styles.backendOption,
-                                        { borderColor: tc.border, backgroundColor: syncBackend === backend ? tc.filterBg : 'transparent' },
+                                        {
+                                            borderColor: tc.border,
+                                            backgroundColor: (backend === 'cloud' ? isCloudSyncSelected : syncBackend === backend)
+                                                ? tc.filterBg
+                                                : 'transparent',
+                                        },
                                     ]}
                                     onPress={() => {
-                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, backend).catch(logSettingsError);
-                                        setSyncBackend(backend);
+                                        const nextBackend = backend === 'cloud'
+                                            ? (cloudProvider === 'cloudkit' ? 'cloudkit' : 'cloud')
+                                            : backend;
+                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, nextBackend).catch(logSettingsError);
+                                        setSyncBackend(nextBackend);
                                         resetSyncStatusForBackendSwitch();
                                     }}
                                 >
-                                    <Text style={[styles.backendOptionText, { color: syncBackend === backend ? tc.tint : tc.secondaryText }]}>
+                                    <Text
+                                        style={[
+                                            styles.backendOptionText,
+                                            {
+                                                color: (backend === 'cloud' ? isCloudSyncSelected : syncBackend === backend)
+                                                    ? tc.tint
+                                                    : tc.secondaryText,
+                                            },
+                                        ]}
+                                    >
                                         {backend === 'off'
                                             ? t('settings.syncBackendOff')
-                                            : backend === 'cloudkit'
-                                                ? 'iCloud'
-                                                : backend === 'file'
+                                            : backend === 'file'
                                                     ? t('settings.syncBackendFile')
                                                     : backend === 'webdav'
                                                         ? t('settings.syncBackendWebdav')
@@ -976,15 +1074,6 @@ export function SyncSettingsScreen() {
                     <View style={[styles.helpBox, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
                         <Text style={[styles.helpTitle, { color: tc.text }]}>{t('settings.syncOff')}</Text>
                         <Text style={[styles.helpText, { color: tc.secondaryText }]}>{t('settings.syncOffDesc')}</Text>
-                    </View>
-                )}
-
-                {syncBackend === 'cloudkit' && supportsNativeICloudSync && (
-                    <View style={[styles.helpBox, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
-                        <Text style={[styles.helpTitle, { color: tc.text }]}>iCloud Sync</Text>
-                        <Text style={[styles.helpText, { color: tc.secondaryText }]}>
-                            Syncs your tasks, projects, and areas across Apple devices using CloudKit. No setup required.
-                        </Text>
                     </View>
                 )}
 
@@ -1136,7 +1225,7 @@ export function SyncSettingsScreen() {
                     </>
                 )}
 
-                {syncBackend === 'cloud' && (
+                {isCloudSyncSelected && (
                     <>
                         <Text style={[styles.sectionTitle, { color: tc.text, marginTop: 16 }]}>{t('settings.syncBackendCloud')}</Text>
                         <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
@@ -1150,7 +1239,11 @@ export function SyncSettingsScreen() {
                                         ]}
                                         onPress={() => {
                                             setCloudProvider('selfhosted');
-                                            AsyncStorage.setItem(CLOUD_PROVIDER_KEY, 'selfhosted').catch(logSettingsError);
+                                            AsyncStorage.multiSet([
+                                                [CLOUD_PROVIDER_KEY, 'selfhosted'],
+                                                [SYNC_BACKEND_KEY, 'cloud'],
+                                            ]).catch(logSettingsError);
+                                            setSyncBackend('cloud');
                                             resetSyncStatusForBackendSwitch();
                                         }}
                                     >
@@ -1166,7 +1259,11 @@ export function SyncSettingsScreen() {
                                             ]}
                                             onPress={() => {
                                                 setCloudProvider('dropbox');
-                                                AsyncStorage.setItem(CLOUD_PROVIDER_KEY, 'dropbox').catch(logSettingsError);
+                                                AsyncStorage.multiSet([
+                                                    [CLOUD_PROVIDER_KEY, 'dropbox'],
+                                                    [SYNC_BACKEND_KEY, 'cloud'],
+                                                ]).catch(logSettingsError);
+                                                setSyncBackend('cloud');
                                                 resetSyncStatusForBackendSwitch();
                                             }}
                                         >
@@ -1175,11 +1272,65 @@ export function SyncSettingsScreen() {
                                             </Text>
                                         </TouchableOpacity>
                                     )}
+                                    {supportsNativeICloudSync && (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.backendOption,
+                                                { borderColor: tc.border, backgroundColor: cloudProvider === 'cloudkit' ? tc.filterBg : 'transparent' },
+                                            ]}
+                                            onPress={() => {
+                                                setCloudProvider('cloudkit');
+                                                AsyncStorage.multiSet([
+                                                    [CLOUD_PROVIDER_KEY, 'cloudkit'],
+                                                    [SYNC_BACKEND_KEY, 'cloudkit'],
+                                                ]).catch(logSettingsError);
+                                                setSyncBackend('cloudkit');
+                                                resetSyncStatusForBackendSwitch();
+                                            }}
+                                        >
+                                            <Text style={[styles.backendOptionText, { color: cloudProvider === 'cloudkit' ? tc.tint : tc.secondaryText }]}>
+                                                iCloud
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
                             </View>
                         </View>
 
-                        {cloudProvider === 'selfhosted' || isFossBuild ? (
+                        {cloudProvider === 'cloudkit' && supportsNativeICloudSync ? (
+                            <>
+                                <View style={[styles.helpBox, { backgroundColor: tc.cardBg, borderColor: tc.border, marginTop: 12 }]}>
+                                    <Text style={[styles.helpTitle, { color: tc.text }]}>iCloud Sync</Text>
+                                    <Text style={[styles.helpText, { color: tc.secondaryText }]}>
+                                        {cloudKitStatusDetails.helpText}
+                                    </Text>
+                                    <Text style={[styles.helpText, { color: tc.secondaryText, marginTop: 8 }]}>
+                                        {localize('Account status', '账户状态')}: {cloudKitStatusDetails.label}
+                                    </Text>
+                                </View>
+
+                                <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginTop: 12 }]}>
+                                    <TouchableOpacity
+                                        style={styles.settingRow}
+                                        onPress={() => void handleSync()}
+                                        disabled={isSyncing || !cloudKitStatusDetails.syncEnabled}
+                                    >
+                                        <View style={styles.settingInfo}>
+                                            <Text style={[styles.settingLabel, { color: cloudKitStatusDetails.syncEnabled ? tc.tint : tc.secondaryText }]}>
+                                                {t('settings.syncNow')}
+                                            </Text>
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize(
+                                                    'Read and merge the latest CloudKit data now.',
+                                                    '立即读取并合并最新的 CloudKit 数据。'
+                                                )}
+                                            </Text>
+                                        </View>
+                                        {isSyncing && <ActivityIndicator size="small" color={tc.tint} />}
+                                    </TouchableOpacity>
+                                </View>
+                            </>
+                        ) : cloudProvider === 'selfhosted' || isFossBuild ? (
                             <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginTop: 12 }]}>
                                 <View style={styles.inputGroup}>
                                     <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.cloudUrl')}</Text>
