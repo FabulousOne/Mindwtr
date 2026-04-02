@@ -21,16 +21,16 @@ describe('getNextProjectOrder', () => {
             createTask('t2', 'project-1', 1),
         ];
 
-        expect(getNextProjectOrder('project-1', tasks, 101)).toBe(2);
-        expect(getNextProjectOrder('project-1', tasks, 101)).toBe(2);
-        expect(getNextProjectOrder('project-1', tasks, 101)).toBe(2);
+        expect(getNextProjectOrder('project-1', tasks)).toBe(2);
+        expect(getNextProjectOrder('project-1', tasks)).toBe(2);
+        expect(getNextProjectOrder('project-1', tasks)).toBe(2);
     });
 
     it('starts from zero for unseen projects on repeated calls', () => {
         const tasks = [createTask('t1', 'project-1', 0)];
 
-        expect(getNextProjectOrder('project-2', tasks, 202)).toBe(0);
-        expect(getNextProjectOrder('project-2', tasks, 202)).toBe(0);
+        expect(getNextProjectOrder('project-2', tasks)).toBe(0);
+        expect(getNextProjectOrder('project-2', tasks)).toBe(0);
     });
 
     it('reserves unique project orders against the same snapshot', () => {
@@ -39,9 +39,9 @@ describe('getNextProjectOrder', () => {
             createTask('t2', 'project-1', 1),
         ];
 
-        expect(reserveNextProjectOrder('project-1', tasks, 303)).toBe(2);
-        expect(reserveNextProjectOrder('project-1', tasks, 303)).toBe(3);
-        expect(reserveNextProjectOrder('project-2', tasks, 303)).toBe(0);
-        expect(reserveNextProjectOrder('project-2', tasks, 303)).toBe(1);
+        expect(reserveNextProjectOrder('project-1', tasks)).toBe(2);
+        expect(reserveNextProjectOrder('project-1', tasks)).toBe(3);
+        expect(reserveNextProjectOrder('project-2', tasks)).toBe(0);
+        expect(reserveNextProjectOrder('project-2', tasks)).toBe(1);
     });
 });

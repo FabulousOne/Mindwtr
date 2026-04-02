@@ -244,7 +244,7 @@ const normalizeTaskUpdateForStore = ({
         const hasTaskOrderOverride = hasOrder || hasOrderNum;
         if (nextProjectId) {
             if (!hasTaskOrderOverride) {
-                const nextOrder = reserveNextProjectOrder(nextProjectId, allTasks, lastDataChangeAt);
+                const nextOrder = reserveNextProjectOrder(nextProjectId, allTasks);
                 adjustedUpdates = {
                     ...adjustedUpdates,
                     order: nextOrder,
@@ -327,7 +327,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave }: TaskA
             const deviceId = deviceState.deviceId;
             const explicitOrder = getTaskOrder(initialProps ?? {});
             const resolvedOrder = !hasTaskOrder && resolvedProjectId
-                ? reserveNextProjectOrder(resolvedProjectId, state._allTasks, state.lastDataChangeAt)
+                ? reserveNextProjectOrder(resolvedProjectId, state._allTasks)
                 : explicitOrder;
             createdTaskId = uuidv4();
             const newTask: Task = {
@@ -649,7 +649,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave }: TaskA
                 deletedAt: undefined,
             }));
             const duplicatedOrder = sourceTask.projectId
-                ? reserveNextProjectOrder(sourceTask.projectId, state._allTasks, state.lastDataChangeAt)
+                ? reserveNextProjectOrder(sourceTask.projectId, state._allTasks)
                 : undefined;
 
             const newTask: Task = {

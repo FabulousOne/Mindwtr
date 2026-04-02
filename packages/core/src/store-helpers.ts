@@ -302,8 +302,7 @@ const getProjectOrderIndex = (tasks: Task[]): Map<string, number> => {
 
 export const getNextProjectOrder = (
     projectId: string | undefined,
-    tasks: Task[],
-    _cacheKey?: number
+    tasks: Task[]
 ): number | undefined => {
     if (!projectId) return undefined;
     return (getProjectOrderIndex(tasks).get(projectId) ?? -1) + 1;
@@ -311,8 +310,7 @@ export const getNextProjectOrder = (
 
 export const reserveNextProjectOrder = (
     projectId: string | undefined,
-    tasks: Task[],
-    cacheKey?: number
+    tasks: Task[]
 ): number | undefined => {
     if (!projectId) return undefined;
     const snapshotReservations = reservedProjectOrders.get(tasks) ?? new Map<string, number>();
@@ -322,7 +320,7 @@ export const reserveNextProjectOrder = (
         snapshotReservations.set(projectId, reserved + 1);
         return reserved;
     }
-    const nextOrder = getNextProjectOrder(projectId, tasks, cacheKey);
+    const nextOrder = getNextProjectOrder(projectId, tasks);
     if (typeof nextOrder !== 'number') return undefined;
     snapshotReservations.set(projectId, nextOrder + 1);
     return nextOrder;
