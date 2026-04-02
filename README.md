@@ -102,7 +102,8 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 
 - GTD workflow end-to-end: Capture, Clarify, Organize, Reflect, Engage.
 - Focus view combines time-based agenda with next actions.
-- Local-first data model with file sync, WebDAV, Dropbox, and self-hosted cloud options.
+- Local-first data model with native iCloud / CloudKit sync on supported Apple builds, plus file sync, WebDAV, Dropbox, and self-hosted cloud options.
+- Projects support sections and areas for larger multi-step planning.
 - Obsidian vault import with note deep links on desktop.
 - Optional AI copilot (BYOK + local/self-hosted compatible models).
 - Cross-platform apps for desktop and mobile, plus PWA.
@@ -114,7 +115,7 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 ### GTD Workflow
 - **Capture** - Quick add tasks from anywhere (global hotkey, tray, share sheet, voice)
 - **Clarify** - Guided inbox processing with 2-minute rule
-- **Organize** - Projects, contexts, and status lists
+- **Organize** - Projects, sections, contexts, and status lists
 - **Reflect** - Weekly review wizard with reminders
 - **Engage** - Context-filtered next actions
 - **AI Assist (Optional)** - Clarify, break down, and review with BYOK AI (OpenAI, Gemini, Claude, or local/self-hosted OpenAI-compatible LLMs)
@@ -122,7 +123,7 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 ### Views
 - 📥 **Inbox** - Capture zone with processing wizard
 - 🎯 **Focus** - Agenda (time-based) + Next Actions in one view
-- 📁 **Projects** - Multi-step outcomes with areas
+- 📁 **Projects** - Multi-step outcomes with sections and areas
 - 🏷️ **Contexts** - Slash-delimited contexts with parent matching (@work/meetings)
 - ⏳ **Waiting For** - Delegated items
 - 💭 **Someday/Maybe** - Deferred ideas
@@ -149,6 +150,7 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 
 ### Data & Sync
 - 🔄 **Sync Options** - See the [Data & Sync wiki](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync) for supported backends and setup
+- 🍎 **Native iCloud / CloudKit Sync** - Apple-only structured sync on supported iPhone, iPad, and macOS builds
 - ☁️ **Dropbox OAuth Sync (Optional)** - Native Dropbox App Folder sync in supported non-FOSS builds
 - 📤 **Export/Backup** - Export data to JSON
 - ♻️ **Restore from Backup** - Replace local data from a validated Mindwtr backup with a recovery snapshot first

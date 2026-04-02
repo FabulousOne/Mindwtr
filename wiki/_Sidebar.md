@@ -29,6 +29,7 @@
 
 **Data & Sync**
 * [[Data and Sync]]
+* [[Backup-and-Restore]]
 * [[iCloud Sync]]
 * [[Sync Algorithm]]
 * [[Dropbox Sync]]

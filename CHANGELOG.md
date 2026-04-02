@@ -16,6 +16,19 @@ All notable changes to Mindwtr will be documented in this file.
 - **Desktop polish**: Improved project task drag targeting, autosizing task descriptions, and agenda/focus virtualization behavior.
 - **Mobile reliability**: Kept auto-sync active after layout updates and repaired post-split regressions.
 
+## [0.7.8] - 2026-04-01
+
+### Changed
+- **Desktop planning**: Unified project details and notes, collapsed project metadata by default, and exposed keyboard shortcut help more clearly.
+- **Architecture**: Split large desktop, mobile, cloud, and core modules to keep sync, settings, and task-editing work maintainable.
+- **Docs**: Refreshed MCP, contributor, and context hierarchy guidance after the module split.
+
+### Fixed
+- **Sync safety**: Hardened delete-biased merge behavior, pending remote cleanup/retries, revision-only conflict handling, and clock-skew reporting.
+- **Store integrity**: Validated task project/section/area references and surfaced save-queue overflow details for easier diagnosis.
+- **Desktop polish**: Improved project drag targeting, audio capture stop behavior, task-description sizing, and focus virtualization.
+- **Mobile reliability**: Kept auto-sync active after layout updates, restored Pomodoro persistence, and improved swipe accessibility and inbox feedback.
+
 ## [0.7.7] - 2026-03-26
 
 ### Fixed
