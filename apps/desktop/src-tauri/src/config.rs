@@ -1,6 +1,10 @@
 use crate::obsidian_paths::normalize_obsidian_inbox_file;
 use crate::*;
 
+fn keyring_enabled() -> bool {
+    !crate::storage::is_portable_mode()
+}
+
 pub(crate) fn parse_toml_string_value(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -232,7 +236,9 @@ pub(crate) fn read_config(app: &tauri::AppHandle) -> AppConfigToml {
         let secrets = read_config_toml(&secrets_path);
         merge_config(&mut config, secrets);
     }
-    migrate_legacy_secrets(app, &mut config);
+    if keyring_enabled() {
+        migrate_legacy_secrets(app, &mut config);
+    }
     config
 }
 
@@ -307,6 +313,9 @@ pub(crate) fn write_config_files(
 }
 
 fn migrate_legacy_secrets(app: &tauri::AppHandle, config: &mut AppConfigToml) {
+    if !keyring_enabled() {
+        return;
+    }
     let mut migrated = false;
     if let Some(value) = config.webdav_password.clone() {
         if set_keyring_secret(app, KEYRING_WEB_DAV_PASSWORD, Some(value)).is_ok() {
@@ -361,6 +370,9 @@ pub(crate) fn get_keyring_secret(
     app: &tauri::AppHandle,
     key: &str,
 ) -> Result<Option<String>, String> {
+    if !keyring_enabled() {
+        return Ok(None);
+    }
     let entry = keyring_entry(app, key)?;
     match entry.get_password() {
         Ok(value) => Ok(Some(value)),
@@ -374,6 +386,9 @@ pub(crate) fn set_keyring_secret(
     key: &str,
     value: Option<String>,
 ) -> Result<(), String> {
+    if !keyring_enabled() {
+        return Err("Portable mode stores secrets in secrets.toml".to_string());
+    }
     let entry = keyring_entry(app, key)?;
     match value {
         Some(value) if !value.trim().is_empty() => {

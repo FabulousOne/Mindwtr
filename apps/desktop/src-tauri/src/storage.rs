@@ -1,6 +1,48 @@
 use crate::*;
 
+const PORTABLE_MARKER_FILE_NAME: &str = "portable.txt";
+const PORTABLE_PROFILE_DIR_NAME: &str = "profile";
+const PORTABLE_CONFIG_DIR_NAME: &str = "config";
+const PORTABLE_DATA_DIR_NAME: &str = "data";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum StorageMode {
+    Standard,
+    Portable { profile_root: PathBuf },
+}
+
+fn portable_profile_root_for_exe_dir(exe_dir: &Path) -> PathBuf {
+    exe_dir.join(PORTABLE_PROFILE_DIR_NAME)
+}
+
+fn detect_storage_mode_from_exe_dir(exe_dir: Option<&Path>) -> StorageMode {
+    let Some(exe_dir) = exe_dir else {
+        return StorageMode::Standard;
+    };
+    let marker_path = exe_dir.join(PORTABLE_MARKER_FILE_NAME);
+    if marker_path.exists() {
+        return StorageMode::Portable {
+            profile_root: portable_profile_root_for_exe_dir(exe_dir),
+        };
+    }
+    StorageMode::Standard
+}
+
+fn detect_storage_mode() -> StorageMode {
+    let exe_dir = env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_path_buf));
+    detect_storage_mode_from_exe_dir(exe_dir.as_deref())
+}
+
+pub(crate) fn is_portable_mode() -> bool {
+    matches!(detect_storage_mode(), StorageMode::Portable { .. })
+}
+
 pub(crate) fn get_config_dir(app: &tauri::AppHandle) -> PathBuf {
+    if let StorageMode::Portable { profile_root } = detect_storage_mode() {
+        return profile_root.join(PORTABLE_CONFIG_DIR_NAME);
+    }
     app.path()
         .resolve(APP_NAME, BaseDirectory::Config)
         .unwrap_or_else(|_| {
@@ -11,6 +53,9 @@ pub(crate) fn get_config_dir(app: &tauri::AppHandle) -> PathBuf {
 }
 
 pub(crate) fn get_data_dir(app: &tauri::AppHandle) -> PathBuf {
+    if let StorageMode::Portable { profile_root } = detect_storage_mode() {
+        return profile_root.join(PORTABLE_DATA_DIR_NAME);
+    }
     app.path()
         .resolve(APP_NAME, BaseDirectory::Data)
         .unwrap_or_else(|_| {
@@ -1518,6 +1563,46 @@ fn parse_json_relaxed(raw: &str) -> Result<Value, serde_json::Error> {
     let start = sanitized.find(|c| c == '{' || c == '[').unwrap_or(0);
     let mut de = serde_json::Deserializer::from_str(&sanitized[start..]);
     Value::deserialize(&mut de)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detect_storage_mode_returns_standard_without_marker() {
+        let exe_dir = std::env::temp_dir().join("mindwtr-portable-mode-without-marker");
+
+        let mode = detect_storage_mode_from_exe_dir(Some(&exe_dir));
+
+        assert_eq!(mode, StorageMode::Standard);
+    }
+
+    #[test]
+    fn detect_storage_mode_returns_portable_when_marker_exists() {
+        let exe_dir = tempfile::tempdir().expect("should create temp exe dir");
+        let marker_path = exe_dir.path().join(PORTABLE_MARKER_FILE_NAME);
+        fs::write(&marker_path, b"portable").expect("should write portable marker");
+
+        let mode = detect_storage_mode_from_exe_dir(Some(exe_dir.path()));
+
+        assert_eq!(
+            mode,
+            StorageMode::Portable {
+                profile_root: exe_dir.path().join(PORTABLE_PROFILE_DIR_NAME),
+            }
+        );
+    }
+
+    #[test]
+    fn portable_profile_root_is_nested_under_executable_dir() {
+        let exe_dir = std::env::temp_dir().join("mindwtr-portable");
+
+        assert_eq!(
+            portable_profile_root_for_exe_dir(&exe_dir),
+            exe_dir.join(PORTABLE_PROFILE_DIR_NAME)
+        );
+    }
 }
 
 fn normalize_sync_value(value: Value) -> Value {

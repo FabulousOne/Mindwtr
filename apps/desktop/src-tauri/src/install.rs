@@ -166,6 +166,9 @@ fn detect_install_source() -> String {
         if is_windows_store_install() {
             return "microsoft-store".to_string();
         }
+        if crate::storage::is_portable_mode() {
+            return "portable".to_string();
+        }
         if env::var_os("WINGET_PACKAGE_IDENTIFIER").is_some() {
             return "winget".to_string();
         }
