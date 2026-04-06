@@ -116,7 +116,8 @@ export const toVisibleTask = (task: Task): Task => {
         : { ...task, attachments: visibleAttachments };
 };
 
-export const selectVisibleTasks = (tasks: Task[]): Task[] => tasks.filter(isTaskVisible).map(toVisibleTask);
+export const selectVisibleTasks = (tasks: Task[]): Task[] =>
+    tasks.filter((task) => isTaskVisible(task)).map(toVisibleTask);
 
 export const updateVisibleTasks = (visible: Task[], previous?: Task | null, next?: Task | null): Task[] => {
     const wasVisible = isTaskVisible(previous);

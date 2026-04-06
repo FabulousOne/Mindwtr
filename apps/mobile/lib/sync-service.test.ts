@@ -16,11 +16,30 @@ import {
 import type { MergeStats } from '@mindwtr/core';
 
 describe('mobile sync-service test utils', () => {
+  const emptyEntityStats = {
+    localTotal: 0,
+    incomingTotal: 0,
+    mergedTotal: 0,
+    localOnly: 0,
+    incomingOnly: 0,
+    conflicts: 0,
+    resolvedUsingLocal: 0,
+    resolvedUsingIncoming: 0,
+    deletionsWon: 0,
+    conflictIds: [],
+    maxClockSkewMs: 0,
+    timestampAdjustments: 0,
+    timestampAdjustmentIds: [],
+    invalidTimestamps: 0,
+    conflictReasonCounts: {},
+    conflictSamples: [],
+  };
+
   const emptyStats: MergeStats = {
-    tasks: { localTotal: 0, incomingTotal: 0, mergedTotal: 0, localOnly: 0, incomingOnly: 0, conflicts: 0, resolvedUsingLocal: 0, resolvedUsingIncoming: 0, deletionsWon: 0, conflictIds: [], maxClockSkewMs: 0, timestampAdjustments: 0, timestampAdjustmentIds: [], conflictReasonCounts: {}, conflictSamples: [] },
-    projects: { localTotal: 0, incomingTotal: 0, mergedTotal: 0, localOnly: 0, incomingOnly: 0, conflicts: 0, resolvedUsingLocal: 0, resolvedUsingIncoming: 0, deletionsWon: 0, conflictIds: [], maxClockSkewMs: 0, timestampAdjustments: 0, timestampAdjustmentIds: [], conflictReasonCounts: {}, conflictSamples: [] },
-    sections: { localTotal: 0, incomingTotal: 0, mergedTotal: 0, localOnly: 0, incomingOnly: 0, conflicts: 0, resolvedUsingLocal: 0, resolvedUsingIncoming: 0, deletionsWon: 0, conflictIds: [], maxClockSkewMs: 0, timestampAdjustments: 0, timestampAdjustmentIds: [], conflictReasonCounts: {}, conflictSamples: [] },
-    areas: { localTotal: 0, incomingTotal: 0, mergedTotal: 0, localOnly: 0, incomingOnly: 0, conflicts: 0, resolvedUsingLocal: 0, resolvedUsingIncoming: 0, deletionsWon: 0, conflictIds: [], maxClockSkewMs: 0, timestampAdjustments: 0, timestampAdjustmentIds: [], conflictReasonCounts: {}, conflictSamples: [] },
+    tasks: { ...emptyEntityStats },
+    projects: { ...emptyEntityStats },
+    sections: { ...emptyEntityStats },
+    areas: { ...emptyEntityStats },
   };
 
   it('normalizes backend values', () => {

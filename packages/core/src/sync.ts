@@ -1,7 +1,6 @@
 import type { AppData, Attachment, Area, Project, Task } from './types';
 import { logWarn } from './logger';
 import {
-    type ClockSkewDirection,
     type ClockSkewWarning,
     type ConflictReason,
     type EntityMergeStats,
