@@ -4,16 +4,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
     mockAsyncStorageGetItem,
+    mockIosWidgetReloadTimelines,
+    mockIosWidgetSetItem,
+    mockPlatform,
     mockRequestWidgetUpdate,
 } = vi.hoisted(() => ({
     mockAsyncStorageGetItem: vi.fn(),
+    mockIosWidgetReloadTimelines: vi.fn(),
+    mockIosWidgetSetItem: vi.fn(),
+    mockPlatform: {
+        OS: 'android',
+    },
     mockRequestWidgetUpdate: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
-    Platform: {
-        OS: 'android',
-    },
+    Platform: mockPlatform,
 }));
 
 vi.mock('@react-native-async-storage/async-storage', () => ({
@@ -28,6 +34,11 @@ vi.mock('react-native-android-widget', () => ({
     requestWidgetUpdate: mockRequestWidgetUpdate,
 }));
 
+vi.mock('react-native-widgetkit', () => ({
+    reloadTimelines: mockIosWidgetReloadTimelines,
+    setItem: mockIosWidgetSetItem,
+}));
+
 import { updateMobileWidgetFromData } from './widget-service';
 
 type WidgetElement = ReactElement<{
@@ -40,16 +51,19 @@ const asWidgetChildren = (children: WidgetElement['props']['children']): WidgetE
     return Array.isArray(children) ? children : [children];
 };
 
-const buildData = (): AppData => {
+const buildData = (taskCount = 5): AppData => {
     const now = new Date().toISOString();
     return {
-        tasks: [
-            { id: '1', title: 'Focused 1', status: 'next', isFocusedToday: true, tags: [], contexts: [], createdAt: now, updatedAt: now },
-            { id: '2', title: 'Focused 2', status: 'next', isFocusedToday: true, tags: [], contexts: [], createdAt: now, updatedAt: now },
-            { id: '3', title: 'Focused 3', status: 'next', isFocusedToday: true, tags: [], contexts: [], createdAt: now, updatedAt: now },
-            { id: '4', title: 'Focused 4', status: 'next', isFocusedToday: true, tags: [], contexts: [], createdAt: now, updatedAt: now },
-            { id: '5', title: 'Focused 5', status: 'next', isFocusedToday: true, tags: [], contexts: [], createdAt: now, updatedAt: now },
-        ],
+        tasks: Array.from({ length: taskCount }, (_, index) => ({
+            id: String(index + 1),
+            title: `Focused ${index + 1}`,
+            status: 'next',
+            isFocusedToday: true,
+            tags: [],
+            contexts: [],
+            createdAt: now,
+            updatedAt: now,
+        })),
         projects: [],
         areas: [],
         sections: [],
@@ -68,8 +82,11 @@ const countRenderedTaskRows = (tree: WidgetElement): number => {
 
 describe('widget-service', () => {
     beforeEach(() => {
+        mockPlatform.OS = 'android';
         mockAsyncStorageGetItem.mockReset();
         mockAsyncStorageGetItem.mockResolvedValue(null);
+        mockIosWidgetReloadTimelines.mockReset();
+        mockIosWidgetSetItem.mockReset();
         mockRequestWidgetUpdate.mockReset();
     });
 
@@ -99,5 +116,24 @@ describe('widget-service', () => {
             throw new Error('Expected Android widget render tree');
         }
         expect(countRenderedTaskRows(renderedTree)).toBe(5);
+    });
+
+    it('writes family-specific iOS payloads using adaptive task limits', async () => {
+        mockPlatform.OS = 'ios';
+        mockIosWidgetSetItem.mockResolvedValue(undefined);
+
+        const didUpdate = await updateMobileWidgetFromData(buildData(9));
+
+        expect(didUpdate).toBe(true);
+        expect(mockRequestWidgetUpdate).not.toHaveBeenCalled();
+        expect(mockIosWidgetSetItem).toHaveBeenCalledTimes(4);
+        const payloadByKey = new Map(
+            mockIosWidgetSetItem.mock.calls.map(([key, value]) => [key, JSON.parse(value as string)])
+        );
+        expect(payloadByKey.get('mindwtr-ios-widget-payload-small')?.items).toHaveLength(3);
+        expect(payloadByKey.get('mindwtr-ios-widget-payload-medium')?.items).toHaveLength(5);
+        expect(payloadByKey.get('mindwtr-ios-widget-payload-large')?.items).toHaveLength(8);
+        expect(payloadByKey.get('mindwtr-ios-widget-payload')?.items).toHaveLength(8);
+        expect(mockIosWidgetReloadTimelines).toHaveBeenCalledWith('MindwtrTasksWidget');
     });
 });

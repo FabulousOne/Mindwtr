@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type AppData, type Language, useTaskStore } from '@mindwtr/core';
 import { requestWidgetUpdate, type WidgetInfo } from 'react-native-android-widget';
+import * as ReactNativeWidgetKit from 'react-native-widgetkit';
 
 import { buildTasksWidgetTree } from '../components/TasksWidget';
 import {
@@ -9,6 +10,9 @@ import {
     IOS_WIDGET_APP_GROUP,
     IOS_WIDGET_KIND,
     IOS_WIDGET_PAYLOAD_KEY,
+    IOS_WIDGET_PAYLOAD_KEY_LARGE,
+    IOS_WIDGET_PAYLOAD_KEY_MEDIUM,
+    IOS_WIDGET_PAYLOAD_KEY_SMALL,
     resolveWidgetLanguage,
     type TasksWidgetPayload,
     WIDGET_LANGUAGE_KEY,
@@ -31,21 +35,24 @@ type IosWidgetApi = {
     reloadAllTimelines?: () => void;
 };
 
+const IOS_WIDGET_FAMILY_HEIGHTS_DP = {
+    small: 180,
+    medium: 320,
+    large: 530,
+} as const;
+
 async function getIosWidgetApi(): Promise<IosWidgetApi | null> {
     if (Platform.OS !== 'ios') return null;
-    try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const api = require('react-native-widgetkit');
-        return api as IosWidgetApi;
-    } catch (error) {
-        if (__DEV__) {
-            void logWarn('[RNWidget] iOS widget API unavailable', {
-                scope: 'widget',
-                extra: { error: error instanceof Error ? error.message : String(error) },
-            });
-        }
-        return null;
+    if (typeof ReactNativeWidgetKit.setItem === 'function') {
+        return ReactNativeWidgetKit as IosWidgetApi;
     }
+    if (__DEV__) {
+        void logWarn('[RNWidget] iOS widget API unavailable', {
+            scope: 'widget',
+            extra: { error: 'react-native-widgetkit setItem unavailable' },
+        });
+    }
+    return null;
 }
 
 async function resolvePayloadLanguage(data: AppData): Promise<Language> {
@@ -109,17 +116,38 @@ async function updateAndroidWidgetsFromData(data: AppData, language: Language): 
     }
 }
 
-async function updateIosWidgetFromPayload(payload: TasksWidgetPayload): Promise<boolean> {
+async function updateIosWidgetsFromData(data: AppData, language: Language): Promise<boolean> {
     if (Platform.OS !== 'ios') return false;
     const widgetApi = await getIosWidgetApi();
     if (!widgetApi) return false;
 
-    try {
-        await widgetApi.setItem(
+    const payloadEntries = [
+        [
             IOS_WIDGET_PAYLOAD_KEY,
-            JSON.stringify(payload),
-            IOS_WIDGET_APP_GROUP,
-        );
+            buildPayloadFromData(data, language, getAdaptiveWidgetTaskLimit(IOS_WIDGET_FAMILY_HEIGHTS_DP.large)),
+        ],
+        [
+            IOS_WIDGET_PAYLOAD_KEY_SMALL,
+            buildPayloadFromData(data, language, getAdaptiveWidgetTaskLimit(IOS_WIDGET_FAMILY_HEIGHTS_DP.small)),
+        ],
+        [
+            IOS_WIDGET_PAYLOAD_KEY_MEDIUM,
+            buildPayloadFromData(data, language, getAdaptiveWidgetTaskLimit(IOS_WIDGET_FAMILY_HEIGHTS_DP.medium)),
+        ],
+        [
+            IOS_WIDGET_PAYLOAD_KEY_LARGE,
+            buildPayloadFromData(data, language, getAdaptiveWidgetTaskLimit(IOS_WIDGET_FAMILY_HEIGHTS_DP.large)),
+        ],
+    ] as const satisfies readonly [string, TasksWidgetPayload][];
+
+    try {
+        for (const [key, payload] of payloadEntries) {
+            await widgetApi.setItem(
+                key,
+                JSON.stringify(payload),
+                IOS_WIDGET_APP_GROUP,
+            );
+        }
         if (typeof widgetApi.reloadTimelines === 'function') {
             widgetApi.reloadTimelines(IOS_WIDGET_KIND);
         } else if (typeof widgetApi.reloadAllTimelines === 'function') {
@@ -144,8 +172,7 @@ export async function updateMobileWidgetFromData(data: AppData): Promise<boolean
     if (Platform.OS === 'android') {
         return await updateAndroidWidgetsFromData(data, language);
     }
-    const payload = buildPayloadFromData(data, language, 8);
-    return await updateIosWidgetFromPayload(payload);
+    return await updateIosWidgetsFromData(data, language);
 }
 
 export async function updateMobileWidgetFromStore(): Promise<boolean> {

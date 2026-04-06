@@ -4,6 +4,9 @@ import WidgetKit
 private let mindwtrWidgetKind = "MindwtrTasksWidget"
 private let mindwtrWidgetAppGroup = "group.tech.dongdongbh.mindwtr"
 private let mindwtrWidgetPayloadKey = "mindwtr-ios-widget-payload"
+private let mindwtrWidgetPayloadKeySmall = "mindwtr-ios-widget-payload-small"
+private let mindwtrWidgetPayloadKeyMedium = "mindwtr-ios-widget-payload-medium"
+private let mindwtrWidgetPayloadKeyLarge = "mindwtr-ios-widget-payload-large"
 private let darkThemeModes: Set<String> = ["dark", "material3-dark", "nord", "oled"]
 private let lightThemeModes: Set<String> = ["light", "material3-light", "eink", "sepia"]
 
@@ -81,30 +84,51 @@ private struct MindwtrTasksWidgetProvider: TimelineProvider {
         MindwtrTasksWidgetEntry(date: Date(), payload: .fallback)
     }
 
-    func getSnapshot(in _: Context, completion: @escaping (MindwtrTasksWidgetEntry) -> Void) {
-        completion(MindwtrTasksWidgetEntry(date: Date(), payload: loadPayload()))
+    func getSnapshot(in context: Context, completion: @escaping (MindwtrTasksWidgetEntry) -> Void) {
+        completion(MindwtrTasksWidgetEntry(date: Date(), payload: loadPayload(for: context.family)))
     }
 
-    func getTimeline(in _: Context, completion: @escaping (Timeline<MindwtrTasksWidgetEntry>) -> Void) {
+    func getTimeline(in context: Context, completion: @escaping (Timeline<MindwtrTasksWidgetEntry>) -> Void) {
         let now = Date()
-        let entry = MindwtrTasksWidgetEntry(date: now, payload: loadPayload())
+        let entry = MindwtrTasksWidgetEntry(date: now, payload: loadPayload(for: context.family))
         let refresh = Calendar.current.date(byAdding: .minute, value: 30, to: now) ?? now.addingTimeInterval(1800)
         completion(Timeline(entries: [entry], policy: .after(refresh)))
     }
 
-    private func loadPayload() -> MindwtrTasksWidgetPayload {
-        guard
-            let defaults = UserDefaults(suiteName: mindwtrWidgetAppGroup),
-            let jsonString = defaults.string(forKey: mindwtrWidgetPayloadKey),
-            let data = jsonString.data(using: .utf8)
-        else {
+    private func loadPayload(for family: WidgetFamily) -> MindwtrTasksWidgetPayload {
+        guard let defaults = UserDefaults(suiteName: mindwtrWidgetAppGroup) else {
             return .fallback
         }
 
-        do {
-            return try JSONDecoder().decode(MindwtrTasksWidgetPayload.self, from: data)
-        } catch {
-            return .fallback
+        let payloadKeys = [payloadKey(for: family), mindwtrWidgetPayloadKey]
+        for key in payloadKeys {
+            guard
+                let jsonString = defaults.string(forKey: key),
+                let data = jsonString.data(using: .utf8)
+            else {
+                continue
+            }
+
+            do {
+                return try JSONDecoder().decode(MindwtrTasksWidgetPayload.self, from: data)
+            } catch {
+                continue
+            }
+        }
+
+        return .fallback
+    }
+
+    private func payloadKey(for family: WidgetFamily) -> String {
+        switch family {
+        case .systemSmall:
+            return mindwtrWidgetPayloadKeySmall
+        case .systemMedium:
+            return mindwtrWidgetPayloadKeyMedium
+        case .systemLarge:
+            return mindwtrWidgetPayloadKeyLarge
+        default:
+            return mindwtrWidgetPayloadKey
         }
     }
 }
