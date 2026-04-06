@@ -635,13 +635,17 @@ export function mergeAppData(local: AppData, incoming: AppData): AppData {
     return mergeAppDataWithStats(local, incoming).data;
 }
 
-const withPendingRemoteWriteFlag = (data: AppData, pendingAt: string): AppData => ({
+const withPendingRemoteWriteFlag = (
+    data: AppData,
+    pendingAt: string,
+    attempts?: number,
+): AppData => ({
     ...data,
     settings: {
         ...data.settings,
         pendingRemoteWriteAt: pendingAt,
         pendingRemoteWriteRetryAt: undefined,
-        pendingRemoteWriteAttempts: undefined,
+        pendingRemoteWriteAttempts: attempts && attempts > 0 ? attempts : undefined,
     },
 });
 
@@ -710,16 +714,26 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
         }
     };
 
-    io.onStep?.('read-local');
-    await yieldToUi();
-    const localDataRaw = await io.readLocal();
-    const localShapeErrors = validateSyncPayloadShape(localDataRaw, 'local');
-    if (localShapeErrors.length > 0) {
-        const sample = localShapeErrors.slice(0, 3).join('; ');
-        throw new Error(`Invalid local sync payload: ${sample}`);
-    }
-    const localNormalized = normalizeAppData(localDataRaw);
-    let localData = purgeExpiredTombstones(localNormalized, nowIso, io.tombstoneRetentionDays).data;
+    const readLocalDataForSync = async (): Promise<AppData> => {
+        io.onStep?.('read-local');
+        await yieldToUi();
+        const localDataRaw = await io.readLocal();
+        const localShapeErrors = validateSyncPayloadShape(localDataRaw, 'local');
+        if (localShapeErrors.length > 0) {
+            const sample = localShapeErrors.slice(0, 3).join('; ');
+            throw new Error(`Invalid local sync payload: ${sample}`);
+        }
+        const localNormalized = normalizeAppData(localDataRaw);
+        return purgeExpiredTombstones(localNormalized, nowIso, io.tombstoneRetentionDays).data;
+    };
+
+    let localData = await readLocalDataForSync();
+    let pendingRemoteWriteMeta:
+        | {
+            pendingAt: string;
+            attempts: number;
+        }
+        | undefined;
 
     if (hasPendingRemoteWriteFlag(localData)) {
         const blockedMs = getPendingRemoteWriteBlockedMs(localData, nowIso);
@@ -727,22 +741,11 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
             const seconds = Math.max(1, Math.ceil(blockedMs / 1000));
             throw new Error(`Sync paused briefly after remote write failure. Retry in about ${seconds}s.`);
         }
-        const recoveredLocalData = clearPendingRemoteWriteFlag(localData);
-        io.onStep?.('write-remote');
-        await yieldToUi();
-        try {
-            await io.writeRemote(recoveredLocalData);
-        } catch (error) {
-            const localDataWithRetry = withPendingRemoteWriteRetry(localData, nowIso);
-            io.onStep?.('write-local');
-            await yieldToUi();
-            await io.writeLocal(localDataWithRetry);
-            throw error;
-        }
-        io.onStep?.('write-local');
-        await yieldToUi();
-        await io.writeLocal(recoveredLocalData);
-        localData = recoveredLocalData;
+        pendingRemoteWriteMeta = {
+            pendingAt: localData.settings.pendingRemoteWriteAt as string,
+            attempts: getPendingRemoteWriteAttemptCount(localData),
+        };
+        localData = clearPendingRemoteWriteFlag(await readLocalDataForSync());
     }
 
     io.onStep?.('read-remote');
@@ -849,7 +852,11 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
         throw new Error(`Sync validation failed: ${sample}`);
     }
 
-    const finalDataWithPendingRemoteWrite = withPendingRemoteWriteFlag(finalData, nowIso);
+    const finalDataWithPendingRemoteWrite = withPendingRemoteWriteFlag(
+        finalData,
+        pendingRemoteWriteMeta?.pendingAt ?? nowIso,
+        pendingRemoteWriteMeta?.attempts,
+    );
     const persistedFinalData = clearPendingRemoteWriteFlag(finalDataWithPendingRemoteWrite);
     io.onStep?.('write-local');
     await yieldToUi();
