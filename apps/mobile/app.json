@@ -95,10 +95,14 @@
       [
         "expo-share-intent",
         {
+          "iosAppGroupIdentifier": "group.tech.dongdongbh.mindwtr",
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsText": true,
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1
+          },
           "androidIntentFilters": [
             "text/*"
-          ],
-          "disableIOS": true
+          ]
         }
       ],
       [
