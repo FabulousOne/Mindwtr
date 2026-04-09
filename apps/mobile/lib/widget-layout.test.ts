@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { getAdaptiveAndroidWidgetTaskLimit, getAdaptiveWidgetTaskLimit } from './widget-layout';
+import {
+    getAdaptiveAndroidWidgetTaskLimit,
+    getAdaptiveWidgetTaskLimit,
+    getAndroidWidgetLayoutMode,
+} from './widget-layout';
 
 describe('widget-layout', () => {
     it('keeps iOS/default widget families at three items for smaller sizes', () => {
@@ -20,10 +24,22 @@ describe('widget-layout', () => {
     });
 
     it('uses Android widget height more aggressively so 3x3 widgets do not waste space', () => {
-        expect(getAdaptiveAndroidWidgetTaskLimit(0)).toBe(4);
-        expect(getAdaptiveAndroidWidgetTaskLimit(180)).toBe(4);
-        expect(getAdaptiveAndroidWidgetTaskLimit(220)).toBe(5);
-        expect(getAdaptiveAndroidWidgetTaskLimit(250)).toBe(6);
-        expect(getAdaptiveAndroidWidgetTaskLimit(320)).toBe(8);
+        expect(getAdaptiveAndroidWidgetTaskLimit(0, 250)).toBe(4);
+        expect(getAdaptiveAndroidWidgetTaskLimit(180, 250)).toBe(4);
+        expect(getAdaptiveAndroidWidgetTaskLimit(220, 250)).toBe(5);
+        expect(getAdaptiveAndroidWidgetTaskLimit(250, 250)).toBe(6);
+        expect(getAdaptiveAndroidWidgetTaskLimit(320, 250)).toBe(8);
+    });
+
+    it('switches narrow Android widgets into compact mode', () => {
+        expect(getAndroidWidgetLayoutMode(180)).toBe('compact');
+        expect(getAndroidWidgetLayoutMode(200)).toBe('compact');
+        expect(getAndroidWidgetLayoutMode(201)).toBe('standard');
+    });
+
+    it('reserves more chrome for compact Android widgets so the button remains visible', () => {
+        expect(getAdaptiveAndroidWidgetTaskLimit(0, 180)).toBe(3);
+        expect(getAdaptiveAndroidWidgetTaskLimit(180, 180)).toBe(3);
+        expect(getAdaptiveAndroidWidgetTaskLimit(220, 180)).toBe(4);
     });
 });

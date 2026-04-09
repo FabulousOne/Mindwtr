@@ -48,4 +48,19 @@ describe('TasksWidget', () => {
         expect(taskItem).toBeDefined();
         expect(taskItem?.props.style.fontSize).toBe(13);
     });
+
+    it('uses a compact layout for narrow Android widgets', () => {
+        const tree = buildTasksWidgetTree(basePayload, { layoutMode: 'compact' });
+        const children = tree.props.children as ReactElement[];
+        const [content, spacer, button] = children;
+        const contentChildren = (content.props.children as ReactElement[]);
+        const taskItem = contentChildren.find(
+            (child) => (child as ReactElement<{ text?: string }>).props.text === '• Review waiting item'
+        ) as ReactElement<{ style: { fontSize: number } }> | undefined;
+
+        expect(children).toHaveLength(3);
+        expect(spacer?.props.style?.flex).toBe(1);
+        expect(taskItem?.props.style.fontSize).toBe(12);
+        expect(button?.props.style.fontSize).toBe(10);
+    });
 });
