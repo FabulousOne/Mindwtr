@@ -464,14 +464,14 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
         tasks: (local.tasks || []).map((task) => normalizeRevisionMetadata(normalizeTaskForSyncMerge(task, nowIso))),
         projects: (local.projects || []).map((project) => normalizeRevisionMetadata(normalizeProjectForSyncMerge(project))),
         sections: (local.sections || []).map((section) => normalizeRevisionMetadata(section)),
-        areas: (local.areas || []).map((area) => normalizeRevisionMetadata(area)),
+        areas: (local.areas || []).map((area) => normalizeRevisionMetadata(normalizeAreaForSyncMerge(area, nowIso))),
     };
     const incomingNormalized: AppData = {
         ...incoming,
         tasks: (incoming.tasks || []).map((task) => normalizeRevisionMetadata(normalizeTaskForSyncMerge(task, nowIso))),
         projects: (incoming.projects || []).map((project) => normalizeRevisionMetadata(normalizeProjectForSyncMerge(project))),
         sections: (incoming.sections || []).map((section) => normalizeRevisionMetadata(section)),
-        areas: (incoming.areas || []).map((area) => normalizeRevisionMetadata(area)),
+        areas: (incoming.areas || []).map((area) => normalizeRevisionMetadata(normalizeAreaForSyncMerge(area, nowIso))),
     };
 
     const mergeAttachments = (localAttachments?: Attachment[], incomingAttachments?: Attachment[]): Attachment[] | undefined => {
