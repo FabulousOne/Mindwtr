@@ -480,9 +480,18 @@ jobs:
           }
 
           Write-Host "Creating new submission..."
-          $submission = Invoke-RestMethodWithRetry -Method Post `
-            -Uri "https://manage.devcenter.microsoft.com/v1.0/my/applications/$applicationId/submissions" `
-            -Headers $headers
+          try {
+            $submission = Invoke-RestMethodWithRetry -Method Post `
+              -Uri "https://manage.devcenter.microsoft.com/v1.0/my/applications/$applicationId/submissions" `
+              -Headers $headers
+          } catch {
+            $errText = $_.Exception.Message
+            if (& $isStoreBusy $errText) {
+              Write-Warning "Microsoft Store rejected new submission creation because another submission is still being processed. Skipping publish."
+              exit 0
+            }
+            throw
+          }
           $submissionId = $submission.id
           $fileUploadUrl = $submission.fileUploadUrl
           Write-Host "Created submission $submissionId"
