@@ -184,7 +184,7 @@ function RootLayoutContent() {
   const incomingUrl = Linking.useURL();
   const { isDark, isReady: themeReady } = useTheme();
   const tc = useThemeColors();
-  const { language, setLanguage, isReady: languageReady, t } = useLanguage();
+  const { language, setLanguage, isReady: languageReady } = useLanguage();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
   const extraConfig = Constants.expoConfig?.extra as MobileExtraConfig | undefined;
   const isFossBuild = parseBool(extraConfig?.isFossBuild);
@@ -207,12 +207,10 @@ function RootLayoutContent() {
   const syncPending = useRef(false);
   const backgroundSyncPending = useRef(false);
   const isActive = useRef(true);
-  const routerRef = useRef(router);
-  const tRef = useRef(t);
   const loadAttempts = useRef(0);
   const lastHandledCaptureUrl = useRef<string | null>(null);
-  const lastSyncErrorShown = useRef<string | null>(null);
-  const lastSyncErrorAt = useRef(0);
+  const lastLoggedAutoSyncError = useRef<string | null>(null);
+  const lastLoggedAutoSyncErrorAt = useRef(0);
   const syncCadenceRef = useRef<AutoSyncCadence>(AUTO_SYNC_CADENCE_REMOTE);
   const syncBackendCacheRef = useRef<{ backend: SyncBackend; readAt: number }>({
     backend: 'off',
@@ -234,14 +232,6 @@ function RootLayoutContent() {
   useEffect(() => {
     markStartupPhase('js.root_layout.mounted');
   }, []);
-
-  useEffect(() => {
-    routerRef.current = router;
-  }, [router]);
-
-  useEffect(() => {
-    tRef.current = t;
-  }, [t]);
 
   useEffect(() => {
     if (Platform.OS !== 'android' || isExpoGo) return;
@@ -299,22 +289,11 @@ function RootLayoutContent() {
           return;
         }
         const nowMs = Date.now();
-        const shouldShow = result.error !== lastSyncErrorShown.current && nowMs - lastSyncErrorAt.current > 10 * 60 * 1000;
-        if (shouldShow) {
-          const translate = tRef.current;
-          lastSyncErrorShown.current = result.error;
-          lastSyncErrorAt.current = nowMs;
-          const syncFailedTitle = translate('settings.lastSyncError') === 'settings.lastSyncError' ? 'Sync failed' : translate('settings.lastSyncError');
-          const closeLabel = translate('common.close') === 'common.close' ? 'Close' : translate('common.close');
-          const settingsLabel = translate('settings.title') === 'settings.title' ? 'Settings' : translate('settings.title');
-          Alert.alert(
-            syncFailedTitle,
-            result.error,
-            [
-              { text: closeLabel, style: 'cancel' },
-              { text: settingsLabel, onPress: () => routerRef.current.push('/settings') },
-            ]
-          );
+        const shouldLog = result.error !== lastLoggedAutoSyncError.current
+          || nowMs - lastLoggedAutoSyncErrorAt.current > 10 * 60 * 1000;
+        if (shouldLog) {
+          lastLoggedAutoSyncError.current = result.error;
+          lastLoggedAutoSyncErrorAt.current = nowMs;
           void logWarn('Auto-sync failed', {
             scope: 'sync',
             extra: { error: result.error },
