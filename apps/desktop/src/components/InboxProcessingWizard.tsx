@@ -41,6 +41,12 @@ type InboxProcessingWizardProps = {
     handleConfirmWaiting: () => void;
     selectedContexts: string[];
     selectedTags: string[];
+    selectedEnergyLevel?: Task['energyLevel'];
+    setSelectedEnergyLevel: (value: Task['energyLevel']) => void;
+    selectedAssignedTo: string;
+    setSelectedAssignedTo: (value: string) => void;
+    showEnergyLevelField: boolean;
+    showAssignedToField: boolean;
     prioritiesEnabled: boolean;
     selectedPriority?: TaskPriority;
     setSelectedPriority: (value: TaskPriority | undefined) => void;
@@ -87,6 +93,7 @@ type InboxProcessingWizardProps = {
 };
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
+const ENERGY_LEVEL_OPTIONS: Array<NonNullable<Task['energyLevel']>> = ['low', 'medium', 'high'];
 
 export function InboxProcessingWizard({
     t,
@@ -123,6 +130,12 @@ export function InboxProcessingWizard({
     handleConfirmWaiting,
     selectedContexts,
     selectedTags,
+    selectedEnergyLevel,
+    setSelectedEnergyLevel,
+    selectedAssignedTo,
+    setSelectedAssignedTo,
+    showEnergyLevelField,
+    showAssignedToField,
     prioritiesEnabled,
     selectedPriority,
     setSelectedPriority,
@@ -692,6 +705,45 @@ export function InboxProcessingWizard({
                                     );
                                 })}
                             </div>
+                        </div>
+                    )}
+
+                    {(showEnergyLevelField || showAssignedToField) && (
+                        <div className="grid gap-3 md:grid-cols-2">
+                            {showEnergyLevelField && (
+                                <div className="space-y-2">
+                                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                                        {t('taskEdit.energyLevel')}
+                                    </div>
+                                    <select
+                                        aria-label={t('taskEdit.energyLevel')}
+                                        value={selectedEnergyLevel ?? ''}
+                                        onChange={(event) => setSelectedEnergyLevel((event.target.value || undefined) as Task['energyLevel'])}
+                                        className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
+                                    >
+                                        <option value="">{t('common.none')}</option>
+                                        {ENERGY_LEVEL_OPTIONS.map((energyLevel) => (
+                                            <option key={energyLevel} value={energyLevel}>
+                                                {t(`energyLevel.${energyLevel}`)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                            {showAssignedToField && (
+                                <div className="space-y-2">
+                                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                                        {t('taskEdit.assignedTo')}
+                                    </div>
+                                    <input
+                                        aria-label={t('taskEdit.assignedTo')}
+                                        value={selectedAssignedTo}
+                                        onChange={(event) => setSelectedAssignedTo(event.target.value)}
+                                        placeholder={t('taskEdit.assignedToPlaceholder')}
+                                        className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
 

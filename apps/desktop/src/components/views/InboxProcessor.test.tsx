@@ -250,6 +250,12 @@ describe('InboxProcessor', () => {
         fireEvent.change(getByLabelText('taskEdit.tagsLabel'), {
             target: { value: '#deep, #writing' },
         });
+        fireEvent.change(getByLabelText('taskEdit.energyLevel'), {
+            target: { value: 'medium' },
+        });
+        fireEvent.change(getByLabelText('taskEdit.assignedTo'), {
+            target: { value: 'Morgan' },
+        });
         fireEvent.click(getByRole('button', { name: 'priority.high' }));
         fireEvent.change(getByLabelText('taskEdit.startDateLabel'), {
             target: { value: '2026-03-23' },
@@ -266,6 +272,8 @@ describe('InboxProcessor', () => {
                     status: 'next',
                     contexts: ['@home', '@desk'],
                     tags: ['#deep', '#writing'],
+                    energyLevel: 'medium',
+                    assignedTo: 'Morgan',
                     priority: 'high',
                     startTime: '2026-03-23',
                 }),
@@ -282,6 +290,12 @@ describe('InboxProcessor', () => {
         fireEvent.click(getByText('process.moreThanOneStepNo'));
         fireEvent.click(getByText('process.takesLonger'));
         fireEvent.click(getByText('process.doIt'));
+        fireEvent.change(getByRole('combobox', { name: 'taskEdit.energyLevel' }), {
+            target: { value: 'high' },
+        });
+        fireEvent.change(getByRole('textbox', { name: 'taskEdit.assignedTo' }), {
+            target: { value: 'Casey' },
+        });
         fireEvent.click(getByRole('button', { name: 'priority.urgent' }));
         fireEvent.click(getByRole('button', { name: /process\.next/ }));
         fireEvent.click(getByRole('button', { name: /process\.noProject/ }));
@@ -291,6 +305,8 @@ describe('InboxProcessor', () => {
                 'task-1',
                 expect.objectContaining({
                     status: 'next',
+                    energyLevel: 'high',
+                    assignedTo: 'Casey',
                     priority: 'urgent',
                 }),
             );

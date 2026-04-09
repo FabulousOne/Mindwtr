@@ -11,11 +11,13 @@ import {
     type Area,
     type Project,
     type Task,
+    type TaskEnergyLevel,
     type TaskPriority,
 } from '@mindwtr/core';
 
 import { InboxProcessingWizard, type ProcessingStep } from '../InboxProcessingWizard';
 import { InboxProcessingQuickPanel, type QuickActionabilityChoice, type QuickExecutionChoice, type QuickTwoMinuteChoice } from '../InboxProcessingQuickPanel';
+import { DEFAULT_TASK_EDITOR_HIDDEN } from '../Task/task-item-helpers';
 import { resolveAreaFilter, taskMatchesAreaFilter } from '../../lib/area-filter';
 import { reportError } from '../../lib/report-error';
 import { useUiStore } from '../../store/ui-store';
@@ -73,6 +75,8 @@ export function InboxProcessor({
     const [quickExecutionChoice, setQuickExecutionChoice] = useState<QuickExecutionChoice>('defer');
     const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [selectedEnergyLevel, setSelectedEnergyLevel] = useState<TaskEnergyLevel | undefined>(undefined);
+    const [selectedAssignedTo, setSelectedAssignedTo] = useState('');
     const [selectedPriority, setSelectedPriority] = useState<TaskPriority | undefined>(undefined);
     const [delegateWho, setDelegateWho] = useState('');
     const [delegateFollowUp, setDelegateFollowUp] = useState('');
@@ -100,6 +104,12 @@ export function InboxProcessor({
     const scheduleEnabled = inboxProcessing.scheduleEnabled === true;
     const referenceEnabled = inboxProcessing.referenceEnabled === true;
     const prioritiesEnabled = settings?.features?.priorities !== false;
+    const hiddenTaskEditorFields = useMemo(
+        () => new Set(settings?.gtd?.taskEditor?.hidden ?? DEFAULT_TASK_EDITOR_HIDDEN),
+        [settings?.gtd?.taskEditor?.hidden],
+    );
+    const showEnergyLevelField = !hiddenTaskEditorFields.has('energyLevel');
+    const showAssignedToField = !hiddenTaskEditorFields.has('assignedTo');
 
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
@@ -154,6 +164,8 @@ export function InboxProcessor({
         setQuickExecutionChoice('defer');
         setSelectedContexts([]);
         setSelectedTags([]);
+        setSelectedEnergyLevel(undefined);
+        setSelectedAssignedTo('');
         setSelectedPriority(undefined);
         setDelegateWho('');
         setDelegateFollowUp('');
@@ -192,6 +204,8 @@ export function InboxProcessor({
         setQuickExecutionChoice('defer');
         setSelectedContexts(task.contexts ?? []);
         setSelectedTags(task.tags ?? []);
+        setSelectedEnergyLevel(task.energyLevel);
+        setSelectedAssignedTo(task.assignedTo ?? '');
         setSelectedPriority(task.priority);
         setCustomContext('');
         setCustomTag('');
@@ -251,6 +265,8 @@ export function InboxProcessor({
         setProcessingTask(null);
         setSelectedContexts([]);
         setSelectedTags([]);
+        setSelectedEnergyLevel(undefined);
+        setSelectedAssignedTo('');
         setSelectedPriority(undefined);
     }, [hydrateProcessingTask, processingTask?.id, tasks, setIsProcessing, skippedIds, matchesAreaFilter]);
 
@@ -356,6 +372,7 @@ export function InboxProcessor({
                 : {};
             applyProcessingEdits({
                 status: 'waiting',
+                energyLevel: selectedEnergyLevel ?? undefined,
                 assignedTo: who || undefined,
                 reviewAt: followUpIso,
                 ...(prioritiesEnabled ? { priority: selectedPriority ?? undefined } : {}),
@@ -486,6 +503,8 @@ export function InboxProcessor({
                 status: 'next',
                 contexts: selectedContexts,
                 tags: selectedTags,
+                energyLevel: selectedEnergyLevel ?? undefined,
+                assignedTo: selectedAssignedTo.trim() || undefined,
                 ...(prioritiesEnabled ? { priority: selectedPriority ?? undefined } : {}),
                 projectId: projectId || undefined,
                 areaId: projectId ? undefined : (selectedAreaId || undefined),
@@ -529,6 +548,8 @@ export function InboxProcessor({
                 status: 'next',
                 contexts: selectedContexts,
                 tags: selectedTags,
+                energyLevel: selectedEnergyLevel ?? undefined,
+                assignedTo: selectedAssignedTo.trim() || undefined,
                 ...(prioritiesEnabled ? { priority: selectedPriority ?? undefined } : {}),
                 projectId: project.id,
                 ...(scheduleEnabled && scheduleDate
@@ -624,6 +645,12 @@ export function InboxProcessor({
                     onSendDelegateRequest={handleSendDelegateRequest}
                     selectedContexts={selectedContexts}
                     selectedTags={selectedTags}
+                    selectedEnergyLevel={selectedEnergyLevel}
+                    setSelectedEnergyLevel={setSelectedEnergyLevel}
+                    selectedAssignedTo={selectedAssignedTo}
+                    setSelectedAssignedTo={setSelectedAssignedTo}
+                    showEnergyLevelField={showEnergyLevelField}
+                    showAssignedToField={showAssignedToField}
                     prioritiesEnabled={prioritiesEnabled}
                     selectedPriority={selectedPriority}
                     setSelectedPriority={setSelectedPriority}
@@ -684,6 +711,12 @@ export function InboxProcessor({
                     handleConfirmWaiting={handleConfirmWaiting}
                     selectedContexts={selectedContexts}
                     selectedTags={selectedTags}
+                    selectedEnergyLevel={selectedEnergyLevel}
+                    setSelectedEnergyLevel={setSelectedEnergyLevel}
+                    selectedAssignedTo={selectedAssignedTo}
+                    setSelectedAssignedTo={setSelectedAssignedTo}
+                    showEnergyLevelField={showEnergyLevelField}
+                    showAssignedToField={showAssignedToField}
                     prioritiesEnabled={prioritiesEnabled}
                     selectedPriority={selectedPriority}
                     setSelectedPriority={setSelectedPriority}
