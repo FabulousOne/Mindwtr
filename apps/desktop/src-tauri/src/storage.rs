@@ -96,6 +96,7 @@ pub(crate) fn open_sqlite(app: &tauri::AppHandle) -> Result<Connection, String> 
     ensure_tasks_order_column(&conn)?;
     ensure_tasks_area_column(&conn)?;
     ensure_tasks_section_column(&conn)?;
+    ensure_tasks_organization_indexes(&conn)?;
     ensure_projects_order_column(&conn)?;
     ensure_projects_due_date_column(&conn)?;
     ensure_projects_area_order_index(&conn)?;
@@ -327,6 +328,20 @@ fn ensure_tasks_section_column(conn: &Connection) -> Result<(), String> {
     }
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_tasks_section_id ON tasks(sectionId)",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn ensure_tasks_organization_indexes(conn: &Connection) -> Result<(), String> {
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_energyLevel ON tasks(energyLevel)",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_assignedTo ON tasks(assignedTo)",
         [],
     )
     .map_err(|e| e.to_string())?;
@@ -1717,6 +1732,36 @@ mod tests {
             .map(|row| row.expect("index row"))
             .collect();
         assert!(index_names.iter().any(|name| name == "idx_projects_dueDate"));
+    }
+
+    #[test]
+    fn ensure_tasks_organization_indexes_create_energy_and_assignee_indexes() {
+        let conn = Connection::open_in_memory().expect("should open in-memory db");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE tasks (
+              id TEXT PRIMARY KEY,
+              title TEXT NOT NULL,
+              status TEXT NOT NULL,
+              energyLevel TEXT,
+              assignedTo TEXT
+            );
+            "#,
+        )
+        .expect("should create tasks table");
+
+        ensure_tasks_organization_indexes(&conn).expect("should create task organization indexes");
+
+        let mut stmt = conn
+            .prepare("PRAGMA index_list(tasks)")
+            .expect("should inspect task indexes");
+        let index_names: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .expect("should read task indexes")
+            .map(|row| row.expect("index row"))
+            .collect();
+        assert!(index_names.iter().any(|name| name == "idx_tasks_energyLevel"));
+        assert!(index_names.iter().any(|name| name == "idx_tasks_assignedTo"));
     }
 }
 
