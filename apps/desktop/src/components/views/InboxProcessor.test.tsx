@@ -226,6 +226,32 @@ describe('InboxProcessor', () => {
         expect(getByText('taskEdit.startDateLabel')).toBeInTheDocument();
     });
 
+    it('hides energy and assigned-to fields when the task editor layout disables them', () => {
+        const { getByRole, getByText, queryByLabelText } = renderInboxProcessor({
+            gtd: {
+                taskEditor: {
+                    hidden: ['energyLevel', 'assignedTo'],
+                },
+            },
+        });
+
+        fireEvent.click(getByRole('button', { name: /process\.btn/i }));
+        fireEvent.click(getByRole('button', { name: 'process.modeQuick' }));
+
+        expect(queryByLabelText('taskEdit.energyLevel')).not.toBeInTheDocument();
+        expect(queryByLabelText('taskEdit.assignedTo')).not.toBeInTheDocument();
+
+        fireEvent.click(getByRole('button', { name: 'process.modeGuided' }));
+        fireEvent.click(getByText('process.refineNext'));
+        fireEvent.click(getByText('process.yesActionable'));
+        fireEvent.click(getByText('process.moreThanOneStepNo'));
+        fireEvent.click(getByText('process.takesLonger'));
+        fireEvent.click(getByText('process.doIt'));
+
+        expect(queryByLabelText('taskEdit.energyLevel')).not.toBeInTheDocument();
+        expect(queryByLabelText('taskEdit.assignedTo')).not.toBeInTheDocument();
+    });
+
     it('processes a task from quick mode with schedule, contexts, tags, and priority by default', async () => {
         const { getByRole, getByLabelText, updateTask } = renderInboxProcessor({
             gtd: {
