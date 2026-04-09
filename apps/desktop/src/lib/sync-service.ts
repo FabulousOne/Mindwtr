@@ -17,6 +17,7 @@ import {
     sanitizeAppDataForRemote,
     areSyncPayloadsEqual,
     assertNoPendingAttachmentUploads,
+    findPendingAttachmentUploads,
     injectExternalCalendars as injectExternalCalendarsForSync,
     persistExternalCalendars as persistExternalCalendarsForSync,
     withRetry,
@@ -1217,6 +1218,41 @@ export class SyncService {
                 return data;
             };
 
+            const prepareRemoteWriteData = async (data: AppData): Promise<AppData> => {
+                if (findPendingAttachmentUploads(data).length === 0) {
+                    return data;
+                }
+
+                setStep('attachments_finalize');
+                await yieldToRenderer();
+
+                if (backend === 'webdav' && webdavConfig?.url) {
+                    ensureNetworkStillAvailable();
+                    const baseUrl = getBaseSyncUrl(webdavConfig.url);
+                    const syncedData = await syncAttachments(data, webdavConfig, baseUrl, attachmentBackendDeps);
+                    return syncedData ?? data;
+                }
+
+                if (backend === 'file' && fileBaseDir) {
+                    await syncFileAttachments(data, fileBaseDir, attachmentBackendDeps);
+                    return data;
+                }
+
+                if (backend === 'cloud' && cloudProvider === 'selfhosted' && cloudConfig?.url) {
+                    ensureNetworkStillAvailable();
+                    const baseUrl = getCloudBaseUrl(cloudConfig.url);
+                    await syncCloudAttachments(data, cloudConfig, baseUrl, attachmentBackendDeps);
+                    return data;
+                }
+
+                if (backend === 'cloud' && cloudProvider === 'dropbox') {
+                    ensureNetworkStillAvailable();
+                    await syncDropboxAttachments(data, resolveDropboxAccessToken, attachmentBackendDeps);
+                }
+
+                return data;
+            };
+
             const writeRemoteDataByBackend = async (data: AppData): Promise<void> => {
                 ensureNetworkStillAvailable();
                 if (backend === 'cloudkit') {
@@ -1307,6 +1343,7 @@ export class SyncService {
                     ensureLocalSnapshotFresh();
                     await persistLocalDataWithTracking(data);
                 },
+                prepareRemoteWrite: prepareRemoteWriteData,
                 writeRemote: async (data) => {
                     ensureLocalSnapshotFresh();
                     await writeRemoteDataByBackend(data);

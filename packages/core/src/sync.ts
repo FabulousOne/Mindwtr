@@ -840,7 +840,7 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
             },
         });
     }
-    const finalData = pruned.data;
+    let finalData = pruned.data;
     const validationErrors = validateMergedSyncData(finalData);
     if (validationErrors.length > 0) {
         const sample = validationErrors.slice(0, 3).join('; ');
@@ -852,6 +852,23 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
             },
         });
         throw new Error(`Sync validation failed: ${sample}`);
+    }
+
+    if (typeof io.prepareRemoteWrite === 'function') {
+        const preparedData = await io.prepareRemoteWrite(finalData);
+        finalData = preparedData ?? finalData;
+        const preparedValidationErrors = validateMergedSyncData(finalData);
+        if (preparedValidationErrors.length > 0) {
+            const sample = preparedValidationErrors.slice(0, 3).join('; ');
+            logWarn('Sync remote-write preparation validation failed', {
+                scope: 'sync',
+                context: {
+                    issues: preparedValidationErrors.length,
+                    sample,
+                },
+            });
+            throw new Error(`Sync validation failed: ${sample}`);
+        }
     }
 
     const finalDataWithPendingRemoteWrite = withPendingRemoteWriteFlag(

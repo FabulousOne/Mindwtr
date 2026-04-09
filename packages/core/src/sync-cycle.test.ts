@@ -532,6 +532,58 @@ describe('performSyncCycle', () => {
         expect(localWrites[1].settings.pendingRemoteWriteAttempts).toBe(1);
     });
 
+    it('preserves remote-write preparation mutations across the pending-write lifecycle', async () => {
+        const localWrites: AppData[] = [];
+        let remoteWriteData: AppData | null = null;
+
+        await expect(performSyncCycle({
+            readLocal: async () => mockAppData([{
+                ...createMockTask('task-1', '2024-01-01T00:00:00.000Z'),
+                attachments: [{
+                    id: 'att-1',
+                    kind: 'file',
+                    title: 'doc.txt',
+                    uri: '/local/doc.txt',
+                    createdAt: '2024-01-01T00:00:00.000Z',
+                    updatedAt: '2024-01-01T00:00:00.000Z',
+                }],
+            }]),
+            readRemote: async () => mockAppData(),
+            writeLocal: async (data) => {
+                localWrites.push(structuredClone(data));
+            },
+            prepareRemoteWrite: async (data) => ({
+                ...data,
+                tasks: data.tasks.map((task) => ({
+                    ...task,
+                    attachments: task.attachments?.map((attachment) => (
+                        attachment.id === 'att-1'
+                            ? {
+                                ...attachment,
+                                cloudKey: 'attachments/att-1.txt',
+                                localStatus: 'available',
+                            }
+                            : attachment
+                    )),
+                })),
+            }),
+            writeRemote: async (data) => {
+                remoteWriteData = structuredClone(data);
+                throw new Error('remote write failed');
+            },
+            now: () => '2026-01-01T00:00:00.000Z',
+        })).rejects.toThrow('remote write failed');
+
+        expect(localWrites).toHaveLength(2);
+        expect(localWrites[0].tasks[0].attachments?.[0].cloudKey).toBe('attachments/att-1.txt');
+        expect(localWrites[0].tasks[0].attachments?.[0].localStatus).toBe('available');
+        expect(localWrites[1].tasks[0].attachments?.[0].cloudKey).toBe('attachments/att-1.txt');
+        expect(localWrites[1].tasks[0].attachments?.[0].localStatus).toBe('available');
+        expect(remoteWriteData?.tasks[0].attachments?.[0].cloudKey).toBe('attachments/att-1.txt');
+        expect(localWrites[0].settings.pendingRemoteWriteAt).toBe('2026-01-01T00:00:00.000Z');
+        expect(localWrites[1].settings.pendingRemoteWriteRetryAt).toBe('2026-01-01T00:00:05.000Z');
+    });
+
     it('pauses pending remote write recovery until the retry window expires', async () => {
         const localWithPending = mockAppData([createMockTask('1', '2024-01-01T00:00:00.000Z')]);
         localWithPending.settings.pendingRemoteWriteAt = '2025-12-31T23:59:59.000Z';
