@@ -9,6 +9,20 @@ vi.mock('react-native-android-widget', () => ({
 
 import { buildTasksWidgetTree } from './TasksWidget';
 
+type WidgetElement = ReactElement<{
+    children?: WidgetElement | WidgetElement[];
+    text?: string;
+    style?: {
+        flex?: number;
+        fontSize?: number;
+    };
+}>;
+
+const asWidgetChildren = (children: WidgetElement['props']['children']): WidgetElement[] => {
+    if (!children) return [];
+    return Array.isArray(children) ? children : [children];
+};
+
 const basePayload: TasksWidgetPayload = {
     headerTitle: 'Today',
     subtitle: 'Inbox: 1',
@@ -38,9 +52,9 @@ const basePayload: TasksWidgetPayload = {
 
 describe('TasksWidget', () => {
     it('uses the larger task title font size in widget rows', () => {
-        const tree = buildTasksWidgetTree(basePayload);
-        const content = (tree.props.children as ReactElement[])[0] as ReactElement<{ children: ReactElement[] }>;
-        const contentChildren = content.props.children;
+        const tree = buildTasksWidgetTree(basePayload) as WidgetElement;
+        const [content] = asWidgetChildren(tree.props.children);
+        const contentChildren = content ? asWidgetChildren(content.props.children) : [];
         const taskItem = contentChildren.find(
             (child) => (child as ReactElement<{ text?: string }>).props.text === '• Review waiting item'
         ) as ReactElement<{ style: { fontSize: number } }> | undefined;
@@ -50,10 +64,10 @@ describe('TasksWidget', () => {
     });
 
     it('uses a compact layout for narrow Android widgets', () => {
-        const tree = buildTasksWidgetTree(basePayload, { layoutMode: 'compact' });
-        const children = tree.props.children as ReactElement[];
+        const tree = buildTasksWidgetTree(basePayload, { layoutMode: 'compact' }) as WidgetElement;
+        const children = asWidgetChildren(tree.props.children);
         const [content, spacer, button] = children;
-        const contentChildren = (content.props.children as ReactElement[]);
+        const contentChildren = content ? asWidgetChildren(content.props.children) : [];
         const taskItem = contentChildren.find(
             (child) => (child as ReactElement<{ text?: string }>).props.text === '• Review waiting item'
         ) as ReactElement<{ style: { fontSize: number } }> | undefined;
@@ -61,6 +75,6 @@ describe('TasksWidget', () => {
         expect(children).toHaveLength(3);
         expect(spacer?.props.style?.flex).toBe(1);
         expect(taskItem?.props.style.fontSize).toBe(12);
-        expect(button?.props.style.fontSize).toBe(10);
+        expect(button?.props.style?.fontSize).toBe(10);
     });
 });
