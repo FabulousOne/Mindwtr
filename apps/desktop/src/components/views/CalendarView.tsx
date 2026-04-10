@@ -5,6 +5,7 @@ import { shallow, safeFormatDate, safeParseDate, safeParseDueDate, type External
 import { useLanguage } from '../../contexts/language-context';
 import { cn } from '../../lib/utils';
 import { reportError } from '../../lib/report-error';
+import { logError } from '../../lib/app-log';
 import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
 import { TaskItem } from '../TaskItem';
@@ -293,8 +294,11 @@ export function CalendarView() {
                 setExternalError(summarizeExternalCalendarWarnings(warnings));
             } catch (error) {
                 if (cancelled) return;
-                reportError('Failed to load external calendars', error);
-                setExternalError(String(error));
+                const message = error instanceof Error && error.message.trim()
+                    ? error.message.trim()
+                    : 'Failed to load external calendars.';
+                void logError(error, { scope: 'calendar', step: 'loadExternalCalendars' });
+                setExternalError(message);
                 setExternalEvents([]);
             } finally {
                 if (!cancelled) {

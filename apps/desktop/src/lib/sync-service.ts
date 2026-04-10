@@ -130,6 +130,9 @@ const WEBDAV_READ_RETRY_OPTIONS = {
     maxDelayMs: 30_000,
     shouldRetry: isRetryableWebdavReadError,
 };
+const ATTACHMENT_WARNING_TOAST_THRESHOLD = 2;
+const ATTACHMENT_WARNING_TOAST_COOLDOWN_MS = 10 * 60 * 1000;
+const ATTACHMENT_WARNING_TOAST_MESSAGE = 'Attachment sync is still failing. Files will retry in the background.';
 type SyncServiceDependencies = {
     isTauriRuntime: () => boolean;
     invoke: <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -371,6 +374,7 @@ type SyncExecutionContext = {
     cachedDropboxAccessToken: string | null;
     syncPath: string;
     fileBaseDir: string;
+    hadAttachmentWarning: boolean;
 };
 
 type SyncExecutionHelpers = {
@@ -412,6 +416,8 @@ export class SyncService {
     private static externalSyncTimer: ReturnType<typeof setTimeout> | null = null;
     private static pendingExternalSyncChange: ExternalSyncChange | null = null;
     private static externalSyncChangeListeners = new Set<(change: ExternalSyncChange | null) => void>();
+    private static consecutiveAttachmentWarningRuns = 0;
+    private static lastAttachmentWarningToastAt = 0;
 
     private static getMonotonicNow(): number {
         if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -473,8 +479,33 @@ export class SyncService {
         SyncService.externalSyncTimer = null;
         SyncService.pendingExternalSyncChange = null;
         SyncService.externalSyncChangeListeners.clear();
+        SyncService.consecutiveAttachmentWarningRuns = 0;
+        SyncService.lastAttachmentWarningToastAt = 0;
         clearAttachmentSyncState();
         clearAttachmentValidationFailures();
+    }
+
+    private static finalizeAttachmentWarningState(context: Pick<SyncExecutionContext, 'hadAttachmentWarning'>, result: Pick<SyncRunResult, 'success'>) {
+        if (context.hadAttachmentWarning) {
+            SyncService.consecutiveAttachmentWarningRuns += 1;
+            if (SyncService.consecutiveAttachmentWarningRuns < ATTACHMENT_WARNING_TOAST_THRESHOLD) {
+                return;
+            }
+            const now = Date.now();
+            if (now - SyncService.lastAttachmentWarningToastAt < ATTACHMENT_WARNING_TOAST_COOLDOWN_MS) {
+                return;
+            }
+            SyncService.lastAttachmentWarningToastAt = now;
+            try {
+                useUiStore.getState().showToast(ATTACHMENT_WARNING_TOAST_MESSAGE, 'error', 6000);
+            } catch {
+                // UI store may be unavailable during shutdown/tests.
+            }
+            return;
+        }
+        if (result.success) {
+            SyncService.consecutiveAttachmentWarningRuns = 0;
+        }
     }
 
     private static updateSyncStatus(partial: Partial<typeof SyncService.syncStatus>) {
@@ -763,6 +794,7 @@ export class SyncService {
             cachedDropboxAccessToken: null,
             syncPath: '',
             fileBaseDir: '',
+            hadAttachmentWarning: false,
         };
     }
 
@@ -889,6 +921,7 @@ export class SyncService {
             if (error instanceof LocalSyncAbort) {
                 throw error;
             }
+            context.hadAttachmentWarning = true;
             logSyncWarning('Attachment pre-sync warning', error);
         }
     }
@@ -1217,6 +1250,7 @@ export class SyncService {
             if (error instanceof LocalSyncAbort) {
                 throw error;
             }
+            context.hadAttachmentWarning = true;
             logSyncWarning('Attachment sync warning', error);
             return mergedData;
         }
@@ -1694,6 +1728,9 @@ export class SyncService {
             SyncService.syncInFlight = null;
         }
         const skippedRequeue = result.skipped === 'requeued';
+        if (!skippedRequeue) {
+            SyncService.finalizeAttachmentWarningState(context, result);
+        }
         SyncService.updateSyncStatus({
             inFlight: false,
             step: null,

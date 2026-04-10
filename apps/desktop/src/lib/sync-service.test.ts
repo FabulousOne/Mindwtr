@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Attachment } from '@mindwtr/core';
 import { DropboxUnauthorizedError } from './dropbox-sync';
 import { fallbackHashString, getFileSyncDir, hashString, normalizeSyncBackend } from './sync-service-utils';
+import { useUiStore } from '../store/ui-store';
 
 const markLocalWriteMock = vi.hoisted(() => vi.fn());
 
@@ -109,6 +110,32 @@ describe('SyncService testability hooks', () => {
         expect((SyncService as any).syncListeners.size).toBe(0);
         expect((SyncService as any).syncQueued).toBe(false);
         expect((SyncService as any).externalSyncTimer).toBeNull();
+    });
+
+    it('only surfaces attachment warnings after repeated sync runs', async () => {
+        const originalShowToast = useUiStore.getState().showToast;
+        const showToast = vi.fn();
+        useUiStore.setState({ showToast });
+
+        try {
+            (SyncService as any).consecutiveAttachmentWarningRuns = 0;
+            (SyncService as any).lastAttachmentWarningToastAt = 0;
+
+            (SyncService as any).finalizeAttachmentWarningState({ hadAttachmentWarning: true }, { success: true });
+            expect(showToast).not.toHaveBeenCalled();
+
+            (SyncService as any).finalizeAttachmentWarningState({ hadAttachmentWarning: true }, { success: true });
+            expect(showToast).toHaveBeenCalledWith(
+                'Attachment sync is still failing. Files will retry in the background.',
+                'error',
+                6000,
+            );
+
+            (SyncService as any).finalizeAttachmentWarningState({ hadAttachmentWarning: false }, { success: true });
+            expect((SyncService as any).consecutiveAttachmentWarningRuns).toBe(0);
+        } finally {
+            useUiStore.setState({ showToast: originalShowToast });
+        }
     });
 
     it('allows injecting tauri dependencies for orchestration tests', async () => {
