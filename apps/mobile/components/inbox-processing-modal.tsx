@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, Modal, ScrollView, TextInput, Platform, Alert, Share, ActivityIndicator, Dimensions, type TextStyle } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 import { addBreadcrumb, DEFAULT_PROJECT_COLOR, collectTaskTokenUsage, useTaskStore, createAIProvider, safeFormatDate, safeParseDate, resolveAutoTextDirection, type Task, type AIProviderId, type TaskPriority } from '@mindwtr/core';
 
@@ -26,6 +27,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
   const { tasks, projects, areas, settings, updateTask, deleteTask, addProject } = useTaskStore();
   const { t, language } = useLanguage();
   const { showToast } = useToast();
+  const router = useRouter();
   const { isDark } = useTheme();
   const tc = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -91,6 +93,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
     writingDirection: resolvedTitleDirection,
     textAlign: resolvedTitleDirection === 'rtl' ? 'right' : 'left',
   }), [resolvedTitleDirection]);
+  const openSettingsLabel = language.startsWith('zh') ? '打开' : 'Open';
   const headerStyle = [styles.processingHeader, {
     borderBottomColor: tc.border,
     paddingTop: Math.max(insets.top, 10),
@@ -507,12 +510,30 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
   const handleAIClarifyInbox = async () => {
     if (!currentTask) return;
     if (!aiEnabled) {
-      Alert.alert(t('ai.errorTitle'), t('ai.disabledBody'));
+      showToast({
+        title: t('ai.errorTitle'),
+        message: t('ai.disabledBody'),
+        tone: 'warning',
+        durationMs: 5200,
+        actionLabel: openSettingsLabel,
+        onAction: () => {
+          router.push({ pathname: '/settings', params: { settingsScreen: 'ai' } });
+        },
+      });
       return;
     }
     const apiKey = await loadAIKey(aiProvider);
     if (isAIKeyRequired(settings) && !apiKey) {
-      Alert.alert(t('ai.errorTitle'), t('ai.missingKeyBody'));
+      showToast({
+        title: t('ai.errorTitle'),
+        message: t('ai.missingKeyBody'),
+        tone: 'warning',
+        durationMs: 5200,
+        actionLabel: openSettingsLabel,
+        onAction: () => {
+          router.push({ pathname: '/settings', params: { settingsScreen: 'ai' } });
+        },
+      });
       return;
     }
     setIsAIWorking(true);

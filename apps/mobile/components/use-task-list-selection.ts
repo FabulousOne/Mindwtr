@@ -48,15 +48,17 @@ export function useTaskListSelection({
       await action();
     } catch (error) {
       void logError(error, { scope: 'tasks', extra: { message: `Bulk action failed: ${label}` } });
-      Alert.alert(
-        t('common.notice'),
-        getBulkActionFailureMessage(error, `${label} failed.`)
-      );
+      showToast({
+        title: t('common.notice'),
+        message: getBulkActionFailureMessage(error, `${label} failed.`),
+        tone: 'warning',
+        durationMs: 4200,
+      });
     } finally {
       setBulkActionLoading(false);
       setBulkActionLabel('');
     }
-  }, [bulkActionLoading, t]);
+  }, [bulkActionLoading, showToast, t]);
 
   const toggleMultiSelect = useCallback((taskId: string) => {
     if (!selectionMode) setSelectionMode(true);

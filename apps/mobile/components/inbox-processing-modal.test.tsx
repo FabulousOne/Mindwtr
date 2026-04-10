@@ -7,6 +7,7 @@ import { InboxProcessingModal } from './inbox-processing-modal';
 const updateTask = vi.fn();
 const deleteTask = vi.fn();
 const addProject = vi.fn();
+const push = vi.fn();
 const mockSettings = { gtd: { inboxProcessing: {} }, ai: {} } as any;
 
 vi.mock('@mindwtr/core', async () => {
@@ -43,6 +44,10 @@ vi.mock('../contexts/language-context', () => ({
 
 vi.mock('../contexts/theme-context', () => ({
   useTheme: () => ({ isDark: false }),
+}));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push }),
 }));
 
 vi.mock('../contexts/toast-context', () => ({

@@ -12,7 +12,7 @@ import { Alert, AppState, AppStateStatus, Platform, SafeAreaView, StatusBar, Tex
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QuickCaptureProvider, type QuickCaptureOptions } from '../contexts/quick-capture-context';
-import { ToastProvider } from '../contexts/toast-context';
+import { ToastProvider, useToast } from '../contexts/toast-context';
 
 import { ThemeProvider, useTheme } from '../contexts/theme-context';
 import { LanguageProvider, useLanguage } from '../contexts/language-context';
@@ -252,7 +252,8 @@ function RootLayoutContent() {
   const incomingUrl = Linking.useURL();
   const { isDark, isReady: themeReady } = useTheme();
   const tc = useThemeColors();
-  const { language, setLanguage, isReady: languageReady } = useLanguage();
+  const { language, setLanguage, t, isReady: languageReady } = useLanguage();
+  const { showToast } = useToast();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
   const extraConfig = Constants.expoConfig?.extra as MobileExtraConfig | undefined;
   const isFossBuild = parseBool(extraConfig?.isFossBuild);
@@ -279,13 +280,30 @@ function RootLayoutContent() {
   const lastHandledCaptureUrl = useRef<string | null>(null);
   const lastLoggedAutoSyncError = useRef<string | null>(null);
   const lastLoggedAutoSyncErrorAt = useRef(0);
+  const notificationPermissionWarningShown = useRef(false);
   const startupContextLogged = useRef(false);
   const syncCadenceRef = useRef<AutoSyncCadence>(AUTO_SYNC_CADENCE_REMOTE);
   const syncBackendCacheRef = useRef<{ backend: SyncBackend; readAt: number }>({
     backend: 'off',
     readAt: 0,
   });
+  const routerRef = useRef(router);
+  const showToastRef = useRef(showToast);
+  const mobileUiCopyRef = useRef({
+    syncIssueTitle: 'Sync issue',
+    syncIssueMessage: 'Background sync failed. Open Data & Sync to review the connection and retry.',
+    notificationsDisabledTitle: 'Notifications disabled',
+    notificationsDisabledMessage: 'Mindwtr can no longer schedule reminders until notification access is restored.',
+    shareUnavailableTitle: 'Share unavailable',
+    shareUnavailableMessage: 'Mindwtr could not read text or a URL from the shared item.',
+    shortcutUnavailableTitle: 'Capture shortcut unavailable',
+    shortcutUnavailableMessage: 'Mindwtr could not read a task title from that shortcut link.',
+    openActionLabel: 'Open',
+  });
   const { selectedAreaIdForNewTasks } = useMobileAreaFilter();
+  const localize = useCallback((english: string, chinese: string) => (
+    language.startsWith('zh') ? chinese : english
+  ), [language]);
   const buildQuickCaptureInitialProps = useCallback((initialProps?: QuickCaptureOptions['initialProps']) => {
     const nextInitialProps = initialProps ? { ...initialProps } : {};
     if (!nextInitialProps.projectId && !nextInitialProps.areaId && selectedAreaIdForNewTasks) {
@@ -301,6 +319,40 @@ function RootLayoutContent() {
   useEffect(() => {
     markStartupPhase('js.root_layout.mounted');
   }, []);
+
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
+
+  useEffect(() => {
+    showToastRef.current = showToast;
+  }, [showToast]);
+
+  useEffect(() => {
+    mobileUiCopyRef.current = {
+      syncIssueTitle: localize('Sync issue', '同步异常'),
+      syncIssueMessage: localize(
+        'Background sync failed. Open Data & Sync to review the connection and retry.',
+        '后台同步失败。请打开“数据与同步”检查连接并重试。'
+      ),
+      notificationsDisabledTitle: localize('Notifications disabled', '通知已禁用'),
+      notificationsDisabledMessage: localize(
+        'Mindwtr can no longer schedule reminders until notification access is restored.',
+        '在恢复通知权限之前，Mindwtr 无法继续安排提醒。'
+      ),
+      shareUnavailableTitle: localize('Share unavailable', '分享不可用'),
+      shareUnavailableMessage: localize(
+        'Mindwtr could not read text or a URL from the shared item.',
+        'Mindwtr 无法从分享内容中读取文本或链接。'
+      ),
+      shortcutUnavailableTitle: localize('Capture shortcut unavailable', '快捷捕获不可用'),
+      shortcutUnavailableMessage: localize(
+        'Mindwtr could not read a task title from that shortcut link.',
+        'Mindwtr 无法从该快捷方式链接中读取任务标题。'
+      ),
+      openActionLabel: localize('Open', '打开'),
+    };
+  }, [localize, t]);
 
   useEffect(() => {
     const breadcrumb = getViewBreadcrumb(pathname);
@@ -372,6 +424,17 @@ function RootLayoutContent() {
           void logWarn('Auto-sync failed', {
             scope: 'sync',
             extra: { error: result.error },
+          });
+          const uiCopy = mobileUiCopyRef.current;
+          showToastRef.current({
+            title: uiCopy.syncIssueTitle,
+            message: uiCopy.syncIssueMessage,
+            tone: 'warning',
+            durationMs: 5200,
+            actionLabel: uiCopy.openActionLabel,
+            onAction: () => {
+              routerRef.current.push({ pathname: '/settings', params: { settingsScreen: 'sync' } } as never);
+            },
           });
         }
       }
@@ -518,14 +581,15 @@ function RootLayoutContent() {
       } as never);
     } else {
       void logError(new Error('Share intent payload missing text'), { scope: 'share-intent' });
-      Alert.alert(
-        'Share unavailable',
-        'Mindwtr could not read text or a URL from the shared item.',
-        [{ text: 'Close' }]
-      );
+      const uiCopy = mobileUiCopyRef.current;
+      showToast({
+        title: uiCopy.shareUnavailableTitle,
+        message: uiCopy.shareUnavailableMessage,
+        tone: 'warning',
+      });
     }
     resetShareIntent();
-  }, [hasShareIntent, resetShareIntent, router, shareIntent?.text, shareIntent?.webUrl]);
+  }, [hasShareIntent, resetShareIntent, router, shareIntent?.text, shareIntent?.webUrl, showToast]);
 
   useEffect(() => {
     if (!dataReady) return;
@@ -539,11 +603,12 @@ function RootLayoutContent() {
         scope: 'shortcuts',
         extra: { url: incomingUrl },
       });
-      Alert.alert(
-        'Capture shortcut unavailable',
-        'Mindwtr could not read a task title from that shortcut link.',
-        [{ text: 'Close' }]
-      );
+      const uiCopy = mobileUiCopyRef.current;
+      showToast({
+        title: uiCopy.shortcutUnavailableTitle,
+        message: uiCopy.shortcutUnavailableMessage,
+        tone: 'warning',
+      });
       return;
     }
 
@@ -552,7 +617,7 @@ function RootLayoutContent() {
       lastHandledCaptureUrl.current = null;
       void logError(error, { scope: 'shortcuts', extra: { url: incomingUrl } });
     });
-  }, [captureFromShortcut, dataReady, incomingUrl]);
+  }, [captureFromShortcut, dataReady, incomingUrl, showToast]);
 
   // Sync on foreground/background transitions
   useEffect(() => {
@@ -590,8 +655,23 @@ function RootLayoutContent() {
               if (!isActive.current) return;
               if (!permission.granted) {
                 stopMobileNotifications().catch(logAppError);
+                if (!notificationPermissionWarningShown.current) {
+                  notificationPermissionWarningShown.current = true;
+                  const uiCopy = mobileUiCopyRef.current;
+                  showToastRef.current({
+                    title: uiCopy.notificationsDisabledTitle,
+                    message: uiCopy.notificationsDisabledMessage,
+                    tone: 'warning',
+                    durationMs: 5200,
+                    actionLabel: uiCopy.openActionLabel,
+                    onAction: () => {
+                      routerRef.current.push({ pathname: '/settings', params: { settingsScreen: 'notifications' } } as never);
+                    },
+                  });
+                }
                 return;
               }
+              notificationPermissionWarningShown.current = false;
               startMobileNotifications().catch(logAppError);
             })
             .catch(logAppError);
