@@ -122,11 +122,18 @@ export function ProjectsView() {
     const [selectedTag, setSelectedTag] = useState(ALL_TAGS);
 
     const handleDuplicateProject = useCallback(async (projectId: string) => {
-        const created = await duplicateProject(projectId);
-        if (created) {
-            setSelectedProjectId(created.id);
+        try {
+            const created = await duplicateProject(projectId);
+            if (created) {
+                setSelectedProjectId(created.id);
+                return;
+            }
+            showToast('Failed to duplicate project', 'error');
+        } catch (error) {
+            reportError('Failed to duplicate project', error);
+            showToast('Failed to duplicate project', 'error');
         }
-    }, [duplicateProject, setSelectedProjectId]);
+    }, [duplicateProject, setSelectedProjectId, showToast]);
 
     useEffect(() => {
         if (!perf.enabled) return;
@@ -153,6 +160,7 @@ export function ProjectsView() {
         deleteArea,
         setCollapsedAreas,
         requestConfirmation,
+        showToast,
     });
 
     const taskSensors = useSensors(
@@ -456,6 +464,11 @@ export function ProjectsView() {
 
     const handleTaskDragEnd = useCallback((event: DragEndEvent) => {
         if (!selectedProject) return;
+        const failTaskMove = (error: unknown) => {
+            reportError('Failed to reorder project tasks', error);
+            showToast('Failed to move task', 'error');
+        };
+
         const { active, over } = event;
         if (!over) return;
         const activeId = String(active.id);
@@ -477,7 +490,9 @@ export function ProjectsView() {
                 : sourceItems.length - 1;
             if (newIndex === -1 || oldIndex === newIndex) return;
             const reordered = arrayMove(sourceItems, oldIndex, newIndex);
-            reorderProjectTasks(selectedProject.id, reordered, getSectionIdFromContainer(sourceContainer));
+            void Promise.resolve(
+                reorderProjectTasks(selectedProject.id, reordered, getSectionIdFromContainer(sourceContainer))
+            ).catch(failTaskMove);
             return;
         }
 
@@ -492,12 +507,21 @@ export function ProjectsView() {
         nextDestinationItems.splice(insertIndex, 0, activeId);
 
         const nextSectionId = getSectionIdFromContainer(destinationContainer) ?? undefined;
-        updateTask(activeId, { sectionId: nextSectionId });
-        if (nextSourceItems.length > 0) {
-            reorderProjectTasks(selectedProject.id, nextSourceItems, getSectionIdFromContainer(sourceContainer));
-        }
-        reorderProjectTasks(selectedProject.id, nextDestinationItems, getSectionIdFromContainer(destinationContainer));
-    }, [reorderProjectTasks, selectedProject, taskIdToContainer, taskIdsByContainer, updateTask]);
+        void (async () => {
+            const updateResult = await Promise.resolve(updateTask(activeId, { sectionId: nextSectionId }));
+            if (updateResult && updateResult.success === false) {
+                throw new Error(updateResult.error || 'Failed to move task');
+            }
+            if (nextSourceItems.length > 0) {
+                await Promise.resolve(
+                    reorderProjectTasks(selectedProject.id, nextSourceItems, getSectionIdFromContainer(sourceContainer))
+                );
+            }
+            await Promise.resolve(
+                reorderProjectTasks(selectedProject.id, nextDestinationItems, getSectionIdFromContainer(destinationContainer))
+            );
+        })().catch(failTaskMove);
+    }, [reorderProjectTasks, selectedProject, showToast, taskIdToContainer, taskIdsByContainer, updateTask]);
 
     const renderSortableTasks = (list: Task[]) => (
         <SortableContext items={list.map((task) => task.id)} strategy={verticalListSortingStrategy}>
@@ -848,6 +872,7 @@ export function ProjectsView() {
                             updateProject={updateProject}
                             reorderProjects={reorderProjects}
                             onDuplicateProject={handleDuplicateProject}
+                            showToast={showToast}
                         />
                     </div>
 

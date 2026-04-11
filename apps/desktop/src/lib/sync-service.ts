@@ -1743,7 +1743,7 @@ export class SyncService {
         SyncService.updateSyncStatus({
             inFlight: false,
             step: null,
-            queued: hasQueuedFollowUp,
+            queued: SyncService.syncQueued,
             lastResult: skippedRequeue
                 ? SyncService.syncStatus.lastResult
                 : result.success

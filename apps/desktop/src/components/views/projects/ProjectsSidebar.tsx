@@ -65,8 +65,9 @@ interface ProjectsSidebarProps {
     projects: Project[];
     toggleProjectFocus: (projectId: string) => void;
     updateProject: (projectId: string, updates: Partial<Project>) => Promise<StoreActionResult> | void;
-    reorderProjects: (projectIds: string[], areaId?: string) => void;
+    reorderProjects: (projectIds: string[], areaId?: string) => Promise<void> | void;
     onDuplicateProject: (projectId: string) => void;
+    showToast?: (message: string, tone?: 'success' | 'error' | 'info', durationMs?: number) => void;
 }
 
 export function ProjectsSidebar({
@@ -104,6 +105,7 @@ export function ProjectsSidebar({
     updateProject,
     reorderProjects,
     onDuplicateProject,
+    showToast,
 }: ProjectsSidebarProps) {
     const projectSensors = useSensors(
         useSensor(PointerSensor, {
@@ -215,6 +217,10 @@ export function ProjectsSidebar({
     const maxFocusedProjectsLabel = t('projects.maxFocusedProjects');
 
     const handleProjectDragEnd = useCallback((dndState: ReturnType<typeof buildProjectDndState>) => (event: DragEndEvent) => {
+        const failProjectMove = (error: unknown) => {
+            reportError('Failed to move project between areas', error);
+            showToast?.('Failed to move project', 'error');
+        };
         const { active, over } = event;
         if (!over || active.id === over.id) return;
         const move = computeProjectAreaDragResult({
@@ -229,21 +235,22 @@ export function ProjectsSidebar({
         const destinationAreaArg = move.destinationAreaId === noAreaId ? undefined : move.destinationAreaId;
 
         if (!move.movedAcrossAreas) {
-            reorderProjects(move.nextDestinationIds, destinationAreaArg);
+            void Promise.resolve(reorderProjects(move.nextDestinationIds, destinationAreaArg)).catch(failProjectMove);
             return;
         }
 
-        Promise.resolve(updateProject(move.movedProjectId, { areaId: destinationAreaArg }))
-            .then(async () => {
+        void Promise.resolve(updateProject(move.movedProjectId, { areaId: destinationAreaArg }))
+            .then(async (result) => {
+                if (result && result.success === false) {
+                    throw new Error(result.error || 'Failed to move project');
+                }
                 if (move.nextSourceIds.length > 0) {
                     await Promise.resolve(reorderProjects(move.nextSourceIds, sourceAreaArg));
                 }
                 await Promise.resolve(reorderProjects(move.nextDestinationIds, destinationAreaArg));
             })
-            .catch((error) => {
-                reportError('Failed to move project between areas', error);
-            });
-    }, [noAreaId, reorderProjects, updateProject]);
+            .catch(failProjectMove);
+    }, [noAreaId, reorderProjects, showToast, updateProject]);
 
     return (
         <div className="w-full h-full min-h-0 flex flex-col gap-4 border-r border-border pr-5 xl:pr-6">
