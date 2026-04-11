@@ -26,6 +26,7 @@ import * as LocalDataWatcher from './lib/local-data-watcher';
 import { isFlatpakRuntime, isTauriRuntime } from './lib/runtime';
 import { logError } from './lib/app-log';
 import { createDesktopAutoSyncController } from './lib/auto-sync-controller';
+import { canDesktopAutoSync } from './lib/desktop-auto-sync-eligibility';
 import { beginSettingsOpenTrace, markSettingsOpenTrace, wrapSettingsOpenImport } from './lib/settings-open-diagnostics';
 import {
     THEME_STORAGE_KEY,
@@ -293,24 +294,6 @@ function App() {
 
         isActiveRef.current = true;
 
-        const canSync = async () => {
-            const backend = await SyncService.getSyncBackend();
-            if (backend === 'off') return false;
-            if (backend === 'file') {
-                const path = await SyncService.getSyncPath();
-                return Boolean(path);
-            }
-            if (backend === 'webdav') {
-                const { url } = await SyncService.getWebDavConfig();
-                return Boolean(url);
-            }
-            if (backend === 'cloud') {
-                const { url } = await SyncService.getCloudConfig();
-                return Boolean(url);
-            }
-            return false;
-        };
-
         const performSync = async () => {
             return SyncService.performSync();
         };
@@ -329,7 +312,7 @@ function App() {
         };
 
         const autoSyncController = createDesktopAutoSyncController({
-            canSync,
+            canSync: () => canDesktopAutoSync(SyncService),
             performSync,
             flushPendingSave,
             reportError,
