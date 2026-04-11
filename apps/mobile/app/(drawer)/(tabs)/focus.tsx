@@ -10,7 +10,7 @@ import { useTheme } from '../../../contexts/theme-context';
 import { useLanguage } from '../../../contexts/language-context';
 import { TaskEditModal } from '@/components/task-edit-modal';
 import { PomodoroPanel } from '@/components/pomodoro-panel';
-import { orderFocusedTasksFirst } from '@/lib/focus-screen-utils';
+import { splitFocusedTasks } from '@/lib/focus-screen-utils';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { projectMatchesAreaFilter, taskMatchesAreaFilter } from '@/lib/area-filter';
 import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
@@ -24,6 +24,7 @@ export default function FocusScreen() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
+    focus: true,
     schedule: true,
     next: true,
   });
@@ -108,10 +109,17 @@ export default function FocusScreen() {
     return firstIds;
   }, [visibleTasks, sequentialProjectIds]);
 
-  const { schedule, nextActions } = useMemo(() => {
+  const { focusedTasks, schedule, nextActions } = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const activeTasks = visibleTasks.filter((task) => (
+      !task.deletedAt
+      && task.status !== 'done'
+      && task.status !== 'reference'
+    ));
+    const { focusedTasks: allFocusedTasks, otherTasks: nonFocusedTasks } = splitFocusedTasks(activeTasks);
+    const focusedItems = allFocusedTasks.slice(0, 3);
 
     const isPlannedForFuture = (task: Task) => {
       const start = safeParseDate(task.startTime);
@@ -123,9 +131,7 @@ export default function FocusScreen() {
       return !sequentialFirstTaskIds.has(task.id);
     };
 
-    const scheduleItems = orderFocusedTasksFirst(visibleTasks.filter((task) => {
-      if (task.deletedAt) return false;
-      if (task.status === 'done' || task.status === 'reference') return false;
+    const scheduleItems = nonFocusedTasks.filter((task) => {
       if (task.status !== 'next') return false;
       if (isSequentialBlocked(task)) return false;
       const due = safeParseDueDate(task.dueDate);
@@ -136,46 +142,61 @@ export default function FocusScreen() {
         && start <= endOfToday
       );
       return Boolean(due && due <= endOfToday) || startsToday;
-    }));
+    });
 
     const scheduleIds = new Set(scheduleItems.map((task) => task.id));
 
-    const nextItems = orderFocusedTasksFirst(visibleTasks.filter((task) => {
-      if (task.deletedAt) return false;
+    const nextItems = nonFocusedTasks.filter((task) => {
       if (task.status !== 'next') return false;
       if (isPlannedForFuture(task)) return false;
       if (isSequentialBlocked(task)) return false;
       return !scheduleIds.has(task.id);
-    }));
+    });
 
-    return { schedule: scheduleItems, nextActions: nextItems };
+    return { focusedTasks: focusedItems, schedule: scheduleItems, nextActions: nextItems };
   }, [visibleTasks, sequentialProjectIds, sequentialFirstTaskIds]);
 
-  const sections = useMemo(() => ([
-    {
-      title: t('focus.schedule') ?? 'Today',
-      data: expandedSections.schedule ? schedule : [],
-      totalCount: schedule.length,
-      expanded: expandedSections.schedule,
-      type: 'schedule' as const,
-    },
-    {
-      title: t('focus.nextActions') ?? t('list.next'),
-      data: expandedSections.next ? nextActions : [],
-      totalCount: nextActions.length,
-      expanded: expandedSections.next,
-      type: 'next' as const,
-    },
-  ]), [expandedSections.next, expandedSections.schedule, schedule, nextActions, t]);
-  const hasTasks = schedule.length > 0 || nextActions.length > 0;
+  const sections = useMemo(() => {
+    const nextSections = [];
+
+    if (focusedTasks.length > 0) {
+      nextSections.push({
+        title: t('agenda.todaysFocus') ?? "Today's Focus",
+        data: expandedSections.focus ? focusedTasks : [],
+        totalCount: focusedTasks.length,
+        expanded: expandedSections.focus,
+        type: 'focus' as const,
+      });
+    }
+
+    nextSections.push(
+      {
+        title: t('focus.schedule') ?? 'Today',
+        data: expandedSections.schedule ? schedule : [],
+        totalCount: schedule.length,
+        expanded: expandedSections.schedule,
+        type: 'schedule' as const,
+      },
+      {
+        title: t('focus.nextActions') ?? t('list.next'),
+        data: expandedSections.next ? nextActions : [],
+        totalCount: nextActions.length,
+        expanded: expandedSections.next,
+        type: 'next' as const,
+      }
+    );
+
+    return nextSections;
+  }, [expandedSections.focus, expandedSections.next, expandedSections.schedule, focusedTasks, schedule, nextActions, t]);
+  const hasTasks = focusedTasks.length > 0 || schedule.length > 0 || nextActions.length > 0;
   const pomodoroTasks = useMemo(() => {
     const byId = new Map<string, Task>();
-    [...schedule, ...nextActions].forEach((task) => {
+    [...focusedTasks, ...schedule, ...nextActions].forEach((task) => {
       if (task.deletedAt) return;
       byId.set(task.id, task);
     });
     return Array.from(byId.values());
-  }, [schedule, nextActions]);
+  }, [focusedTasks, schedule, nextActions]);
 
   const onEdit = useCallback((task: Task) => {
     setEditingTask(task);
@@ -186,7 +207,7 @@ export default function FocusScreen() {
     updateTask(taskId, updates);
   }, [updateTask]);
 
-  const toggleSection = useCallback((sectionType: 'schedule' | 'next') => {
+  const toggleSection = useCallback((sectionType: 'focus' | 'schedule' | 'next') => {
     setExpandedSections((current) => ({
       ...current,
       [sectionType]: !current[sectionType],

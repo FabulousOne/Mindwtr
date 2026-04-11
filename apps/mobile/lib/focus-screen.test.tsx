@@ -70,6 +70,7 @@ vi.mock('../contexts/language-context', () => ({
   useLanguage: () => ({
     t: (key: string) =>
       ({
+        'agenda.todaysFocus': "Today's Focus",
         'focus.schedule': 'Today',
         'focus.nextActions': 'Next Actions',
         'agenda.allClear': 'All clear',
@@ -126,7 +127,7 @@ vi.mock('@/lib/task-meta-navigation', () => ({
 }));
 
 describe('FocusScreen', () => {
-  it('renders focused next actions before other next actions', () => {
+  it('renders starred tasks in a dedicated Today\'s Focus section', () => {
     storeState.tasks = [
       makeTask('plain-next', { title: 'Plain next' }),
       makeTask('focused-next', { title: 'Focused next', isFocusedToday: true }),
@@ -142,6 +143,56 @@ describe('FocusScreen', () => {
     expect(
       tree.root.findAllByType(SwipeableTaskItem).map((node) => node.props.task.id),
     ).toEqual(['focused-next', 'plain-next', 'another-next']);
+
+    expect(() =>
+      tree.root.find((node) =>
+        node.props.accessibilityLabel === "Today's Focus" && typeof node.props.onPress === 'function'
+      )
+    ).not.toThrow();
+  });
+
+  it('keeps Today\'s Focus visible when collapsing Next Actions', () => {
+    storeState.tasks = [
+      makeTask('focused-next', { title: 'Focused next', isFocusedToday: true }),
+      makeTask('plain-next', { title: 'Plain next' }),
+    ];
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<FocusScreen />);
+    });
+
+    const nextSectionButton = tree.root.find((node) =>
+      node.props.accessibilityLabel === 'Next Actions' && typeof node.props.onPress === 'function'
+    );
+
+    act(() => {
+      nextSectionButton.props.onPress();
+    });
+
+    expect(
+      tree.root.findAllByType(SwipeableTaskItem).map((node) => node.props.task.id),
+    ).toEqual(['focused-next']);
+  });
+
+  it('does not render a Today\'s Focus section when no task is starred', () => {
+    storeState.tasks = [
+      makeTask('plain-next', { title: 'Plain next' }),
+      makeTask('another-next', { title: 'Another next' }),
+    ];
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<FocusScreen />);
+    });
+
+    expect(() =>
+      tree.root.find((node) =>
+        node.props.accessibilityLabel === "Today's Focus" && typeof node.props.onPress === 'function'
+      )
+    ).toThrow();
   });
 
   it('collapses the Next Actions section without showing the empty state', () => {
