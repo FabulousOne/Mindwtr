@@ -37,6 +37,12 @@ describe('widget-layout', () => {
         expect(getAndroidWidgetLayoutMode(201)).toBe('standard');
     });
 
+    it('lets shorter compact Android widgets fall back to two tasks', () => {
+        expect(getAdaptiveAndroidWidgetTaskLimit(120, 180)).toBe(2);
+        expect(getAdaptiveAndroidWidgetTaskLimit(179, 180)).toBe(2);
+        expect(getAdaptiveAndroidWidgetTaskLimit(180, 180)).toBe(3);
+    });
+
     it('reserves more chrome for compact Android widgets so the button remains visible', () => {
         expect(getAdaptiveAndroidWidgetTaskLimit(0, 180)).toBe(3);
         expect(getAdaptiveAndroidWidgetTaskLimit(180, 180)).toBe(3);
