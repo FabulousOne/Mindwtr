@@ -363,6 +363,7 @@ You can help in several ways:
 - 🤖 Add to F-Droid
 - 🗣️ iOS Reminders Inbox import (Siri capture -> Mindwtr Inbox)
 - ✉️ Email to Inbox
+- 🗓️ One-way Mindwtr -> external calendar export/sync ([#361](https://github.com/dongdongbh/Mindwtr/issues/361))
 
 ## Documentation
 
