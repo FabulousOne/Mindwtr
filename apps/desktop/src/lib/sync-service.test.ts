@@ -399,6 +399,68 @@ describe('SyncService orchestration', () => {
         expect(snapshots.some((status) => status.queued === true)).toBe(true);
     });
 
+    it('queues an additional follow-up when a new request lands during the queued rerun', async () => {
+        const firstRun = createDeferred();
+        const secondRun = createDeferred();
+        const backendSpy = vi.spyOn(SyncService as any, 'getSyncBackend');
+        let backendCalls = 0;
+        backendSpy.mockImplementation(async () => {
+            backendCalls += 1;
+            if (backendCalls === 1) {
+                await firstRun.promise;
+            } else if (backendCalls === 2) {
+                await secondRun.promise;
+            }
+            return 'off';
+        });
+        const snapshots: Array<ReturnType<typeof SyncService.getSyncStatus>> = [];
+        const unsubscribe = SyncService.subscribeSyncStatus((status) => {
+            snapshots.push({ ...status });
+        });
+
+        const first = SyncService.performSync();
+        await waitForAssertion(() => {
+            expect(SyncService.getSyncStatus()).toMatchObject({
+                inFlight: true,
+                queued: false,
+            });
+        });
+        const second = SyncService.performSync();
+        await waitForAssertion(() => {
+            expect(SyncService.getSyncStatus()).toMatchObject({
+                inFlight: true,
+                queued: true,
+            });
+        });
+        firstRun.resolve();
+        await waitForAssertion(() => {
+            expect(backendCalls).toBeGreaterThanOrEqual(2);
+            expect(SyncService.getSyncStatus().inFlight).toBe(true);
+        });
+        const third = SyncService.performSync();
+        await waitForAssertion(() => {
+            expect(SyncService.getSyncStatus()).toMatchObject({
+                inFlight: true,
+                queued: true,
+            });
+        });
+        secondRun.resolve();
+
+        const [firstResult, secondResult, thirdResult] = await Promise.all([first, second, third]);
+        expect(firstResult.success).toBe(true);
+        expect(secondResult.success).toBe(true);
+        expect(thirdResult.success).toBe(true);
+        await waitForAssertion(() => {
+            expect(SyncService.getSyncStatus()).toMatchObject({
+                inFlight: false,
+                queued: false,
+                lastResult: 'success',
+            });
+            expect(countInFlightStarts(snapshots)).toBe(3);
+        });
+        unsubscribe();
+    });
+
     it('emits queued status updates while a sync is already in flight', async () => {
         const firstRun = createDeferred();
         const backendSpy = vi.spyOn(SyncService as any, 'getSyncBackend');

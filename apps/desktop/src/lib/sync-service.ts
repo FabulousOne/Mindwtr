@@ -391,6 +391,7 @@ export class SyncService {
     private static didMigrate = false;
     private static syncInFlight: Promise<SyncRunResult> | null = null;
     private static syncQueued = false;
+    private static syncQueueVersion = 0;
     private static syncStatus: {
         inFlight: boolean;
         queued: boolean;
@@ -424,6 +425,12 @@ export class SyncService {
             return performance.now();
         }
         return Date.now();
+    }
+
+    private static requestQueuedSyncRun() {
+        SyncService.syncQueued = true;
+        SyncService.syncQueueVersion += 1;
+        SyncService.updateSyncStatus({ queued: true });
     }
 
     static getSyncStatus() {
@@ -460,6 +467,7 @@ export class SyncService {
         SyncService.didMigrate = false;
         SyncService.syncInFlight = null;
         SyncService.syncQueued = false;
+        SyncService.syncQueueVersion = 0;
         SyncService.syncStatus = {
             inFlight: false,
             queued: false,
@@ -1506,11 +1514,11 @@ export class SyncService {
      */
     static async performSync(options: SyncRunOptions = {}): Promise<SyncRunResult> {
         if (SyncService.syncInFlight) {
-            SyncService.syncQueued = true;
-            SyncService.updateSyncStatus({ queued: true });
+            SyncService.requestQueuedSyncRun();
             return SyncService.syncInFlight;
         }
-        // Consume any queued follow-up token only when this cycle has actually started.
+        // Consume queued follow-up requests by snapshotting the version at cycle start.
+        const cycleQueueVersion = SyncService.syncQueueVersion;
         SyncService.syncQueued = false;
         let inFlightSettled = false;
         let resolveInFlight: ((value: SyncRunResult) => void) | null = null;
@@ -1560,8 +1568,7 @@ export class SyncService {
         };
         const ensureLocalSnapshotFresh = () => {
             if (getStoreState().lastDataChangeAt > context.localSnapshotChangeAt) {
-                SyncService.syncQueued = true;
-                SyncService.updateSyncStatus({ queued: true });
+                SyncService.requestQueuedSyncRun();
                 throw new LocalSyncAbort();
             }
         };
@@ -1731,10 +1738,12 @@ export class SyncService {
         if (!skippedRequeue) {
             SyncService.finalizeAttachmentWarningState(context, result);
         }
+        const hasQueuedFollowUp = SyncService.syncQueueVersion > cycleQueueVersion;
+        SyncService.syncQueued = hasQueuedFollowUp;
         SyncService.updateSyncStatus({
             inFlight: false,
             step: null,
-            queued: SyncService.syncQueued,
+            queued: hasQueuedFollowUp,
             lastResult: skippedRequeue
                 ? SyncService.syncStatus.lastResult
                 : result.success
@@ -1745,7 +1754,7 @@ export class SyncService {
                 : new Date().toISOString(),
         });
 
-        if (SyncService.syncQueued) {
+        if (hasQueuedFollowUp) {
             void SyncService.performSync(options)
                 .then((queuedResult) => {
                     if (!queuedResult.success) {
