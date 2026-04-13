@@ -957,6 +957,12 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                     body: resolveText('someday.emptyHint', 'Store ideas for later.'),
                     action: t('nav.addTask') || 'Add task',
                 };
+            case 'reference':
+                return {
+                    title: resolveText('reference.empty', t('list.reference') || 'Reference'),
+                    body: resolveText('reference.emptyHint', 'Reference holds info you might want later — no action required.'),
+                    action: t('nav.addTask') || 'Add task',
+                };
             case 'done':
                 return {
                     title: t('list.done') || 'Done',

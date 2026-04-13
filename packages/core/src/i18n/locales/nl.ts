@@ -13,7 +13,6 @@ export const nlOverrides: Record<string, string> = {
         'nav.calendar': 'Kalender',
         'nav.review': 'Nalezen',
         'nav.agenda': 'Agenda',
-        'nav.tutorial': 'Handleiding',
         'nav.settings': 'Instellingen',
         'nav.done': 'Klaar',
         'nav.archived': 'Gearchiveerd',

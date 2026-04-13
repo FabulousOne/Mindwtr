@@ -7,7 +7,6 @@ import {
     Layers,
     Tag,
     CheckCircle2,
-    HelpCircle,
     Folder,
     Settings,
     Target,
@@ -167,7 +166,6 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
         'contexts',
         'search',
         'agenda',
-        'tutorial',
         'obsidian',
     ]);
     const isWideView = wideViews.has(currentView);
@@ -207,7 +205,6 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                     ? [{ id: 'obsidian', labelKey: 'nav.obsidian', fallbackLabel: 'Obsidian', icon: BookOpen }]
                     : []),
                 { id: 'board', labelKey: 'nav.board', icon: Layers },
-                { id: 'tutorial', labelKey: 'nav.tutorial', icon: HelpCircle },
             ],
         },
         {

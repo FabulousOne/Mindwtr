@@ -805,7 +805,7 @@ export function CalendarView() {
                 </div>
             )}
             {openTask && (
-                <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+                <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
                     <div
                         className="absolute inset-0"
                         onClick={() => setOpenTaskId(null)}
