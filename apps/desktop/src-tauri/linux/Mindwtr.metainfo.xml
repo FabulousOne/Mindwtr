@@ -51,6 +51,18 @@
   <url type="bugtracker">https://github.com/dongdongbh/Mindwtr/issues</url>
   <url type="vcs-browser">https://github.com/dongdongbh/Mindwtr</url>
   <releases>
+    <release version="0.8.3" date="2026-04-14">
+      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v0.8.3</url>
+      <description translate="no">
+        <p>Mindwtr 0.8.3 expands desktop planning and Markdown editing while tightening Linux-facing polish and sync recovery.</p>
+        <ul>
+          <li>Expanded desktop Markdown notes with fullscreen editors, toolbar actions, automatic list continuation, and task/project internal links.</li>
+          <li>Added area filter keyboard chords, task-date clear buttons, contexts bulk energy assignment, and a new energy-level focus filter.</li>
+          <li>Kept the desktop shell tidier with persistent collapsible sidebar sections, localized native date inputs, Lucide sync-setting icons, and remembered area collapse state.</li>
+          <li>Made sync recovery safer by preserving recoverable createdAt timestamps and flushing pending writes before retry recovery.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.8.2" date="2026-04-11">
       <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v0.8.2</url>
       <description translate="no">

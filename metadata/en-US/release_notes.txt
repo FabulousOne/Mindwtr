@@ -1,4 +1,4 @@
-- Quick capture now understands natural language dates like tomorrow and next Friday.
-- Mobile feedback is calmer with queued toasts, larger action targets, and fewer blocking alerts.
-- Sync and cloud handling are more reliable, with safer attachment uploads and clearer server request IDs.
-- Focus and settings flows are steadier with prioritized focus tasks and more consistent error toasts.
+- Added DGT GTD import plus task and project links inside Markdown notes.
+- Markdown editing is better with expanded editors, toolbar actions, and automatic list continuation.
+- Review notifications reopen the right flow again, reminder snooze actions are back, and AI clarify now shows loading feedback.
+- Today waits for local data before loading, and search/localization polish keeps mobile planning steadier.

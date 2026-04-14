@@ -30,7 +30,7 @@
           "完全离线可用，无需互联网连接",
           "完全开源，安全透明"
         ],
-        "ReleaseNotes": "• 桌面端快速收集现已支持“明天”等自然语言日期解析。\n• 桌面同步现在会保留排队中的重试、恢复 Dropbox 自动同步，并在刷新时更稳定地保留滚动位置。\n• 确认对话框以及项目拖拽、日历和同步错误都会更清晰地显示出来，不再被重渲染吞掉。\n• 自托管云端错误更清晰，危险上传会被更安全地拦截，500 错误也会附带请求 ID。",
+        "ReleaseNotes": "• 桌面端 Markdown 备注现已支持扩展编辑器、工具栏操作、自动续写列表，以及任务/项目内部链接。\n• 新增区域筛选快捷键、任务日期清除按钮、按情境批量设置能量值，以及新的能量等级筛选。\n• 侧边栏分组可保持折叠，原生日期输入已本地化，区域折叠状态也能更稳定地保留。\n• 同步恢复更安全：会保留可恢复的 createdAt，在重试恢复前先刷新待写入数据，并增强 MCP SQLite 启动恢复。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "• Added natural-language date parsing to desktop quick capture so inbox entry can understand phrases like tomorrow.\n• Desktop sync now preserves queued reruns, restores Dropbox autosync, and keeps scroll position steadier during refreshes.\n• Confirmation dialogs and project, calendar, and sync failures surface more clearly instead of disappearing in rerenders.\n• Self-hosted cloud errors are clearer with safer upload blocking and request IDs on 500 responses.",
+        "ReleaseNotes": "• Expanded Markdown notes on desktop with fullscreen editors, toolbar actions, automatic list continuation, and task/project links.\n• Added area filter keyboard chords, task date clear buttons, contexts bulk energy assignment, and a new energy-level focus filter.\n• Sidebar sections can stay collapsed, native date inputs are localized, and area collapse state persists more reliably.\n• Sync recovery is safer with recoverable createdAt preservation, pending-write flushes before retry recovery, and sturdier MCP SQLite bootstrap handling.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -130,7 +130,7 @@
           "No requiere conexión a internet para funcionar",
           "Código abierto y transparente"
         ],
-        "ReleaseNotes": "• Agregamos fechas en lenguaje natural para la captura rapida de escritorio, con frases como manana.\n• El sync de escritorio ahora conserva reintentos en cola, recupera el autosync de Dropbox y mantiene mejor el scroll durante refrescos.\n• Los dialogos de confirmacion y los errores de proyectos, calendario y sync se muestran con mas claridad.\n• Los errores de nube autohospedada son mas claros, con uploads bloqueados de forma mas segura e IDs de solicitud en errores 500.",
+        "ReleaseNotes": "• Las notas Markdown de escritorio ahora tienen editores ampliados, acciones de barra, continuacion automatica de listas y enlaces a tareas/proyectos.\n• Agregamos atajos de teclado para filtrar areas, botones para limpiar fechas, asignacion masiva de energia por contexto y un nuevo filtro por nivel de energia.\n• Las secciones laterales pueden quedar plegadas, los campos nativos de fecha estan localizados y el estado de plegado de areas se conserva mejor.\n• La recuperacion de sync es mas segura al preservar createdAt recuperables, vaciar escrituras pendientes antes de reintentar y reforzar el arranque SQLite del MCP.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
