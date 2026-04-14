@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CLOCK_SKEW_THRESHOLD_MS, mergeAppData, mergeAppDataWithStats } from './sync';
+import { chooseDeterministicWinner } from './sync-signatures';
 import { createMockArea, createMockProject, createMockSection, createMockTask, mockAppData } from './sync-test-utils';
 import { AppData, Task, Project, Attachment, Section, Area } from './types';
 
@@ -911,6 +912,26 @@ describe('Sync Logic', () => {
             expect(merged.tasks[0].title).toBe('incoming');
         });
 
+        it('falls back to deterministic tie-break when only one side has revBy', () => {
+            const localTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+                title: 'alpha',
+                rev: 7,
+                revBy: 'device-z',
+            } satisfies Task;
+            const incomingTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+                title: 'zulu',
+                rev: 7,
+            } satisfies Task;
+
+            const merged = mergeAppData(mockAppData([localTask]), mockAppData([incomingTask]));
+
+            expect(merged.tasks).toHaveLength(1);
+            expect(merged.tasks[0].title).toBe('zulu');
+            expect(merged.tasks[0].title).toBe(chooseDeterministicWinner(localTask, incomingTask).title);
+        });
+
         it('counts a conflict when revision metadata matches but content differs', () => {
             const localTask = {
                 ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
@@ -1229,6 +1250,30 @@ describe('Sync Logic', () => {
             expect(data.projects).toHaveLength(1);
             expect(data.projects[0].updatedAt).toBe('2023-01-02T00:01:00.000Z');
             expect(data.projects[0].createdAt).toBe('2023-01-02T00:01:00.000Z');
+            expect(stats.projects.timestampAdjustments).toBe(1);
+        });
+
+        it('reuses a recoverable peer createdAt before falling back to updatedAt', () => {
+            const localProject: Project = {
+                ...createMockProject('p1', '2023-01-02T00:03:00.000Z'),
+                title: 'local wins',
+                createdAt: '2023-01-02T00:05:00.000Z',
+            };
+            const incomingProject: Project = {
+                ...createMockProject('p1', '2023-01-02T00:01:00.000Z'),
+                title: 'incoming older',
+                createdAt: '2023-01-02T00:00:00.000Z',
+            };
+
+            const { data, stats } = mergeAppDataWithStats(
+                mockAppData([], [localProject]),
+                mockAppData([], [incomingProject])
+            );
+
+            expect(data.projects).toHaveLength(1);
+            expect(data.projects[0].title).toBe('local wins');
+            expect(data.projects[0].updatedAt).toBe('2023-01-02T00:03:00.000Z');
+            expect(data.projects[0].createdAt).toBe('2023-01-02T00:00:00.000Z');
             expect(stats.projects.timestampAdjustments).toBe(1);
         });
 

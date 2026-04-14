@@ -227,12 +227,22 @@ function mergeEntitiesWithStats<T extends MergeableEntity>(
     let invalidDeletedAtWarnings = 0;
     let ambiguousResurrectionWarnings = 0;
     const maxAllowedMergeTime = Date.now();
-    const normalizeTimestamps = (item: T): T => {
+    const recoverCreatedAtFromCounterpart = (item: T, counterpart?: T): string | undefined => {
+        if (!counterpart?.createdAt) return undefined;
+        const updatedTime = new Date(item.updatedAt).getTime();
+        const counterpartCreatedTime = new Date(counterpart.createdAt).getTime();
+        if (!Number.isFinite(updatedTime) || !Number.isFinite(counterpartCreatedTime)) return undefined;
+        if (counterpartCreatedTime > updatedTime) return undefined;
+        return counterpart.createdAt;
+    };
+    const normalizeTimestamps = (item: T, counterpart?: T): T => {
         if (!item.createdAt) return item;
         const createdTime = new Date(item.createdAt).getTime();
         const updatedTime = new Date(item.updatedAt).getTime();
         if (!Number.isFinite(createdTime) || !Number.isFinite(updatedTime)) return item;
         if (updatedTime >= createdTime) return item;
+        const recoveredCreatedAt = recoverCreatedAtFromCounterpart(item, counterpart);
+        const normalizedCreatedAt = recoveredCreatedAt ?? item.updatedAt;
         stats.timestampAdjustments += 1;
         if (item.id && stats.timestampAdjustmentIds.length < 20) {
             stats.timestampAdjustmentIds.push(item.id);
@@ -241,10 +251,16 @@ function mergeEntitiesWithStats<T extends MergeableEntity>(
             logWarn('Normalized createdAt after updatedAt', {
                 scope: 'sync',
                 category: 'sync',
-                context: { id: item.id, createdAt: item.createdAt, updatedAt: item.updatedAt },
+                context: {
+                    id: item.id,
+                    createdAt: item.createdAt,
+                    updatedAt: item.updatedAt,
+                    normalizedCreatedAt,
+                    counterpartCreatedAt: recoveredCreatedAt,
+                },
             });
         }
-        return { ...item, createdAt: item.updatedAt };
+        return { ...item, createdAt: normalizedCreatedAt };
     };
 
     for (const id of allIds) {
@@ -270,8 +286,8 @@ function mergeEntitiesWithStats<T extends MergeableEntity>(
             continue;
         }
 
-        const normalizedLocalItem = normalizeTimestamps(localItem);
-        const normalizedIncomingItem = normalizeTimestamps(incomingItem);
+        const normalizedLocalItem = normalizeTimestamps(localItem, incomingItem);
+        const normalizedIncomingItem = normalizeTimestamps(incomingItem, localItem);
         const localUpdatedTime = parseMergeTimestamp(normalizedLocalItem.updatedAt, maxAllowedMergeTime);
         const incomingUpdatedTime = parseMergeTimestamp(normalizedIncomingItem.updatedAt, maxAllowedMergeTime);
         const safeLocalTime = localUpdatedTime.safe;
@@ -426,6 +442,8 @@ function mergeEntitiesWithStats<T extends MergeableEntity>(
                 winner = revDiff > 0 ? normalizedLocalItem : normalizedIncomingItem;
             } else if (comparableUpdatedTimeDiff !== 0) {
                 winner = comparableUpdatedTimeDiff > 0 ? normalizedIncomingItem : normalizedLocalItem;
+            // Only use revBy when both sides provide it; otherwise older clients without revBy
+            // fall back to deterministic convergence instead of silently losing to partial metadata.
             } else if (revByDiff && localRevBy && incomingRevBy) {
                 winner = incomingRevBy > localRevBy ? normalizedIncomingItem : normalizedLocalItem;
             } else {
