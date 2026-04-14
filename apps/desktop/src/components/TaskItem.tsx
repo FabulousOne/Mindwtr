@@ -34,6 +34,7 @@ import { useTaskItemAi } from './Task/useTaskItemAi';
 import { useTaskItemEditState } from './Task/useTaskItemEditState';
 import { useTaskItemProjectContext } from './Task/useTaskItemProjectContext';
 import { useTaskItemFieldLayout } from './Task/useTaskItemFieldLayout';
+import { dispatchNavigateEvent } from '../lib/navigation-events';
 import { reportError } from '../lib/report-error';
 import { mergeMarkdownChecklist } from './Task/task-item-checklist';
 import { useTaskItemStoreState, useTaskItemUiState } from './Task/useTaskItemStoreState';
@@ -724,7 +725,7 @@ export const TaskItem = memo(function TaskItem({
     const handleOpenProject = useCallback((projectId: string) => {
         setHighlightTask(task.id);
         setSelectedProjectId(projectId);
-        window.dispatchEvent(new CustomEvent('mindwtr:navigate', { detail: { view: 'projects' } }));
+        dispatchNavigateEvent('projects');
     }, [setHighlightTask, setSelectedProjectId, task.id]);
     const waitingDuePromptTitle = useMemo(() => {
         const translated = t('task.waitingDuePromptTitle');

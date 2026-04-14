@@ -1,4 +1,5 @@
 import { safeParseDate, type Task, type TaskStatus } from '@mindwtr/core';
+import type { DesktopViewId } from './navigation-events';
 
 function isDeferredForPrimaryFocus(task: Task, now: Date = new Date()): boolean {
     const start = safeParseDate(task.startTime);
@@ -7,8 +8,8 @@ function isDeferredForPrimaryFocus(task: Task, now: Date = new Date()): boolean 
     return start > endOfToday;
 }
 
-export function resolveTaskNavigationView(task: Task, now: Date = new Date()): string {
-    const statusViewMap: Record<TaskStatus, string> = {
+export function resolveTaskNavigationView(task: Task, now: Date = new Date()): DesktopViewId {
+    const statusViewMap: Record<TaskStatus, DesktopViewId> = {
         inbox: 'inbox',
         next: 'next',
         waiting: 'waiting',

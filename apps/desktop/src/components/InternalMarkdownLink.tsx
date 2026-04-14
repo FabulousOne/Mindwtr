@@ -2,6 +2,7 @@ import React from 'react';
 import { parseMarkdownReferenceHref, useTaskStore, shallow } from '@mindwtr/core';
 
 import { useLanguage } from '../contexts/language-context';
+import { dispatchNavigateEvent } from '../lib/navigation-events';
 import { cn } from '../lib/utils';
 import { resolveTaskNavigationView } from '../lib/task-navigation';
 import { useUiStore } from '../store/ui-store';
@@ -23,9 +24,11 @@ function isSafeExternalHref(href: string): boolean {
 
 export function InternalMarkdownLink({ href, className, children }: InternalMarkdownLinkProps) {
     const { t } = useLanguage();
-    const { tasks, projects, setHighlightTask } = useTaskStore((state) => ({
+    const { tasks, projects, restoreTask, restoreProject, setHighlightTask } = useTaskStore((state) => ({
         tasks: state._allTasks,
-        projects: state.projects,
+        projects: state._allProjects,
+        restoreTask: state.restoreTask,
+        restoreProject: state.restoreProject,
         setHighlightTask: state.setHighlightTask,
     }), shallow);
     const setProjectView = useUiStore((state) => state.setProjectView);
@@ -70,14 +73,35 @@ export function InternalMarkdownLink({ href, className, children }: InternalMark
         const translated = t('markdown.referenceDeletedProject');
         return translated === 'markdown.referenceDeletedProject' ? 'deleted project' : translated;
     })();
+    const restoreLabel = (() => {
+        const translated = t('markdown.referenceRestore');
+        return translated === 'markdown.referenceRestore' ? 'Restore' : translated;
+    })();
 
     if (reference.entityType === 'project') {
         const project = projects.find((candidate) => candidate.id === reference.id && !candidate.deletedAt);
+        const deletedProject = project ? null : projects.find((candidate) => candidate.id === reference.id && !!candidate.deletedAt);
         if (!project) {
             return (
                 <span className={cn('text-muted-foreground', className)}>
                     <span className="line-through">{children}</span>
                     <span className="ml-1 text-[0.9em]">({deletedProjectLabel})</span>
+                    {deletedProject ? (
+                        <button
+                            type="button"
+                            className="ml-2 text-xs text-primary underline underline-offset-2 hover:opacity-90"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                void restoreProject(deletedProject.id).then((result) => {
+                                    if (!result.success) return;
+                                    setProjectView({ selectedProjectId: deletedProject.id });
+                                    dispatchNavigateEvent('projects');
+                                }).catch(() => undefined);
+                            }}
+                        >
+                            {restoreLabel}
+                        </button>
+                    ) : null}
                 </span>
             );
         }
@@ -94,7 +118,7 @@ export function InternalMarkdownLink({ href, className, children }: InternalMark
                 onClick={(event) => {
                     event.stopPropagation();
                     setProjectView({ selectedProjectId: project.id });
-                    window.dispatchEvent(new CustomEvent('mindwtr:navigate', { detail: { view: 'projects' } }));
+                    dispatchNavigateEvent('projects');
                 }}
             >
                 {children}
@@ -103,11 +127,37 @@ export function InternalMarkdownLink({ href, className, children }: InternalMark
     }
 
     const task = tasks.find((candidate) => candidate.id === reference.id && !candidate.deletedAt);
+    const deletedTask = task ? null : tasks.find((candidate) => candidate.id === reference.id && !!candidate.deletedAt);
     if (!task) {
         return (
             <span className={cn('text-muted-foreground', className)}>
                 <span className="line-through">{children}</span>
                 <span className="ml-1 text-[0.9em]">({deletedTaskLabel})</span>
+                {deletedTask ? (
+                    <button
+                        type="button"
+                        className="ml-2 text-xs text-primary underline underline-offset-2 hover:opacity-90"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            void restoreTask(deletedTask.id).then((result) => {
+                                if (!result.success) return;
+                                const restoredTask = useTaskStore.getState()._allTasks.find((candidate) =>
+                                    candidate.id === deletedTask.id && !candidate.deletedAt
+                                );
+                                if (!restoredTask) return;
+                                setHighlightTask(restoredTask.id);
+                                if (restoredTask.projectId) {
+                                    setProjectView({ selectedProjectId: restoredTask.projectId });
+                                    dispatchNavigateEvent('projects');
+                                    return;
+                                }
+                                dispatchNavigateEvent(resolveTaskNavigationView(restoredTask));
+                            }).catch(() => undefined);
+                        }}
+                    >
+                        {restoreLabel}
+                    </button>
+                ) : null}
             </span>
         );
     }
@@ -129,12 +179,10 @@ export function InternalMarkdownLink({ href, className, children }: InternalMark
                 setHighlightTask(task.id);
                 if (task.projectId) {
                     setProjectView({ selectedProjectId: task.projectId });
-                    window.dispatchEvent(new CustomEvent('mindwtr:navigate', { detail: { view: 'projects' } }));
+                    dispatchNavigateEvent('projects');
                     return;
                 }
-                window.dispatchEvent(new CustomEvent('mindwtr:navigate', {
-                    detail: { view: resolveTaskNavigationView(task) },
-                }));
+                dispatchNavigateEvent(resolveTaskNavigationView(task));
             }}
         >
             {children}

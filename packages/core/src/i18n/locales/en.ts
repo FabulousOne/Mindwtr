@@ -196,6 +196,7 @@ export const en: Record<string, string> = {
         'markdown.collapse': 'Collapse',
         'markdown.referenceDeletedTask': 'deleted task',
         'markdown.referenceDeletedProject': 'deleted project',
+        'markdown.referenceRestore': 'Restore',
         'markdown.toolbar.heading': 'Insert heading',
         'markdown.toolbar.bold': 'Bold',
         'markdown.toolbar.italic': 'Italic',

@@ -21,6 +21,7 @@ import { useUiStore } from '../../store/ui-store';
 import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
 import { useListViewOptimizations } from '../../hooks/useListViewOptimizations';
+import { dispatchNavigateEvent } from '../../lib/navigation-events';
 import { reportError } from '../../lib/report-error';
 import { AREA_FILTER_ALL, AREA_FILTER_NONE, projectMatchesAreaFilter, resolveAreaFilter, taskMatchesAreaFilter } from '../../lib/area-filter';
 import { cn } from '../../lib/utils';
@@ -515,7 +516,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     const showEmptyState = filteredTasks.length === 0 && !showDeferredProjectSection;
     const handleOpenProject = useCallback((projectId: string) => {
         setProjectView({ selectedProjectId: projectId });
-        window.dispatchEvent(new CustomEvent('mindwtr:navigate', { detail: { view: 'projects' } }));
+        dispatchNavigateEvent('projects');
     }, [setProjectView]);
     const handleReactivateProject = useCallback((projectId: string) => {
         updateProject(projectId, { status: 'active' })
