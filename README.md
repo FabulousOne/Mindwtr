@@ -361,7 +361,6 @@ You can help in several ways:
 ## Roadmap
 
 - 🤖 Add to F-Droid ([#219](https://github.com/dongdongbh/Mindwtr/issues/219))
-- 🗣️ iOS Reminders Inbox import (Siri capture -> Mindwtr Inbox)
 - ✉️ Email to Inbox ([#35](https://github.com/dongdongbh/Mindwtr/issues/35))
 - 🗓️ One-way Mindwtr -> external calendar export/sync ([#361](https://github.com/dongdongbh/Mindwtr/issues/361))
 
@@ -371,6 +370,7 @@ You can help in several ways:
 - 🚀 [Getting Started](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started)
 - ❓ [FAQ](https://github.com/dongdongbh/Mindwtr/wiki/FAQ)
 - 🔄 [Data & Sync](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync)
+- 🔗 [Markdown Links](https://github.com/dongdongbh/Mindwtr/wiki/Markdown-Links)
 - ☁️ [Cloud Sync](https://github.com/dongdongbh/Mindwtr/wiki/Cloud-Sync)
 - 🛠️ [Cloud Deployment](https://github.com/dongdongbh/Mindwtr/wiki/Cloud-Deployment)
 - 🧠 [MCP Server](https://github.com/dongdongbh/Mindwtr/wiki/MCP-Server)
