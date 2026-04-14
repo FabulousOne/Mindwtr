@@ -560,6 +560,9 @@ function enqueueReschedule(api: AlarmNotificationsApi): void {
 
 export function setLocalNotificationOpenHandler(handler: NotificationOpenHandler | null): void {
   notificationOpenHandler = handler;
+  if (handler) {
+    attachNativeEventListeners();
+  }
 }
 
 export async function requestLocalNotificationPermission(): Promise<NotificationPermissionResult> {

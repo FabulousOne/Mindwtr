@@ -74,13 +74,12 @@ const patchMainApplication = (source) => {
 };
 
 const patchMainActivity = (source) => {
-  if (source.includes('startupMark("native.main_activity.on_create:start")')) {
-    return source;
-  }
+  let next = source;
 
-  const next = source.replace(
-    /override fun onCreate\(savedInstanceState: Bundle\?\) \{[\s\S]*?\n  \}/,
-    `override fun onCreate(savedInstanceState: Bundle?) {
+  if (!next.includes('startupMark("native.main_activity.on_create:start")')) {
+    next = next.replace(
+      /override fun onCreate\(savedInstanceState: Bundle\?\) \{[\s\S]*?\n  \}/,
+      `override fun onCreate(savedInstanceState: Bundle?) {
     startupMark("native.main_activity.on_create:start")
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.
@@ -96,7 +95,104 @@ const patchMainActivity = (source) => {
     }
     startupMark("native.main_activity.on_create:end")
   }`
-  );
+    );
+  }
+
+  if (!next.includes('import android.content.Intent')) {
+    next = next.replace(
+      'import android.os.Build\n',
+      'import android.content.Intent\nimport android.os.Build\n'
+    );
+  }
+
+  if (!next.includes('import com.facebook.react.ReactApplication')) {
+    next = next.replace(
+      'import com.facebook.react.ReactActivity\n',
+      'import com.facebook.react.ReactApplication\nimport com.facebook.react.ReactActivity\n'
+    );
+  }
+
+  if (!next.includes('import com.facebook.react.modules.core.DeviceEventManagerModule')) {
+    next = next.replace(
+      'import com.facebook.react.defaults.DefaultReactActivityDelegate\n',
+      'import com.facebook.react.defaults.DefaultReactActivityDelegate\nimport com.facebook.react.modules.core.DeviceEventManagerModule\n'
+    );
+  }
+
+  if (!next.includes('import org.json.JSONObject')) {
+    next = next.replace(
+      '\nimport expo.modules.ReactActivityDelegateWrapper\n',
+      '\nimport org.json.JSONObject\n\nimport expo.modules.ReactActivityDelegateWrapper\n'
+    );
+  }
+
+  if (!next.includes('fun consumePendingNotificationOpenPayload()')) {
+    next = next.replace(
+      'class MainActivity : ReactActivity() {\n',
+      `class MainActivity : ReactActivity() {
+  companion object {
+    @Volatile
+    private var pendingNotificationOpenPayload: LinkedHashMap<String, String>? = null
+
+    fun consumePendingNotificationOpenPayload(): LinkedHashMap<String, String>? {
+      val payload = pendingNotificationOpenPayload ?: return null
+      pendingNotificationOpenPayload = null
+      return LinkedHashMap(payload)
+    }
+  }
+`
+    );
+  }
+
+  if (!next.includes('cacheNotificationOpenPayload(intent)')) {
+    next = next.replace(
+      '    startupMark("native.main_activity.on_create:end")\n',
+      '    cacheNotificationOpenPayload(intent)\n    startupMark("native.main_activity.on_create:end")\n'
+    );
+  }
+
+  if (!next.includes('override fun onNewIntent(intent: Intent?)')) {
+    next = next.replace(
+      '\n  override fun getMainComponentName(): String = "main"\n',
+      `
+  override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    val payload = cacheNotificationOpenPayload(intent) ?: return
+    emitNotificationOpenPayload(payload)
+  }
+
+  override fun getMainComponentName(): String = "main"\n`
+    );
+  }
+
+  if (!next.includes('private fun cacheNotificationOpenPayload(intent: Intent?)')) {
+    next = next.replace(
+      '\n}\n',
+      `
+  private fun cacheNotificationOpenPayload(intent: Intent?): LinkedHashMap<String, String>? {
+    val extras = intent?.extras ?: return null
+    val payload = LinkedHashMap<String, String>()
+    listOf("alarmKey", "id", "taskId", "projectId", "kind").forEach { key ->
+      val value = extras.get(key) ?: return@forEach
+      payload[key] = value.toString()
+    }
+    if (payload.isEmpty()) return null
+    pendingNotificationOpenPayload = LinkedHashMap(payload)
+    return payload
+  }
+
+  private fun emitNotificationOpenPayload(payload: Map<String, String>) {
+    val reactApplication = application as? ReactApplication ?: return
+    val reactContext = reactApplication.reactNativeHost.reactInstanceManager.currentReactContext ?: return
+    reactContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      .emit("OnNotificationOpened", JSONObject(payload).toString())
+  }
+}
+`
+    );
+  }
 
   return next;
 };
@@ -130,7 +226,6 @@ module.exports = function withAndroidStartupTrace(config) {
           fs.writeFileSync(mainApplicationPath, patched);
         }
         if (!patched.includes('startupMark("native.main_application.on_create:start")')) {
-          // eslint-disable-next-line no-console
           console.warn(`[android-startup-trace] unable to patch ${mainApplicationPath}`);
         }
       }
@@ -142,7 +237,6 @@ module.exports = function withAndroidStartupTrace(config) {
           fs.writeFileSync(mainActivityPath, patched);
         }
         if (!patched.includes('startupMark("native.main_activity.on_create:start")')) {
-          // eslint-disable-next-line no-console
           console.warn(`[android-startup-trace] unable to patch ${mainActivityPath}`);
         }
       }
@@ -157,4 +251,10 @@ module.exports = function withAndroidStartupTrace(config) {
       return cfg;
     },
   ]);
+};
+
+module.exports.__testables = {
+  buildStartupTraceSource,
+  patchMainApplication,
+  patchMainActivity,
 };

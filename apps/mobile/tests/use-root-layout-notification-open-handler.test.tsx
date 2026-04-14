@@ -7,9 +7,11 @@ import { useRootLayoutNotificationOpenHandler } from '@/app/_effects/use-root-la
 const {
   setNotificationOpenHandler,
   setHighlightTask,
+  consumePendingNotificationOpenPayload,
 } = vi.hoisted(() => ({
   setNotificationOpenHandler: vi.fn(),
   setHighlightTask: vi.fn(),
+  consumePendingNotificationOpenPayload: vi.fn(async () => null),
 }));
 
 vi.mock('@mindwtr/core', () => ({
@@ -24,6 +26,10 @@ vi.mock('@/lib/notification-service', () => ({
   setNotificationOpenHandler,
 }));
 
+vi.mock('@/modules/notification-open-intents', () => ({
+  consumePendingNotificationOpenPayload,
+}));
+
 function TestHarness({ router }: { router: { push: ReturnType<typeof vi.fn> } }) {
   useRootLayoutNotificationOpenHandler({ router });
   return null;
@@ -33,6 +39,8 @@ describe('useRootLayoutNotificationOpenHandler', () => {
   beforeEach(() => {
     setNotificationOpenHandler.mockReset();
     setHighlightTask.mockReset();
+    consumePendingNotificationOpenPayload.mockReset();
+    consumePendingNotificationOpenPayload.mockResolvedValue(null);
   });
 
   it('routes review notifications to the dedicated review flows', () => {
@@ -57,6 +65,24 @@ describe('useRootLayoutNotificationOpenHandler', () => {
     expect(router.push).toHaveBeenNthCalledWith(2, {
       pathname: '/weekly-review',
       params: { openToken: 'weekly-1' },
+    });
+  });
+
+  it('replays a pending Android notification open on mount', async () => {
+    const router = { push: vi.fn() };
+    consumePendingNotificationOpenPayload.mockResolvedValue({
+      kind: 'weekly-review',
+      notificationId: 'pending-weekly',
+    });
+
+    await act(async () => {
+      create(<TestHarness router={router} />);
+    });
+
+    expect(consumePendingNotificationOpenPayload).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/weekly-review',
+      params: { openToken: 'pending-weekly' },
     });
   });
 
