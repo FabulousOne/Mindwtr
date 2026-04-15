@@ -26,6 +26,7 @@ type ExpandedMarkdownEditorProps = {
     onApplyAction: (actionId: MarkdownToolbarActionId, selection: MarkdownSelection) => MarkdownToolbarResult | void;
     onSelectionChange: (selection: MarkdownSelection) => void;
     onEditorKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+    currentTaskId?: string;
 };
 
 export function ExpandedMarkdownEditor({
@@ -46,6 +47,7 @@ export function ExpandedMarkdownEditor({
     onApplyAction,
     onSelectionChange,
     onEditorKeyDown,
+    currentTaskId,
 }: ExpandedMarkdownEditorProps) {
     const [mode, setMode] = useState<'edit' | 'preview'>(initialMode);
     const modalRef = useRef<HTMLDivElement | null>(null);
@@ -55,6 +57,7 @@ export function ExpandedMarkdownEditor({
     const titleId = useId();
     const resolvedHeaderTitle = (headerTitle || '').trim() || title;
     const autocomplete = useMarkdownReferenceAutocomplete({
+        currentTaskId,
         value,
         selection,
         textareaRef,
@@ -227,6 +230,8 @@ export function ExpandedMarkdownEditor({
                                     selectedIndex={autocomplete.selectedIndex}
                                     setSelectedIndex={autocomplete.setSelectedIndex}
                                     applySuggestion={autocomplete.applySuggestion}
+                                    menuRef={autocomplete.menuRef}
+                                    position={autocomplete.position}
                                     t={t}
                                 />
                             </div>
