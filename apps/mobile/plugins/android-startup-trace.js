@@ -134,6 +134,11 @@ const patchMainActivity = (source) => {
   }
 
   next = next.replace(
+    'override fun onNewIntent(intent: Intent?) {',
+    'override fun onNewIntent(intent: Intent) {'
+  );
+
+  next = next.replace(
     /\n  companion object \{\n    @Volatile\n    private var pendingNotificationOpenPayload: LinkedHashMap<String, String>\? = null\n\n    fun consumePendingNotificationOpenPayload\(\): LinkedHashMap<String, String>\? \{\n      val payload = pendingNotificationOpenPayload \?: return null\n      pendingNotificationOpenPayload = null\n      return LinkedHashMap\(payload\)\n    \}\n  \}\n/,
     '\n'
   );
@@ -145,11 +150,11 @@ const patchMainActivity = (source) => {
     );
   }
 
-  if (!next.includes('override fun onNewIntent(intent: Intent?)')) {
+  if (!next.includes('override fun onNewIntent(intent: Intent)')) {
     next = next.replace(
       '\n  override fun getMainComponentName(): String = "main"\n',
       `
-  override fun onNewIntent(intent: Intent?) {
+  override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
     val payload = cacheNotificationOpenPayload(intent) ?: return

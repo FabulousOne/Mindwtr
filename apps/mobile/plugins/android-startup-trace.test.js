@@ -37,7 +37,7 @@ class MainActivity : ReactActivity() {
     expect(output).toContain('import tech.dongdongbh.mindwtr.notificationopenintents.NotificationOpenPayloadStore');
     expect(output).toContain('cacheNotificationOpenPayload(intent)');
     expect(output).toContain('NotificationOpenPayloadStore.cache(payload)');
-    expect(output).toContain('override fun onNewIntent(intent: Intent?)');
+    expect(output).toContain('override fun onNewIntent(intent: Intent)');
     expect(output).toContain('emit("OnNotificationOpened", JSONObject(payload).toString())');
   });
 
@@ -71,7 +71,7 @@ class MainActivity : ReactActivity() {
     startupMark("native.main_activity.on_create:end")
   }
 
-  override fun onNewIntent(intent: Intent?) {
+  override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
     val payload = cacheNotificationOpenPayload(intent) ?: return
@@ -179,7 +179,9 @@ class MainActivity : ReactActivity() {
     const output = patchMainActivity(input);
 
     expect(output).toContain('import tech.dongdongbh.mindwtr.notificationopenintents.NotificationOpenPayloadStore');
+    expect(output).toContain('override fun onNewIntent(intent: Intent)');
     expect(output).not.toContain('fun consumePendingNotificationOpenPayload()');
+    expect(output).not.toContain('override fun onNewIntent(intent: Intent?)');
     expect(output).not.toContain('pendingNotificationOpenPayload = LinkedHashMap(payload)');
     expect(output).toContain('NotificationOpenPayloadStore.cache(payload)');
   });
