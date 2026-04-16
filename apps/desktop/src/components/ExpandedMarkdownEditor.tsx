@@ -4,8 +4,8 @@ import { X } from 'lucide-react';
 
 import { cn } from '../lib/utils';
 import { MarkdownFormatToolbar } from './MarkdownFormatToolbar';
-import { Markdown } from './Markdown';
 import { MarkdownReferenceAutocompleteMenu, useMarkdownReferenceAutocomplete } from './MarkdownReferenceAutocomplete';
+import { RichMarkdown } from './RichMarkdown';
 import type { MarkdownSelection, MarkdownToolbarActionId, MarkdownToolbarResult } from '@mindwtr/core';
 
 type ExpandedMarkdownEditorProps = {
@@ -244,7 +244,7 @@ export function ExpandedMarkdownEditor({
                                 isRtl && 'text-right',
                             )}
                         >
-                            <Markdown markdown={value} className={isRtl ? 'text-right' : undefined} />
+                            <RichMarkdown markdown={value} />
                         </div>
                     )}
                 </div>
