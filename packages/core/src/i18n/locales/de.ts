@@ -178,7 +178,7 @@ export const deOverrides: Record<string, string> = {
         'markdown.edit': 'Bearbeiten',
         'markdown.expand': 'Erweitern',
         'markdown.collapse': 'Zusammklappen',
-        'markdown.toolbar.heading': 'Titel einfügen,
+        'markdown.toolbar.heading': 'Titel einfügen',
         'markdown.toolbar.bold': 'Fett',
         'markdown.toolbar.italic': 'Schrägschrift',
         'markdown.toolbar.bulletList': 'Punkteliste',
