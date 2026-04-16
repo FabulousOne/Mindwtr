@@ -126,23 +126,17 @@ const patchMainActivity = (source) => {
     );
   }
 
-  if (!next.includes('fun consumePendingNotificationOpenPayload()')) {
+  if (!next.includes('import tech.dongdongbh.mindwtr.notificationopenintents.NotificationOpenPayloadStore')) {
     next = next.replace(
-      'class MainActivity : ReactActivity() {\n',
-      `class MainActivity : ReactActivity() {
-  companion object {
-    @Volatile
-    private var pendingNotificationOpenPayload: LinkedHashMap<String, String>? = null
-
-    fun consumePendingNotificationOpenPayload(): LinkedHashMap<String, String>? {
-      val payload = pendingNotificationOpenPayload ?: return null
-      pendingNotificationOpenPayload = null
-      return LinkedHashMap(payload)
-    }
-  }
-`
+      'import org.json.JSONObject\n',
+      'import org.json.JSONObject\nimport tech.dongdongbh.mindwtr.notificationopenintents.NotificationOpenPayloadStore\n'
     );
   }
+
+  next = next.replace(
+    /\n  companion object \{\n    @Volatile\n    private var pendingNotificationOpenPayload: LinkedHashMap<String, String>\? = null\n\n    fun consumePendingNotificationOpenPayload\(\): LinkedHashMap<String, String>\? \{\n      val payload = pendingNotificationOpenPayload \?: return null\n      pendingNotificationOpenPayload = null\n      return LinkedHashMap\(payload\)\n    \}\n  \}\n/,
+    '\n'
+  );
 
   if (!next.includes('cacheNotificationOpenPayload(intent)')) {
     next = next.replace(
@@ -178,7 +172,7 @@ const patchMainActivity = (source) => {
       payload[key] = value.toString()
     }
     if (payload.isEmpty()) return null
-    pendingNotificationOpenPayload = LinkedHashMap(payload)
+    NotificationOpenPayloadStore.cache(payload)
     return payload
   }
 
@@ -193,6 +187,11 @@ const patchMainActivity = (source) => {
 `
     );
   }
+
+  next = next.replace(
+    '    pendingNotificationOpenPayload = LinkedHashMap(payload)\n',
+    '    NotificationOpenPayloadStore.cache(payload)\n'
+  );
 
   return next;
 };
